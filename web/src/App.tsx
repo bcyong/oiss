@@ -56,7 +56,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [selection, setSelection] = useState<Selection | null>(start?.selection ?? null);
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
-  const [showCameras, setShowCameras] = useState(start?.showCameras ?? false);
+  const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
   const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
   const [streamType, setStreamType] = useState<string>("");
 
@@ -325,7 +325,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             </>
           )}
           <dt>Today</dt>
-          <dd>{day.robot.runs.map((r) => `${clock(r.start)} to ${clock(r.end)}`).join(", ")}</dd>
+          <dd>{day.robot.runs.length} scan runs, the first at {clock(day.robot.runs[0]?.start ?? 0)} and the last ending at {clock(day.robot.runs[day.robot.runs.length - 1]?.end ?? 0)}</dd>
         </dl>
         <p className="note top">The route is drawn only from the robot's ShelfObservation records: each bay column it photographs is one stop. OISS needs no separate location feed for it.</p>
       </>
@@ -359,7 +359,7 @@ export function App({ start }: { start?: AppStart } = {}) {
 
       <div className="layout">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
+          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
           <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
@@ -383,10 +383,6 @@ export function App({ start }: { start?: AppStart } = {}) {
               <i className="swatch robot-swatch" />
               Robot and its route
             </span>
-            <label className="toggle">
-              <input type="checkbox" checked={showCameras} onChange={(e) => setShowCameras(e.target.checked)} />
-              Cameras
-            </label>
           </div>
           <Timeline day={day} t={t} onSeek={setT} />
           <div className="playback">

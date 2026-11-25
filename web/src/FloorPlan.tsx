@@ -128,6 +128,7 @@ interface Props {
   shoppers: ShopperDot[];
   queues: Map<string, number>;
   showCameras: boolean;
+  onToggleCameras: () => void;
   incidents: Map<string, CheckoutIncidents>;
   robot: RobotAt | null;
   selection: Selection | null;
@@ -136,7 +137,7 @@ interface Props {
 
 const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
 
-export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, incidents, robot, selection, onSelect }: Props) {
+export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, selection, onSelect }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -333,6 +334,11 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
           ))}
         </g>
       </svg>
+      <div className="map-controls">
+        <button type="button" className={`layer${showCameras ? " on" : ""}`} aria-pressed={showCameras} onClick={onToggleCameras} title={showCameras ? "Hide cameras" : "Show cameras"}>
+          Cameras
+        </button>
+      </div>
       <div className="zoom" role="group" aria-label="Zoom">
         <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={view.k >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in">
           +

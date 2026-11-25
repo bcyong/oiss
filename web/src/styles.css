@@ -311,8 +311,8 @@ h1 {
 }
 .zoom-level {
   position: absolute;
-  top: 12px;
-  left: 10px;
+  top: 44px;
+  right: 10px;
   font-size: 12px;
   color: var(--muted);
   background: var(--panel);
@@ -347,16 +347,33 @@ h1 {
   background: var(--zone);
   opacity: 0.35;
 }
-.toggle {
+.map-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 4px;
+}
+.map-controls button.layer {
+  padding: 4px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
-  color: var(--text);
 }
-.toggle input {
-  accent-color: var(--accent);
-  margin: 0;
+.map-controls button.layer::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.5px solid var(--muted);
+}
+.map-controls button.layer.on::before {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .timeline {

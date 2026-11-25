@@ -5,7 +5,7 @@
  *
  * Sources in the demo store (all synthetic):
  * - Demo Grocery space planning (the retailer's own system): the StoreLayout and planogram, once before opening.
- * - Mock vendor A, a shelf-scanning robot: every facing it can reach, twice a day.
+ * - Mock vendor A, a shelf-scanning robot: every facing it can reach, every two hours from 8 AM to 8 PM.
  * - Store shelf cameras (in-house): aisle 3 and the dairy wall every 5 minutes, reporting changes.
  * - Mock vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
  * - Mock vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
@@ -42,7 +42,8 @@ const PROV = {
   tracker: { system: "Mock multi-camera tracker", vendor: "Mock vendor C", model: { name: "mtmc-tracker", version: "0.2" }, synthetic: true },
 } satisfies Record<string, Provenance>;
 
-export const ROBOT_RUNS = [hours(8), hours(14)];
+/** Scan runs every two hours from 8 AM; each takes about 46 minutes. */
+export const ROBOT_RUNS = [8, 10, 12, 14, 16, 18, 20].map((h) => hours(h));
 const ROBOT_SECONDS_PER_POSITION = 12;
 const SHELF_CAM_INTERVAL = 300;
 const METRIC_WINDOW = 900;

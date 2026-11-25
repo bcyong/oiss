@@ -10,9 +10,9 @@
       "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
     },
     "shelf-observations.jsonl": {
-      "records": 2494,
-      "bytes": 2321684,
-      "sha256": "746b20e5f28fff862b171d66469ce476e9850bd1234e243b6a31583fc4f3bc8a"
+      "records": 7504,
+      "bytes": 7056966,
+      "sha256": "9c373fc19eb96bdb14a804571bda117d4f0ad71d561286f47ca5d15191e5d8fd"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
@@ -25,9 +25,9 @@
       "sha256": "aa3cd6cf92c818ff0b16e00cb64bc566086605e71a246f67330fc0da802a5583"
     },
     "evidence.jsonl": {
-      "records": 356,
-      "bytes": 331130,
-      "sha256": "95787ac476ed85a73cd4d8305a41cc45a04fb4dd1fad88035b4cb0f24b05a201"
+      "records": 993,
+      "bytes": 920275,
+      "sha256": "5ae32b0702684130752850d9628924982598d2772985e037e5b24dd8c6902ed0"
     },
     "incidents.jsonl": {
       "records": 25,
