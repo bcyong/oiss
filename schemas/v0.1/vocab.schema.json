@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/vocab.schema.json",
+  "title": "OISS v0.1 vocabularies",
+  "description": "Controlled values shared by the OISS record types. See spec/vocabularies.md.",
+  "$defs": {
+    "recordType": {
+      "enum": [
+        "oiss.StoreLayout",
+        "oiss.ShelfObservation",
+        "oiss.ZoneMetric",
+        "oiss.ShopperPath",
+        "oiss.Incident",
+        "oiss.Evidence",
+        "oiss.Task"
+      ]
+    },
+    "privacyClass": {
+      "description": "Ordered from least to most sensitive: operational, aggregate, anonymous_path, restricted.",
+      "enum": [
+        "operational",
+        "aggregate",
+        "anonymous_path",
+        "restricted"
+      ]
+    },
+    "shelfStatus": {
+      "enum": [
+        "in_stock",
+        "low_stock",
+        "out_of_stock",
+        "unknown"
+      ]
+    },
+    "shelfFlag": {
+      "description": "Shelf conditions found during a scan or audit.",
+      "enum": [
+        "misplaced_item",
+        "price_mismatch",
+        "missing_tag",
+        "facing_count_mismatch",
+        "needs_recovery",
+        "damaged_item",
+        "planogram_noncompliant"
+      ]
+    },
+    "zoneKind": {
+      "enum": [
+        "aisle",
+        "endcap",
+        "front_end",
+        "self_checkout",
+        "entrance",
+        "exit",
+        "produce",
+        "deli",
+        "bakery",
+        "meat_and_seafood",
+        "dairy",
+        "frozen",
+        "pharmacy",
+        "service_counter",
+        "backroom",
+        "other"
+      ]
+    },
+    "fixtureKind": {
+      "enum": [
+        "gondola",
+        "endcap",
+        "wall_section",
+        "cooler",
+        "freezer",
+        "display",
+        "pallet_display",
+        "bin",
+        "checkout_lane",
+        "self_checkout",
+        "other"
+      ]
+    },
+    "objectClass": {
+      "description": "Human, Vehicle, Bicycle and Animal follow ONVIF's analytics object type names. Cart, Basket, Bag and Item are OISS additions for retail. ONVIF's HumanFace and LicensePlate are left out on purpose.",
+      "enum": [
+        "Human",
+        "Vehicle",
+        "Bicycle",
+        "Animal",
+        "Cart",
+        "Basket",
+        "Bag",
+        "Item"
+      ]
+    },
+    "incidentType": {
+      "description": "Loss-prevention exceptions and store safety incidents.",
+      "enum": [
+        "non_scan",
+        "ticket_switching",
+        "bottom_of_basket",
+        "sweethearting",
+        "push_out",
+        "shelf_sweep",
+        "safety_hazard",
+        "other"
+      ]
+    },
+    "incidentStatus": {
+      "enum": [
+        "open",
+        "under_review",
+        "confirmed",
+        "dismissed"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "taskKind": {
+      "enum": [
+        "replenish",
+        "recover",
+        "fix_shelf_tag",
+        "go_back",
+        "open_lane",
+        "review_exception",
+        "cleanup",
+        "other"
+      ]
+    },
+    "taskState": {
+      "description": "open \u2192 assigned \u2192 in_progress \u2192 done \u2192 verified. A task that needs verification closes only at verified. cancelled can follow any state.",
+      "enum": [
+        "open",
+        "assigned",
+        "in_progress",
+        "done",
+        "verified",
+        "cancelled"
+      ]
+    },
+    "redaction": {
+      "enum": [
+        "none",
+        "people_blurred",
+        "people_masked",
+        "cropped_to_shelf"
+      ]
+    }
+  }
+}

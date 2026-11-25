@@ -1,0 +1,38 @@
+{
+  "specversion": "1.0",
+  "id": "task-0001-v4",
+  "source": "urn:oiss:demo-001:agents",
+  "type": "oiss.Task",
+  "time": "2026-11-25T09:40:00-08:00",
+  "subject": "task-0001",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/task.schema.json",
+  "datacontenttype": "application/json",
+  "oissversion": "0.1",
+  "oissstore": "demo-001",
+  "oissprivacy": "operational",
+  "data": {
+    "provenance": {
+      "system": "Store Operations Assistant",
+      "model": {
+        "name": "availability-agent",
+        "version": "0.1"
+      },
+      "synthetic": true
+    },
+    "location": {
+      "zone": "aisle-07",
+      "facing": "A07-L-S3-F05"
+    },
+    "kind": "replenish",
+    "state": "verified",
+    "title": "Replenish aisle 7, shelf 3, facing 5",
+    "createdBy": "agent:availability",
+    "assignedTo": "associate:a-14",
+    "basedOn": [
+      "so-0001"
+    ],
+    "verification": {
+      "required": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/zone-metric.schema.json",
+  "title": "OISS v0.1 ZoneMetric data",
+  "description": "Traffic, dwell and front-end measures for one zone over one interval. Aggregates only. subject is the zone id.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
+  "properties": {
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "traffic": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Shoppers who entered the zone."
+        },
+        "avgOccupancy": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peakOccupancy": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "avgDwellSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "queueLength": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Shoppers in line at the end of the interval."
+        },
+        "avgWaitSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "openLanes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Checkout lanes open at the end of the interval."
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "metrics",
+    "window",
+    "location"
+  ],
+  "unevaluatedProperties": false
+}

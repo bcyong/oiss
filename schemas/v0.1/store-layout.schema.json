@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/store-layout.schema.json",
+  "title": "OISS v0.1 StoreLayout data",
+  "description": "The store layout and planogram: zones, fixtures, shelves, facings with their planogram items, and cameras. subject is the store id.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
+  "properties": {
+    "store": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "defs.schema.json#/$defs/id"
+        },
+        "storeNumber": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The retailer's own store number."
+        },
+        "banner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The store brand the location trades under."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gln": {
+          "$ref": "defs.schema.json#/$defs/gln"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "IANA time zone, such as America/Los_Angeles."
+        },
+        "floor": {
+          "type": "object",
+          "description": "The floor-plan frame: origin at the plan's southwest corner, x east, y north, z up, in meters.",
+          "properties": {
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "depth": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "units": {
+              "const": "m"
+            }
+          },
+          "required": [
+            "width",
+            "depth",
+            "units"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "timezone",
+        "floor"
+      ],
+      "additionalProperties": false
+    },
+    "planogramVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "name": {
+            "type": "string",
+            "description": "Such as Aisle 7 or Front end."
+          },
+          "kind": {
+            "$ref": "vocab.schema.json#/$defs/zoneKind"
+          },
+          "polygon": {
+            "$ref": "defs.schema.json#/$defs/polygon"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "polygon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "zone": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "kind": {
+            "$ref": "vocab.schema.json#/$defs/fixtureKind",
+            "description": "Gondola, endcap, cooler and so on."
+          },
+          "footprint": {
+            "$ref": "defs.schema.json#/$defs/polygon"
+          }
+        },
+        "required": [
+          "id",
+          "zone",
+          "kind",
+          "footprint"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "shelves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "fixture": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Shelf position on the fixture, 0 at the bottom."
+          },
+          "height": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Height of the shelf surface above the floor, in meters."
+          }
+        },
+        "required": [
+          "id",
+          "fixture",
+          "level"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "facings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "shelf": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Order along the shelf, left to right as a shopper faces it."
+          },
+          "width": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Meters."
+          },
+          "gtin": {
+            "$ref": "defs.schema.json#/$defs/gtin",
+            "description": "The item the planogram assigns here."
+          },
+          "facings": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many units wide the item is faced."
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Shelf capacity in units."
+          },
+          "shelfPrice": {
+            "$ref": "defs.schema.json#/$defs/money",
+            "description": "The price the shelf tag should show."
+          }
+        },
+        "required": [
+          "id",
+          "shelf",
+          "sequence"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Planogram positions: each facing is the slot one item holds on a shelf."
+    },
+    "cameras": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "defs.schema.json#/$defs/id"
+          },
+          "position": {
+            "$ref": "defs.schema.json#/$defs/point"
+          },
+          "yaw": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Degrees, counterclockwise from +x."
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Degrees, negative looks down."
+          },
+          "hfov": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 360
+          },
+          "vfov": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 180
+          },
+          "range": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Useful range, in meters."
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "defs.schema.json#/$defs/id"
+            },
+            "description": "Zones in view."
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "yaw",
+          "hfov"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "store",
+    "zones"
+  ],
+  "unevaluatedProperties": false
+}

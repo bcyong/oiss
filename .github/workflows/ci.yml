@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the validator
+        run: pip install -e "validator[test]"
+      - name: Check that the schemas are valid JSON Schema
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          from jsonschema import Draft202012Validator
+          for path in sorted(pathlib.Path("schemas").rglob("*.schema.json")):
+              Draft202012Validator.check_schema(json.loads(path.read_text()))
+              print("ok", path)
+          PY
+      - name: Valid examples pass
+        run: oiss-validate examples/valid
+      - name: Invalid examples fail
+        run: "! oiss-validate -q examples/invalid"
+      - name: Tests
+        run: pytest validator/tests

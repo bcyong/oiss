@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/envelope.schema.json",
+  "title": "OISS v0.1 record envelope",
+  "description": "Every OISS record is a CloudEvents 1.0 event in structured JSON mode. CloudEvents attributes carry routing fields; the record body is in data. See spec/envelope.md.",
+  "type": "object",
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique per source."
+    },
+    "source": {
+      "type": "string",
+      "format": "uri-reference",
+      "minLength": 1
+    },
+    "type": {
+      "$ref": "vocab.schema.json#/$defs/recordType"
+    },
+    "time": {
+      "$ref": "defs.schema.json#/$defs/timestamp",
+      "description": "When the observed thing happened, or when the record's state took effect."
+    },
+    "subject": {
+      "$ref": "defs.schema.json#/$defs/id",
+      "description": "The id of the thing the record is about: a store, facing, zone, path, incident, evidence item or task."
+    },
+    "dataschema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "oissversion": {
+      "const": "0.1"
+    },
+    "oissstore": {
+      "$ref": "defs.schema.json#/$defs/id",
+      "description": "The store id, as given in its StoreLayout."
+    },
+    "oissprivacy": {
+      "$ref": "vocab.schema.json#/$defs/privacyClass"
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "time",
+    "subject",
+    "datacontenttype",
+    "oissversion",
+    "oissstore",
+    "oissprivacy",
+    "data"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.StoreLayout"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "store-layout.schema.json"
+          },
+          "oissprivacy": {
+            "const": "operational"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.ShelfObservation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "shelf-observation.schema.json"
+          },
+          "oissprivacy": {
+            "enum": [
+              "operational",
+              "restricted"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.ZoneMetric"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "zone-metric.schema.json"
+          },
+          "oissprivacy": {
+            "enum": [
+              "aggregate",
+              "restricted"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.ShopperPath"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "shopper-path.schema.json"
+          },
+          "oissprivacy": {
+            "enum": [
+              "anonymous_path",
+              "restricted"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.Incident"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "incident.schema.json"
+          },
+          "oissprivacy": {
+            "const": "restricted"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.Evidence"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "evidence.schema.json"
+          },
+          "oissprivacy": {
+            "const": "restricted"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "oiss.Task"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "task.schema.json"
+          },
+          "oissprivacy": {
+            "enum": [
+              "operational",
+              "restricted"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
