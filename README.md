@@ -4,7 +4,7 @@ OISS is a draft open interchange standard for store-intelligence data. Its goal 
 
 Each source publishes what it saw as OISS records, so any consumer, from a store operations dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and raise store tasks, so the value shows right away.
 
-> **Status:** v0.1 draft, milestone M0 (spec skeleton). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
+> **Status:** v0.1 draft, milestone M1 (synthetic store and demo preview). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
 
 ## Why a retailer would adopt it
 
@@ -80,7 +80,7 @@ Data moves top to bottom, in five layers:
 - **Access control.** Each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system.
 - **Traceability.** Every record carries its source system, model and version, a confidence and links to evidence, so every agent answer can cite where it came from.
 
-Today the spec, schemas, examples and validator are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
+Today the spec, schemas, examples, validator, store simulator and a preview of the demo are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
 
 ## Record types
 
@@ -98,16 +98,29 @@ Today the spec, schemas, examples and validator are built; the rest arrives mile
 
 | Folder | Contents | Milestone |
 | --- | --- | --- |
-| [`spec`](spec) | The specification text: envelope, store layout model, record types, vocabularies, identifiers | M0 |
+| [`spec`](spec) | The specification text: envelope, store layout model, record types, vocabularies, identifiers, versioning | M0–M1 |
 | [`schemas/v0.1`](schemas/v0.1) | JSON Schemas (draft 2020-12) for the envelope and the seven record types | M0 |
 | [`examples`](examples) | One valid and one invalid record per type | M0 |
 | [`validator`](validator) | `oiss-validate`, a Python validator for vendors and integration teams | M0 |
-| [`sim`](sim) | Synthetic store simulator | M1 |
-| [`web`](web) | The demo web app | M2 |
+| [`sim`](sim) | Synthetic grocery store simulator that writes a day of OISS records from a seed | M1 |
+| [`web`](web) | The site: the OISS landing page at `/` and the demo store at `/demo/` (preview now, full replay in M2) | M1–M2 |
 | [`adapters`](adapters) | Mock vendor exports and adapters into OISS | M3 |
 | [`server`](server) | Ingest, storage and the query API | M3–M4 |
 | [`mcp`](mcp) | MCP server and the Store Operations Assistant | M4 |
-| [`docs`](docs) | Guides and design notes | ongoing |
+| [`docs`](docs) | Demo decisions, the Netlify deployment guide and other notes | ongoing |
+
+## Run the demo
+
+Needs Node 22.18 or later.
+
+```sh
+npm install
+npm run dev             # the site at http://localhost:5173, the demo store at /demo/
+npm test                # simulator tests
+npm run golden:check    # the golden day still matches its manifest
+```
+
+The site deploys to Netlify from this repository with the settings in [`netlify.toml`](netlify.toml). See [docs/deploy-netlify.md](docs/deploy-netlify.md) to link it.
 
 ## Validate records
 

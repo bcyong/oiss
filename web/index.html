@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Intelligent Store Specification (OISS)</title>
+    <meta name="description" content="An open interchange standard for store-intelligence data, so retailers can combine data from several vendors with their in-house systems to run their stores better." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='3' width='14' height='10' rx='1.5' fill='%2376b900'/%3E%3Crect x='4' y='6' width='2' height='5' fill='white'/%3E%3Crect x='7' y='6' width='2' height='5' fill='white'/%3E%3Crect x='10' y='6' width='2' height='5' fill='white'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/landing.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main-content">Skip to main content</a>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1.5" /><rect class="cut" x="4" y="6" width="2" height="5" /><rect class="cut" x="7" y="6" width="2" height="5" /><rect class="cut" x="10" y="6" width="2" height="5" /></svg>
+          OISS
+        </a>
+        <nav aria-label="Main">
+          <a href="https://github.com/bcyong/oiss/tree/main/spec">Spec</a>
+          <a href="https://github.com/bcyong/oiss/tree/main/schemas/v0.1">Schemas</a>
+          <a href="https://github.com/bcyong/oiss/tree/main/validator">Validator</a>
+          <a href="/demo/">Demo</a>
+        </nav>
+        <a class="topbar-gh" href="https://github.com/bcyong/oiss">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero">
+        <div class="hero-art" aria-hidden="true">
+          <svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice">
+            <rect width="600" height="400" class="art-floor" />
+            <g class="art-fix">
+              <rect x="130" y="90" width="6" height="166" /><rect x="172" y="90" width="6" height="166" /><rect x="214" y="90" width="6" height="166" /><rect x="256" y="90" width="6" height="166" /><rect x="298" y="90" width="6" height="166" /><rect x="340" y="90" width="6" height="166" /><rect x="382" y="90" width="6" height="166" /><rect x="424" y="90" width="6" height="166" />
+            </g>
+            <g class="art-in">
+              <rect x="124" y="90" width="6" height="60" /><rect x="136" y="150" width="6" height="106" /><rect x="166" y="90" width="6" height="120" /><rect x="178" y="90" width="6" height="80" /><rect x="208" y="140" width="6" height="116" /><rect x="220" y="90" width="6" height="166" /><rect x="250" y="90" width="6" height="90" /><rect x="262" y="120" width="6" height="136" /><rect x="292" y="90" width="6" height="140" /><rect x="304" y="90" width="6" height="70" /><rect x="334" y="90" width="6" height="166" /><rect x="346" y="150" width="6" height="106" /><rect x="376" y="90" width="6" height="110" /><rect x="388" y="90" width="6" height="166" /><rect x="418" y="90" width="6" height="166" /><rect x="430" y="110" width="6" height="146" />
+              <rect x="10" y="90" width="10" height="170" /><rect x="540" y="90" width="10" height="160" /><rect x="120" y="45" width="300" height="10" />
+            </g>
+            <g class="art-low"><rect x="124" y="150" width="6" height="40" /><rect x="304" y="160" width="6" height="40" /><rect x="250" y="180" width="6" height="40" /><rect x="540" y="250" width="10" height="20" /></g>
+            <g class="art-out"><rect x="178" y="170" width="6" height="30" /><rect x="376" y="200" width="6" height="26" /><rect x="136" y="120" width="6" height="30" /><rect x="10" y="260" width="10" height="20" /></g>
+            <g class="art-lanes"><rect x="130" y="300" width="14" height="40" /><rect x="170" y="300" width="14" height="40" /><rect x="210" y="300" width="14" height="40" /><rect x="250" y="300" width="14" height="40" /><rect x="290" y="300" width="14" height="40" /><rect x="420" y="300" width="60" height="40" /></g>
+            <g class="art-dots"><circle cx="150" cy="200" r="4" /><circle cx="196" cy="130" r="4" /><circle cx="280" cy="230" r="4" /><circle cx="365" cy="160" r="4" /><circle cx="60" cy="180" r="4" /><circle cx="90" cy="230" r="4" /><circle cx="160" cy="355" r="4" /><circle cx="200" cy="355" r="4" /><circle cx="240" cy="360" r="4" /><circle cx="500" cy="140" r="4" /><circle cx="300" cy="275" r="4" /><circle cx="440" cy="360" r="4" /></g>
+          </svg>
+        </div>
+        <div class="hero-inner">
+          <p class="owner"><a href="https://github.com/bcyong">bcyong</a></p>
+          <div class="title-row">
+            <h1>Open Intelligent Store Specification</h1>
+            <span class="badge">Draft v0.1</span>
+            <span class="badge">Open standard</span>
+          </div>
+          <p class="lede">An open interchange standard for store-intelligence data, so a retailer can combine several vendors' data with its own systems and use it to run its stores better.</p>
+          <div class="hero-meta">
+            <p class="stack">
+              <a href="https://github.com/cloudevents/spec">CloudEvents 1.0</a><span>•</span><span class="std">GS1 EPCIS 2.0</span><span>•</span><span class="std">ONVIF Profile M</span><span>•</span><span class="std">JSON Schema 2020-12</span><span>•</span><span class="std">Model Context Protocol</span>
+            </p>
+            <ul class="pills" aria-label="Labels">
+              <li>retail</li>
+              <li>store operations</li>
+              <li>on-shelf availability</li>
+              <li>computer vision</li>
+              <li>agents</li>
+            </ul>
+          </div>
+          <div class="cta">
+            <a class="btn btn-outline" href="https://github.com/bcyong/oiss">View GitHub</a>
+            <a class="btn btn-primary" href="/demo/">Open the demo</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="card-wrap">
+        <div class="card">
+          <div class="tabs" role="tablist">
+            <a class="tab active" role="tab" aria-selected="true" href="/">Specification Card</a>
+            <a class="tab" role="tab" aria-selected="false" href="/demo/">Demo</a>
+          </div>
+          <div class="card-body">
+            <article class="content">
+              <p>The <strong>Open Intelligent Store Specification (OISS)</strong> lets each store-intelligence source, from shelf-scanning robots and shelf cameras to people counting, loss-prevention vision and the retailer's own planogram, publish what it saw as standard records. Any consumer, from a store operations dashboard to an AI agent, then reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms, so the value shows right away.</p>
+              <p>Key Value Propositions:</p>
+              <ul>
+                <li><strong>One View Across Vendors</strong>: on-shelf availability, traffic, front-end queues and loss-prevention exceptions line up on one store layout and one item master</li>
+                <li><strong>Use Cases No Single Vendor Covers</strong>: replenish the out-of-stocks with the most shopper traffic first, and close a task only when the next shelf scan shows it fixed</li>
+                <li><strong>No Lock-In</strong>: change or add vendors without rewiring every report, task tool or agent downstream</li>
+                <li><strong>Agent-Ready</strong>: a query API and an MCP server let any agent platform read the data and write tasks back</li>
+                <li><strong>Built on What Retailers Use</strong>: GTINs from the item master, the retailer's own store numbers, and CloudEvents, GS1 and ONVIF underneath</li>
+              </ul>
+
+              <h2 id="architecture-diagram">Architecture Diagram</h2>
+              <figure class="diagram">
+                <svg class="arch" viewBox="0 0 760 520" role="img" aria-labelledby="arch-title arch-desc">
+                  <title id="arch-title">OISS architecture</title>
+                  <desc id="arch-desc">Store-intelligence sources feed adapters, which publish OISS records to a stream. Records land in an OISS store and an evidence store, which a query API and MCP server expose to the Store Operations Assistant and its five agents. Their actions reach the store, and tasks flow back as records.</desc>
+                  <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead" /></marker>
+                  </defs>
+                  <g class="d-group"><rect x="10" y="10" width="740" height="92" rx="10" /><text x="26" y="30" class="d-cap">Store-intelligence sources (simulated in the demo)</text></g>
+                  <g class="d-box"><rect x="26" y="42" width="168" height="48" rx="8" /><text x="110" y="62">Shelf vendors</text><text x="110" y="79" class="d-sub">Shelf scanning, ESL cameras</text></g>
+                  <g class="d-box"><rect x="206" y="42" width="168" height="48" rx="8" /><text x="290" y="62">Loss prevention</text><text x="290" y="79" class="d-sub">Front-end exceptions</text></g>
+                  <g class="d-box"><rect x="386" y="42" width="168" height="48" rx="8" /><text x="470" y="62">Vision AI apps</text><text x="470" y="79" class="d-sub">Traffic, queues, paths</text></g>
+                  <g class="d-box"><rect x="566" y="42" width="168" height="48" rx="8" /><text x="650" y="62">Retailer systems</text><text x="650" y="79" class="d-sub">Planogram, POS, item master</text></g>
+                  <g class="d-box"><rect x="200" y="128" width="360" height="48" rx="8" /><text x="380" y="148">Adapters and validator</text><text x="380" y="165" class="d-sub">Map each vendor export to the OISS schemas</text></g>
+                  <g class="d-box d-accent"><rect x="140" y="202" width="480" height="48" rx="8" /><text x="380" y="222">OISS record stream</text><text x="380" y="239" class="d-sub">CloudEvents over MQTT or HTTP, GS1 identifiers, one store layout</text></g>
+                  <g class="d-box"><rect x="140" y="276" width="230" height="48" rx="8" /><text x="255" y="296">OISS store</text><text x="255" y="313" class="d-sub">Current state and history</text></g>
+                  <g class="d-box"><rect x="390" y="276" width="230" height="48" rx="8" /><text x="505" y="296">Evidence store</text><text x="505" y="313" class="d-sub">Clips and images, retention</text></g>
+                  <g class="d-box"><rect x="200" y="350" width="360" height="40" rx="8" /><text x="380" y="375">Query API and MCP server</text></g>
+                  <g class="d-group"><rect x="60" y="414" width="640" height="56" rx="10" /><text x="76" y="432" class="d-cap">Store Operations Assistant</text></g>
+                  <g class="d-chip"><rect x="76" y="440" width="110" height="22" rx="11" /><text x="131" y="455">Availability</text></g>
+                  <g class="d-chip"><rect x="198" y="440" width="110" height="22" rx="11" /><text x="253" y="455">Price and label</text></g>
+                  <g class="d-chip"><rect x="320" y="440" width="110" height="22" rx="11" /><text x="375" y="455">Front end</text></g>
+                  <g class="d-chip"><rect x="442" y="440" width="120" height="22" rx="11" /><text x="502" y="455">Loss prevention</text></g>
+                  <g class="d-chip"><rect x="574" y="440" width="110" height="22" rx="11" /><text x="629" y="455">Store insights</text></g>
+                  <g class="d-box"><rect x="160" y="484" width="440" height="30" rx="8" /><text x="380" y="504" class="d-sub-strong">Tasks to associates, shelf tag fixes, lane openings, alerts</text></g>
+                  <g class="d-lines">
+                    <path d="M380 102 V126" marker-end="url(#arrow)" />
+                    <path d="M380 176 V200" marker-end="url(#arrow)" />
+                    <path d="M255 250 V274" marker-end="url(#arrow)" />
+                    <path d="M505 250 V274" marker-end="url(#arrow)" />
+                    <path d="M380 324 V348" marker-end="url(#arrow)" />
+                    <path d="M380 390 V412" marker-end="url(#arrow)" />
+                    <path d="M380 470 V482" marker-end="url(#arrow)" />
+                    <path class="d-dash" d="M600 499 H726 V226 H622" marker-end="url(#arrow)" />
+                  </g>
+                  <text x="732" y="370" class="d-sub d-side" transform="rotate(90 732 370)">Task records, verified by the next shelf check</text>
+                </svg>
+              </figure>
+
+              <h2 id="key-features">Key Features</h2>
+              <ul>
+                <li><strong>Store Operations Assistant:</strong> a reference orchestrator that routes each question to a specialized agent reading OISS through MCP</li>
+                <li><strong>Multi-Agent System</strong> - Five specialized agents:
+                  <ul>
+                    <li><strong>Availability Agent</strong> - Prioritizes replenishment by lost sales and closes a task only when the next shelf check shows it fixed</li>
+                    <li><strong>Price and Label Agent</strong> - Fixes wrong shelf prices through the electronic shelf label or a task</li>
+                    <li><strong>Front-End Agent</strong> - Opens a lane when a queue grows and feeds queue trends to labor scheduling</li>
+                    <li><strong>Loss Prevention Agent</strong> - Ties a front-end exception to an anonymous shopper path, a missing item and the evidence, for a person to review</li>
+                    <li><strong>Store Insights Agent</strong> - Measures display lift, compares stores and flags where two vendors disagree about the same shelf</li>
+                  </ul>
+                </li>
+                <li><strong>Seven Record Types:</strong> StoreLayout, ShelfObservation, ZoneMetric, ShopperPath, Incident, Evidence and Task, versioned together as v0.1</li>
+                <li><strong>Adapters and Validation:</strong> one adapter per vendor export, the <code>oiss-validate</code> schema validator, and a mapping from ShelfObservation to a GS1 EPCIS 2.0 ObjectEvent</li>
+                <li><strong>Storage and Query:</strong> current state and history for every record, and an evidence store that enforces retention</li>
+                <li><strong>Agent Access:</strong> an MCP server with tools such as out-of-stocks since a time, zone status, open incidents and create task</li>
+                <li><strong>Access Control:</strong> each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system</li>
+                <li><strong>Traceability:</strong> every record carries its source system, model and version, a confidence and links to evidence</li>
+              </ul>
+
+              <h2 id="record-types">Record Types</h2>
+              <table>
+                <thead><tr><th>Record</th><th>What it says</th></tr></thead>
+                <tbody>
+                  <tr><td>StoreLayout</td><td>Zones, fixtures, shelves and facings, with the planogram and camera placement</td></tr>
+                  <tr><td>ShelfObservation</td><td>On-shelf availability, planogram compliance and price integrity at one facing</td></tr>
+                  <tr><td>ZoneMetric</td><td>Traffic, dwell, queue length, wait time and open lanes for one zone over one interval</td></tr>
+                  <tr><td>ShopperPath</td><td>An anonymous shopper path on the floor plan; off by default</td></tr>
+                  <tr><td>Incident</td><td>A loss-prevention exception or safety incident, with a confidence, for a person to review</td></tr>
+                  <tr><td>Evidence</td><td>A clip or image reference with time range, camera, retention and access roles</td></tr>
+                  <tr><td>Task</td><td>A store task, such as replenish or fix a shelf tag, and its status</td></tr>
+                </tbody>
+              </table>
+
+              <h2 id="what-adoption-takes">What Adoption Takes</h2>
+              <h3 id="data-requirements">Data Requirements</h3>
+              <ul>
+                <li>A store layout with the planogram, keyed by GTIN and the retailer's own store number, plus shelf observations, is enough to start on on-shelf availability. Traffic, front-end and loss-prevention data can follow one feed at a time.</li>
+              </ul>
+              <h3 id="deployment-options">Deployment Options</h3>
+              <ul>
+                <li>No rip and replace: vendors keep their own systems, and one small adapter per feed maps its export to OISS</li>
+                <li>Vendors that emit OISS natively need no adapter</li>
+                <li>The demo runs entirely in a web browser on synthetic data</li>
+              </ul>
+
+              <h2 id="software-used">Software Used in This Blueprint</h2>
+              <p><strong>Open Standards</strong></p>
+              <ul>
+                <li><a href="https://github.com/cloudevents/spec">CloudEvents 1.0</a></li>
+                <li>GS1 EPCIS 2.0 and GS1 identifiers (GTIN, GLN)</li>
+                <li>ONVIF Profile M object classes</li>
+                <li>JSON Schema 2020-12</li>
+                <li>Model Context Protocol</li>
+              </ul>
+              <p><strong>Reference Implementation</strong></p>
+              <ul>
+                <li>TypeScript store simulator</li>
+                <li>React and SVG demo app</li>
+                <li>Python validator (<code>oiss-validate</code>)</li>
+                <li>An NVIDIA-hosted model for the Store Operations Assistant (coming in milestone M4)</li>
+              </ul>
+
+              <h2 id="ethical-considerations">Ethical Considerations</h2>
+              <p>OISS carries no faces or biometrics. Records are aggregates by default, shopper paths are anonymous, with ids that rotate (every 15 minutes in the demo), and are off unless a retailer turns them on, and every record carries a privacy class, a retention date and access roles where it needs them. Incidents are for a person to review, never an automatic accusation. Retailers adopting OISS should check it against their own privacy, labor and loss-prevention policies and local law.</p>
+              <p>Please report issues and concerns on <a href="https://github.com/bcyong/oiss/issues">GitHub</a>.</p>
+
+              <h2 id="license">License</h2>
+              <p>Governing Terms: the specification text is under <a href="https://creativecommons.org/licenses/by/4.0/legalcode">CC BY 4.0</a>, and the schemas, examples and code are under the <a href="https://github.com/bcyong/oiss/blob/main/LICENSE">Apache License, Version 2.0</a>. All data in the demo is synthetic.</p>
+            </article>
+
+            <aside class="toc">
+              <nav aria-label="Table of contents">
+                <p>On this page</p>
+                <ul>
+                  <li><a href="#architecture-diagram">Architecture Diagram</a></li>
+                  <li><a href="#key-features">Key Features</a></li>
+                  <li><a href="#record-types">Record Types</a></li>
+                  <li><a href="#what-adoption-takes">What Adoption Takes</a>
+                    <ul>
+                      <li><a href="#data-requirements">Data Requirements</a></li>
+                      <li><a href="#deployment-options">Deployment Options</a></li>
+                    </ul>
+                  </li>
+                  <li><a href="#software-used">Software Used in This Blueprint</a></li>
+                  <li><a href="#ethical-considerations">Ethical Considerations</a></li>
+                  <li><a href="#license">License</a></li>
+                </ul>
+              </nav>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <a href="https://github.com/bcyong/oiss">GitHub</a>
+      <span aria-hidden="true">|</span>
+      <a href="https://github.com/bcyong/oiss/tree/main/spec">Specification</a>
+      <span aria-hidden="true">|</span>
+      <a href="/demo/">Demo</a>
+      <p>OISS is a community draft. All demo data is synthetic.</p>
+    </footer>
+  </body>
+</html>
