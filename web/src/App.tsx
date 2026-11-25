@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { clock, clockOf, indexDay, latestObservation, shoppersAt, statusesAt, zoneMetricAt, type IndexedDay } from "./day.ts";
-import { FloorPlan } from "./FloorPlan.tsx";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { arrivedCount, clock, clockOf, indexDay, latestObservation, recentRecords, shoppersAt, statusesAt, zoneMetricAt, type IndexedDay } from "./day.ts";
+import { duration, humanize, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { FloorPlan, type Selection } from "./FloorPlan.tsx";
+import { Inspector } from "./Inspector.tsx";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
-import type { ShelfStatus } from "./oiss.ts";
+import type { AnyRecord, ShelfStatus } from "./oiss.ts";
+import { Timeline } from "./Timeline.tsx";
 
 const SPEEDS = [
   { label: "1 min/s", value: 60 },
@@ -10,28 +13,51 @@ const SPEEDS = [
   { label: "15 min/s", value: 900 },
 ];
 
-const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
-  in_stock: "In stock",
-  low_stock: "Low stock",
-  out_of_stock: "Out of stock",
-  unknown: "Not readable",
-  none: "Not yet observed",
-};
+const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperPath", "oiss.Evidence"] as const;
 
-const money = (m?: { amount: number; currency: string }) => (m ? m.amount.toLocaleString("en-US", { style: "currency", currency: m.currency }) : "");
-const pct = (v: number) => `${Math.round(v * 100)}%`;
-const mins = (s?: number) => (s === undefined ? "–" : s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, "0")} s`);
+export type Tab = "now" | "stream" | "sources";
 
-export function App() {
-  const [day, setDay] = useState<IndexedDay | null>(null);
+/** The thing on the floor plan that a record is about, so picking a record also picks it on the map. */
+function selectionFor(day: IndexedDay, r: AnyRecord): Selection | null {
+  const loc = (r.data as { location?: { facing?: string; zone?: string } }).location;
+  if (loc?.facing) {
+    const index = day.facingById.get(loc.facing);
+    if (index !== undefined) return { kind: "facing", index };
+  }
+  if (r.type === "oiss.ZoneMetric" && loc?.zone) return { kind: "zone", id: loc.zone };
+  if (r.type === "oiss.ShopperPath") {
+    const path = day.paths.findIndex((p) => p.record.id === r.id);
+    if (path >= 0) return { kind: "shopper", path };
+  }
+  return null;
+}
+
+/** A starting state, for rendering the app in tests without loading data. */
+export interface AppStart {
+  day: IndexedDay;
+  t?: number;
+  selection?: Selection;
+  pinned?: string;
+  tab?: Tab;
+  showCameras?: boolean;
+}
+
+export function App({ start }: { start?: AppStart } = {}) {
+  const [day, setDay] = useState<IndexedDay | null>(start?.day ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [t, setT] = useState(9 * 3600);
+  const [t, setT] = useState(start?.t ?? 9 * 3600);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(300);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(start?.selection ?? null);
+  /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
+  const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
+  const [showCameras, setShowCameras] = useState(start?.showCameras ?? false);
+  const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
+  const [streamType, setStreamType] = useState<string>("");
 
   useEffect(() => {
+    if (start) return;
     loadGoldenDay()
       .then((files) => setDay(indexDay(files)))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
@@ -73,7 +99,7 @@ export function App() {
     return next;
   }, [day, t]);
 
-  // Zone occupancy changes every 15 minutes, so recompute it every 5 minutes of store time, not every frame.
+  // Zone figures change every 15 minutes, so recompute them every 5 minutes of store time, not every frame.
   const bucket = Math.floor(t / 300) * 300;
   const zoneDensity = useMemo(() => {
     const m = new Map<string, number>();
@@ -85,11 +111,46 @@ export function App() {
     }
     return m;
   }, [day, bucket]);
+  const queues = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!day) return m;
+    for (const z of day.layout.zones) {
+      const q = zoneMetricAt(day, z.id, bucket)?.data.metrics.queueLength;
+      if (q !== undefined) m.set(z.id, q);
+    }
+    return m;
+  }, [day, bucket]);
 
   const shoppers = useMemo(() => (day ? shoppersAt(day, t) : []), [day, t]);
 
+  // Records from each in-house shelf camera, for the camera card.
+  const byCamera = useMemo(() => {
+    const m = new Map<string, number[]>();
+    if (!day) return m;
+    for (const r of day.files.records.shelfObservations) {
+      const cam = r.data.location.camera;
+      if (!cam) continue;
+      const list = m.get(cam) ?? [];
+      list.push((Date.parse(r.data.window.end) - day.midnightMs) / 1000);
+      m.set(cam, list);
+    }
+    return m;
+  }, [day]);
+
   if (error) return <main className="message">{error}</main>;
   if (!day) return <main className="message">Loading the store day…</main>;
+
+  const select = (s: Selection | null) => {
+    setSelection(s);
+    setPinned(null);
+  };
+  const inspect = (id: string) => {
+    const r = day.byId.get(id);
+    if (!r) return;
+    setPinned(id);
+    const s = selectionFor(day, r);
+    if (s) setSelection(s);
+  };
 
   const counts = { in_stock: 0, low_stock: 0, out_of_stock: 0, unknown: 0, none: 0 };
   for (const s of statuses) counts[s]++;
@@ -97,7 +158,8 @@ export function App() {
   const front = zoneMetricAt(day, "front-end", t)?.data.metrics;
   const sco = zoneMetricAt(day, "self-checkout", t)?.data.metrics;
   const staffedLanes = day.layout.fixtures.filter((f) => f.kind === "checkout_lane").length;
-  const { records } = day.files;
+  const total = day.stream.length;
+  const arrived = arrivedCount(day, t);
 
   const runNewDay = () => {
     setBusy(true);
@@ -105,28 +167,116 @@ export function App() {
     const seed = Math.floor(Math.random() * 1e9);
     simulateInBrowser(seed, day.files.date)
       .then((files) => {
-        setSelected(null);
+        setSelection(null);
+        setPinned(null);
         setDay(indexDay(files));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
   };
 
-  const sel = selected === null ? null : day.facings[selected];
-  const selObs = sel ? latestObservation(sel, t) : undefined;
-  const selItem = sel ? day.items.get(sel.facing.gtin) : undefined;
+  // The selection's card, and the record the inspector shows.
+  let selectionCard: ReactNode = null;
+  let following: AnyRecord | undefined;
+  let related: AnyRecord[] = [];
+  if (selection?.kind === "facing") {
+    const v = day.facings[selection.index]!;
+    const obs = latestObservation(v, t);
+    const item = day.items.get(v.facing.gtin);
+    following = obs;
+    related = v.obs.filter((_, i) => v.times[i]! <= t).reverse();
+    selectionCard = (
+      <>
+        <h2>{item?.name ?? v.facing.gtin}</h2>
+        <dl>
+          <dt>Location</dt>
+          <dd>
+            {zoneName(day, v.zone)}, fixture {v.fixture.id}, shelf {v.level + 1}
+          </dd>
+          <dt>GTIN</dt>
+          <dd>{v.facing.gtin}</dd>
+          <dt>Planogram</dt>
+          <dd>
+            {v.facing.facings} facings, capacity {v.facing.capacity}, {money(v.facing.shelfPrice)}
+          </dd>
+          <dt>On the shelf</dt>
+          <dd>{obs ? `${STATUS_LABEL[obs.data.status]}${obs.data.fillLevel !== undefined ? `, ${pct(obs.data.fillLevel)} full` : ""}, at ${clockOf(day, obs.data.window.end)}` : "Not observed yet today"}</dd>
+          {item?.promo && (
+            <>
+              <dt>Promotion</dt>
+              <dd>On promotion this week</dd>
+            </>
+          )}
+        </dl>
+      </>
+    );
+  } else if (selection?.kind === "zone") {
+    const z = day.zones.get(selection.id);
+    const m = zoneMetricAt(day, selection.id, t);
+    following = m;
+    const series = day.zoneSeries.get(selection.id);
+    related = series ? series.recs.filter((_, i) => series.end[i]! <= t).reverse() : [];
+    selectionCard = (
+      <>
+        <h2>{z?.name ?? selection.id}</h2>
+        <dl>
+          <dt>Kind</dt>
+          <dd>{humanize(z?.kind ?? "")}</dd>
+          <dt>Area</dt>
+          <dd>{Math.round(day.zoneArea.get(selection.id) ?? 0)} m²</dd>
+          <dt>Shoppers now</dt>
+          <dd>{m ? `${m.data.metrics.avgOccupancy ?? 0} on average in the last 15 minutes` : "No figures yet"}</dd>
+        </dl>
+      </>
+    );
+  } else if (selection?.kind === "shopper") {
+    const p = day.paths[selection.path]!;
+    following = p.record;
+    related = [p.record];
+    selectionCard = (
+      <>
+        <h2>Anonymous shopper</h2>
+        <p className="note top">One ShopperPath record covers at most 15 minutes. After that the tracker gives the same shopper a new id, so no one can be followed through a whole visit.</p>
+      </>
+    );
+  } else if (selection?.kind === "camera") {
+    const c = day.layout.cameras.find((x) => x.id === selection.id);
+    const times = byCamera.get(selection.id) ?? [];
+    const shelf = selection.id.startsWith("shelf-");
+    selectionCard = c ? (
+      <>
+        <h2>Camera {c.id}</h2>
+        <dl>
+          <dt>Kind</dt>
+          <dd>{shelf ? "In-house shelf camera" : "Ceiling camera"}</dd>
+          <dt>Covers</dt>
+          <dd>{(c.covers ?? []).map((id) => zoneName(day, id).split(", ")[0] || id).join(", ")}</dd>
+          <dt>Mounted</dt>
+          <dd>
+            {c.position.z} m up, {c.hfov}° wide, about {c.range} m range
+          </dd>
+          <dt>Records</dt>
+          <dd>{shelf ? `${times.filter((x) => x <= t).length} ShelfObservation records so far today` : "Feeds people counting and anonymous shopper paths"}</dd>
+        </dl>
+      </>
+    ) : null;
+  }
+  const pinnedRecord = pinned ? day.byId.get(pinned) : undefined;
+  const shown = pinnedRecord ?? following;
+
+  const stream = recentRecords(day, t, 14, streamType || undefined);
 
   return (
     <div className="app">
       <nav className="crumbs" aria-label="Breadcrumb">
-        <a href="/">OISS</a> <span aria-hidden="true">/</span> Demo store
+        <a href="/">OISS</a> <span aria-hidden="true">/</span> Demo store <span aria-hidden="true">·</span> <a href="/spec/">Spec browser</a>
       </nav>
       <header>
         <div>
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
-            A synthetic grocery day, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, told only in{" "}
-            <a href="https://github.com/bcyong/oiss">OISS</a> records from a mock shelf-scanning robot, in-house shelf cameras and a mock people-counting vendor. Milestone M1 preview.
+            A synthetic grocery day, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, replayed only from{" "}
+            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras and a mock people-counting vendor. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
@@ -139,7 +289,7 @@ export function App() {
 
       <div className="layout">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} t={t} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} selected={selected} onSelect={setSelected} />
+          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} selection={selection} onSelect={select} />
           <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
@@ -155,7 +305,12 @@ export function App() {
               <i className="swatch zone-swatch" />
               Zone occupancy
             </span>
+            <label className="toggle">
+              <input type="checkbox" checked={showCameras} onChange={(e) => setShowCameras(e.target.checked)} />
+              Cameras
+            </label>
           </div>
+          <Timeline day={day} t={t} onSeek={setT} />
           <div className="playback">
             <button type="button" className="play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
               {playing ? "❚❚" : "▶"}
@@ -170,114 +325,144 @@ export function App() {
               ))}
             </select>
           </div>
+          <p className="note">
+            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press Reset to see the whole store.
+          </p>
         </section>
 
         <aside>
-          {sel ? (
+          {selectionCard ? (
             <section className="card">
               <div className="card-head">
-                <h2>{selItem?.name ?? sel.facing.gtin}</h2>
-                <button type="button" className="close" onClick={() => setSelected(null)} aria-label="Close">
+                <div>{selectionCard}</div>
+                <button type="button" className="close" onClick={() => select(null)} aria-label="Close">
                   ×
                 </button>
               </div>
-              <dl>
-                <dt>Location</dt>
-                <dd>
-                  {day.zones.get(sel.zone)?.name}, fixture {sel.fixture.id}, shelf {sel.level + 1}
-                </dd>
-                <dt>GTIN</dt>
-                <dd>{sel.facing.gtin}</dd>
-                <dt>Planogram</dt>
-                <dd>
-                  {sel.facing.facings} facings, capacity {sel.facing.capacity}, {money(sel.facing.shelfPrice)}
-                </dd>
-                <dt>Last observed</dt>
-                <dd>{selObs ? `${STATUS_LABEL[selObs.data.status]}${selObs.data.fillLevel !== undefined ? `, ${pct(selObs.data.fillLevel)} full` : ""}, at ${clockOf(day, selObs.data.window.end)}` : "Not yet today"}</dd>
-                {selObs && (
-                  <>
-                    <dt>Source</dt>
-                    <dd>
-                      {selObs.data.provenance.system}, confidence {pct(selObs.data.confidence)}
-                    </dd>
-                  </>
-                )}
-                {selObs?.data.tagPrice && (
-                  <>
-                    <dt>Shelf tag</dt>
-                    <dd>
-                      {money(selObs.data.tagPrice)} (system price {money(selObs.data.systemPrice)})
-                    </dd>
-                  </>
-                )}
-              </dl>
-              <p className="note">{sel.times.filter((x) => x <= t).length} ShelfObservation records for this facing so far today.</p>
+              {related.length > 1 && (
+                <>
+                  <h3>Records so far today</h3>
+                  <ul className="records">
+                    {related.slice(0, 6).map((r) => (
+                      <li key={r.id}>
+                        <button type="button" className={r.id === shown?.id ? "current" : undefined} onClick={() => inspect(r.id)}>
+                          <span className="time">{timeOf(day, r)}</span>
+                          <span>{summarize(day, r)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {related.length > 6 && <p className="note">and {related.length - 6} earlier</p>}
+                </>
+              )}
             </section>
           ) : (
-            <p className="hint">Tap a facing on the floor plan to see its item and its latest ShelfObservation.</p>
+            !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper or a camera to see the OISS records behind it, or pick a record from the stream.</p>
           )}
 
-          <section className="card">
-            <h2>At {clock(t)}</h2>
-            <div className="kpis">
-              <div>
-                <b>{known ? pct((counts.in_stock + counts.low_stock) / known) : "–"}</b>
-                <span>On-shelf availability, of facings observed</span>
-              </div>
-              <div>
-                <b>{counts.out_of_stock}</b>
-                <span>Facings out of stock</span>
-              </div>
-              <div>
-                <b>{shoppers.length}</b>
-                <span>Shoppers in the store</span>
-              </div>
-              <div>
-                <b>
-                  {front?.openLanes ?? "–"} of {staffedLanes}
-                </b>
-                <span>Staffed lanes open</span>
-              </div>
-              <div>
-                <b>{front?.queueLength ?? "–"}</b>
-                <span>In line at staffed lanes</span>
-              </div>
-              <div>
-                <b>{mins(front?.avgWaitSeconds)}</b>
-                <span>Average wait, staffed</span>
-              </div>
-            </div>
-            <p className="note">
-              {known} of {day.facings.length} facings observed so far. Self-checkout: {sco?.queueLength ?? 0} in line. Front-end figures are from the last 15-minute ZoneMetric.
-            </p>
-          </section>
+          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} />}
 
           <section className="card">
-            <h2>Sources</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Record type</th>
-                  <th className="num">Records</th>
-                </tr>
-              </thead>
-              <tbody>
-                {day.sources.map((s) => (
-                  <tr key={`${s.system}|${s.type}`}>
-                    <td>
-                      {s.system}
-                      {s.vendor ? <span className="vendor">{s.vendor}</span> : null}
-                    </td>
-                    <td>{s.type}</td>
-                    <td className="num">{s.records.toLocaleString("en-US")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="note">
-              {(1 + records.shelfObservations.length + records.zoneMetrics.length + records.shopperPaths.length).toLocaleString("en-US")} records, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.
-            </p>
+            <div className="tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
+                At {clock(t)}
+              </button>
+              <button type="button" role="tab" aria-selected={tab === "stream"} onClick={() => setTab("stream")}>
+                Record stream
+              </button>
+              <button type="button" role="tab" aria-selected={tab === "sources"} onClick={() => setTab("sources")}>
+                Sources
+              </button>
+            </div>
+
+            {tab === "now" && (
+              <>
+                <div className="kpis">
+                  <div>
+                    <b>{known ? pct((counts.in_stock + counts.low_stock) / known) : "–"}</b>
+                    <span>On-shelf availability, of facings observed</span>
+                  </div>
+                  <div>
+                    <b>{counts.out_of_stock}</b>
+                    <span>Facings out of stock</span>
+                  </div>
+                  <div>
+                    <b>{shoppers.length}</b>
+                    <span>Shoppers in the store</span>
+                  </div>
+                  <div>
+                    <b>
+                      {front?.openLanes ?? "–"} of {staffedLanes}
+                    </b>
+                    <span>Staffed lanes open</span>
+                  </div>
+                  <div>
+                    <b>{front?.queueLength ?? "–"}</b>
+                    <span>In line at staffed lanes</span>
+                  </div>
+                  <div>
+                    <b>{duration(front?.avgWaitSeconds)}</b>
+                    <span>Average wait, staffed</span>
+                  </div>
+                </div>
+                <p className="note">
+                  {known} of {day.facings.length} facings observed so far. Self-checkout: {sco?.queueLength ?? 0} in line. Front-end figures are from the last 15-minute ZoneMetric.
+                </p>
+              </>
+            )}
+
+            {tab === "stream" && (
+              <>
+                <select className="filter" value={streamType} onChange={(e) => setStreamType(e.target.value)} aria-label="Record type">
+                  <option value="">All record types</option>
+                  {STREAM_TYPES.map((ty) => (
+                    <option key={ty} value={ty}>
+                      {typeName(ty)}
+                    </option>
+                  ))}
+                </select>
+                <ul className="records">
+                  {stream.map((r) => (
+                    <li key={r.id}>
+                      <button type="button" className={r.id === shown?.id ? "current" : undefined} onClick={() => inspect(r.id)}>
+                        <span className="time">{timeOf(day, r)}</span>
+                        <span>
+                          <span className="type">{typeName(r.type)}</span> {summarize(day, r)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="note">The newest records at {clock(t)}, newest first. Pause playback to read them.</p>
+              </>
+            )}
+
+            {tab === "sources" && (
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Record type</th>
+                      <th className="num">Records</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {day.sources.map((s) => (
+                      <tr key={`${s.system}|${s.type}`}>
+                        <td>
+                          {s.system}
+                          {s.vendor ? <span className="vendor">{s.vendor}</span> : null}
+                        </td>
+                        <td>{s.type}</td>
+                        <td className="num">{s.records.toLocaleString("en-US")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="note">{total.toLocaleString("en-US")} records, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.</p>
+              </>
+            )}
           </section>
         </aside>
       </div>

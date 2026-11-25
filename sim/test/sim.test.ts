@@ -86,7 +86,28 @@ test("shopper path ids rotate at least every 15 minutes and never repeat", () =>
 });
 
 test("records in each file are in time order", () => {
-  for (const list of [day.records.shelfObservations, day.records.zoneMetrics, day.records.shopperPaths]) {
+  for (const list of [day.records.shelfObservations, day.records.zoneMetrics, day.records.shopperPaths, day.records.evidence]) {
     for (let k = 1; k < list.length; k++) assert.ok(list[k - 1]!.time <= list[k]!.time);
   }
+});
+
+test("a shelf image backs every low-stock and out-of-stock read, and nothing else", () => {
+  const evidence = new Map(day.records.evidence.map((r) => [r.id, r]));
+  const used = new Set<string>();
+  for (const r of day.records.shelfObservations) {
+    const d = r.data as { status: string; evidence?: string[]; location: { facing: string } };
+    const backed = d.status === "low_stock" || d.status === "out_of_stock";
+    assert.equal(d.evidence?.length ?? 0, backed ? 1 : 0, r.id);
+    for (const id of d.evidence ?? []) {
+      const ev = evidence.get(id);
+      assert.ok(ev, `${r.id} points to missing ${id}`);
+      assert.equal(ev.oissprivacy, "restricted");
+      assert.equal((ev.data as { location: { facing: string } }).location.facing, d.location.facing);
+      assert.equal(ev.time, r.time);
+      used.add(id);
+    }
+  }
+  assert.equal(used.size, evidence.size);
+  const retain = (day.records.evidence[0]!.data as { retainUntil: string }).retainUntil;
+  assert.equal(retain, "2026-12-17T00:00:00-08:00");
 });

@@ -23,6 +23,7 @@ It is plain TypeScript with no Node-only code, so the same source runs in Node f
 | Demo Grocery space planning | StoreLayout | The floor plan, fixtures, shelves, facings, planogram and cameras |
 | Mock shelf-scanning robot (mock vendor A) | ShelfObservation | Every facing at 8 AM and 2 PM, with fill level and shelf tag price |
 | Store shelf cameras (in-house) | ShelfObservation | Aisle 3 and the dairy wall every 5 minutes, reported on change |
+| Shelf scanner and shelf cameras | Evidence | A shelf image reference for each low-stock or out-of-stock observation, cropped to the shelf, kept 30 days and viewable by store and department managers. The synthetic store has no images, so the demo draws a placeholder |
 | Mock people-counting system (mock vendor C) | ZoneMetric | Traffic, occupancy, dwell, line length, wait and open lanes per zone every 15 minutes |
 | Mock multi-camera tracker (mock vendor C) | ShopperPath | Anonymous paths with ids that rotate every 15 minutes |
 

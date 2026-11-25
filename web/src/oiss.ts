@@ -12,7 +12,8 @@ export interface Money {
 export interface Provenance {
   system: string;
   vendor?: string;
-  model?: { name: string; version: string };
+  model?: { name: string; version?: string };
+  adapter?: { name: string; version: string };
   synthetic?: boolean;
 }
 export interface Window {
@@ -30,6 +31,8 @@ export interface OissRecord<D> {
   oissversion: string;
   oissstore: string;
   oissprivacy: string;
+  dataschema?: string;
+  datacontenttype?: string;
   data: D;
 }
 
@@ -64,6 +67,12 @@ export interface Facing {
 export interface Camera {
   id: string;
   position: Point & { z: number };
+  /** Degrees, 0 along +x, increasing toward +y. */
+  yaw?: number;
+  pitch?: number;
+  hfov?: number;
+  vfov?: number;
+  range?: number;
   covers?: string[];
 }
 export interface StoreLayoutData {
@@ -90,6 +99,7 @@ export interface ShelfObservationData {
   systemPrice?: Money;
   flags?: string[];
   confidence: number;
+  evidence?: string[];
 }
 
 export interface ZoneMetricData {
@@ -114,6 +124,19 @@ export interface ShopperPathData {
   objectClass: string;
   idValidUntil: string;
   points: { t: string; x: number; y: number }[];
+  confidence?: number;
+}
+
+export interface EvidenceData {
+  provenance: Provenance;
+  window: Window;
+  location: { zone?: string; fixture?: string; shelf?: string; facing?: string; camera?: string };
+  mediaType: string;
+  uri: string;
+  sha256?: string;
+  redaction: string;
+  retainUntil: string;
+  accessRoles: string[];
 }
 
 /** The retailer's item master. Not an OISS record: OISS refers to items by GTIN. */
@@ -128,4 +151,13 @@ export interface DayRecords {
   shelfObservations: OissRecord<ShelfObservationData>[];
   zoneMetrics: OissRecord<ZoneMetricData>[];
   shopperPaths: OissRecord<ShopperPathData>[];
+  /** Shelf images behind low-stock and out-of-stock reads. Days written before M2 have none. */
+  evidence?: OissRecord<EvidenceData>[];
 }
+
+export type AnyRecord =
+  | OissRecord<StoreLayoutData>
+  | OissRecord<ShelfObservationData>
+  | OissRecord<ZoneMetricData>
+  | OissRecord<ShopperPathData>
+  | OissRecord<EvidenceData>;

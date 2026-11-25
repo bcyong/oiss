@@ -30,11 +30,12 @@ export async function loadGoldenDay(): Promise<DayFiles> {
   const index = (await (await get("index.json")).json()) as { days: { store: string; date: string; seed: number; path: string }[] };
   const day = index.days[0];
   if (!day) throw new Error("No days in data/index.json");
-  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, itemMaster] = await Promise.all([
+  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, itemMaster] = await Promise.all([
     get(`${day.path}store-layout.json`).then((r) => r.json()),
     jsonl(`${day.path}shelf-observations.jsonl`),
     jsonl(`${day.path}zone-metrics.jsonl`),
     jsonl(`${day.path}shopper-paths.jsonl`),
+    jsonl(`${day.path}evidence.jsonl`),
     get(`${day.path}item-master.json`).then((r) => r.json()),
   ]);
   return {
@@ -42,7 +43,7 @@ export async function loadGoldenDay(): Promise<DayFiles> {
     date: day.date,
     seed: day.seed,
     origin: "golden",
-    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths } as DayRecords,
+    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence } as DayRecords,
     itemMaster: itemMaster as ItemMaster,
   };
 }

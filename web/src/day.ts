@@ -1,5 +1,5 @@
 import type { DayFiles } from "./load.ts";
-import type { Facing, Fixture, OissRecord, Point, ShelfObservationData, ShelfStatus, StoreLayoutData, Zone, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, Facing, Fixture, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, Zone, ZoneMetricData } from "./oiss.ts";
 
 export interface Rect {
   x: number;
@@ -20,6 +20,7 @@ export interface FacingView {
 }
 
 export interface PathView {
+  record: OissRecord<ShopperPathData>;
   start: number;
   end: number;
   t: number[];
@@ -49,7 +50,18 @@ export interface IndexedDay {
   paths: PathView[];
   items: Map<string, DayFiles["itemMaster"]["items"][number]>;
   sources: { system: string; vendor?: string; type: string; records: number }[];
+  /** Index into facings by facing id. */
+  facingById: Map<string, number>;
+  /** Every record of the day, in time order, with its time in seconds since store midnight. */
+  stream: AnyRecord[];
+  streamTimes: number[];
+  byId: Map<string, AnyRecord>;
+  evidence: Map<string, OissRecord<EvidenceData>>;
+  /** Out-of-stock facings, as last reported, every TIMELINE_STEP seconds from open to close. */
+  timeline: { t: number; outOfStock: number; lowStock: number }[];
 }
+
+export const TIMELINE_STEP = 300;
 
 const bbox = (pts: Point[]): Rect => {
   const xs = pts.map((p) => p.x);
@@ -155,7 +167,7 @@ export function indexDay(files: DayFiles): IndexedDay {
 
   const paths: PathView[] = records.shopperPaths.map((r) => {
     const pts = r.data.points;
-    return { start: sec(r.data.window.start), end: sec(r.data.window.end), t: pts.map((p) => sec(p.t)), x: pts.map((p) => p.x), y: pts.map((p) => p.y) };
+    return { record: r, start: sec(r.data.window.start), end: sec(r.data.window.end), t: pts.map((p) => sec(p.t)), x: pts.map((p) => p.x), y: pts.map((p) => p.y) };
   });
 
   const starts = records.zoneMetrics.map((r) => sec(r.data.window.start));
@@ -163,13 +175,32 @@ export function indexDay(files: DayFiles): IndexedDay {
   const open = starts.length ? Math.floor(Math.min(...starts) / 3600) * 3600 : 7 * 3600;
   const close = ends.length ? Math.ceil(Math.max(...ends) / 3600) * 3600 : 22 * 3600;
 
+  const evidenceList = records.evidence ?? [];
   const sourceCounts = new Map<string, { system: string; vendor?: string; type: string; records: number }>();
-  const all = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths] as OissRecord<{ provenance: { system: string; vendor?: string } }>[];
+  const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList];
   for (const r of all) {
     const key = `${r.data.provenance.system}|${r.type}`;
     const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0 };
     entry.records++;
     sourceCounts.set(key, entry);
+  }
+
+  const stream = [...all].sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+  const streamTimes = stream.map((r) => sec(r.time));
+  const facingById = new Map(facings.map((v, i) => [v.facing.id, i]));
+
+  const timeline: IndexedDay["timeline"] = [];
+  for (let t = open; t <= close; t += TIMELINE_STEP) {
+    let outOfStock = 0;
+    let lowStock = 0;
+    for (const v of facings) {
+      const i = lastAtOrBefore(v.times, t);
+      if (i < 0) continue;
+      const st = v.obs[i]!.data.status;
+      if (st === "out_of_stock") outOfStock++;
+      else if (st === "low_stock") lowStock++;
+    }
+    timeline.push({ t, outOfStock, lowStock });
   }
 
   return {
@@ -187,6 +218,12 @@ export function indexDay(files: DayFiles): IndexedDay {
     paths,
     items: new Map(files.itemMaster.items.map((i) => [i.gtin, i])),
     sources: [...sourceCounts.values()],
+    facingById,
+    stream,
+    streamTimes,
+    byId: new Map(all.map((r) => [r.id, r])),
+    evidence: new Map(evidenceList.map((r) => [r.id, r])),
+    timeline,
   };
 }
 
@@ -211,17 +248,23 @@ export function zoneMetricAt(day: IndexedDay, zone: string, t: number): OissReco
   return i < 0 ? undefined : s.recs[i];
 }
 
+export interface ShopperDot extends Point {
+  /** Index into day.paths. */
+  path: number;
+}
+
 /** Shopper positions at time t, interpolated along each anonymous shopper path. */
-export function shoppersAt(day: IndexedDay, t: number): Point[] {
-  const out: Point[] = [];
-  for (const p of day.paths) {
+export function shoppersAt(day: IndexedDay, t: number): ShopperDot[] {
+  const out: ShopperDot[] = [];
+  for (let k = 0; k < day.paths.length; k++) {
+    const p = day.paths[k]!;
     if (t < p.start || t >= p.end) continue;
     const i = lastAtOrBefore(p.t, t);
     if (i < 0) continue;
     const j = Math.min(i + 1, p.t.length - 1);
     const span = p.t[j]! - p.t[i]!;
     const f = span > 0 ? (t - p.t[i]!) / span : 0;
-    out.push({ x: p.x[i]! + (p.x[j]! - p.x[i]!) * f, y: p.y[i]! + (p.y[j]! - p.y[i]!) * f });
+    out.push({ path: k, x: p.x[i]! + (p.x[j]! - p.x[i]!) * f, y: p.y[i]! + (p.y[j]! - p.y[i]!) * f });
   }
   return out;
 }
@@ -235,4 +278,23 @@ export function clock(t: number): string {
 
 export function clockOf(day: IndexedDay, iso: string): string {
   return clock((Date.parse(iso) - day.midnightMs) / 1000);
+}
+
+/** The newest records at or before time t, newest first, optionally of one type. */
+export function recentRecords(day: IndexedDay, t: number, limit: number, type?: string): AnyRecord[] {
+  const out: AnyRecord[] = [];
+  for (let i = lastAtOrBefore(day.streamTimes, t); i >= 0 && out.length < limit; i--) {
+    const r = day.stream[i]!;
+    if (!type || r.type === type) out.push(r);
+  }
+  return out;
+}
+
+/** Records at or before time t: how many of each type have arrived so far. */
+export function arrivedCount(day: IndexedDay, t: number): number {
+  return lastAtOrBefore(day.streamTimes, t) + 1;
+}
+
+export function secondsOf(day: IndexedDay, iso: string): number {
+  return (Date.parse(iso) - day.midnightMs) / 1000;
 }
