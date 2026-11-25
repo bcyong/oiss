@@ -289,8 +289,8 @@ h1 {
 }
 .zoom {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 14px;
+  right: 14px;
   display: flex;
   gap: 4px;
 }
@@ -318,8 +318,8 @@ h1 {
 }
 .zoom-level {
   position: absolute;
-  top: 44px;
-  right: 10px;
+  top: 50px;
+  right: 16px;
   font-size: 12px;
   color: var(--muted);
   background: var(--panel);
@@ -356,29 +356,30 @@ h1 {
 }
 .map-controls {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 14px;
+  left: 14px;
   display: flex;
   gap: 4px;
 }
 .map-controls button.layer {
-  padding: 4px 10px;
-  font-size: 13px;
-  line-height: 1.4;
+  min-width: 34px;
+  padding: 4px 8px;
+  line-height: 1.2;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
   background: var(--panel);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
-.map-controls button.layer::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  border: 1.5px solid var(--muted);
+.map-controls button.layer svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
-.map-controls button.layer.on::before {
+.map-controls button.layer.on {
+  color: var(--panel);
   background: var(--accent);
   border-color: var(--accent);
 }

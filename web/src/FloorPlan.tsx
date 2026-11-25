@@ -335,8 +335,12 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
         </g>
       </svg>
       <div className="map-controls">
-        <button type="button" className={`layer${showCameras ? " on" : ""}`} aria-pressed={showCameras} onClick={onToggleCameras} title={showCameras ? "Hide cameras" : "Show cameras"}>
-          Cameras
+        <button type="button" className={`layer${showCameras ? " on" : ""}`} aria-pressed={showCameras} aria-label="Cameras" onClick={onToggleCameras} title={showCameras ? "Hide cameras" : "Show cameras"}>
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <rect x="1.5" y="4.5" width="9" height="7" rx="1.8" />
+            <path d="M10.5 7.2l3.3-1.9a.5.5 0 0 1 .7.4v4.6a.5.5 0 0 1-.7.4l-3.3-1.9" />
+            {!showCameras && <path className="slash" d="M2 2.5l12 11" />}
+          </svg>
         </button>
       </div>
       <div className="zoom" role="group" aria-label="Zoom">

@@ -8,7 +8,7 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 
 ## The demo store
 
-- A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, loss prevention incidents at each checkout lane and self-checkout station, the shelf-scanning robot and its route during a scan run, and cameras with their fields of view (shown by default; turn them off with **Cameras** above the floor plan).
+- A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, loss prevention incidents at each checkout lane and self-checkout station, the shelf-scanning robot and its route during a scan run, and cameras with their fields of view (shown by default; turn them off with the camera button at the top left of the floor plan).
 - **Zoom** with the + and − buttons, ctrl or ⌘ and the scroll wheel, a trackpad pinch or a two-finger pinch on a phone. Drag to pan when zoomed in. The corners button goes back to the whole store.
 - A playback bar for the store day, at 1, 5 or 15 minutes of store time per second, and a day timeline of out-of-stock and low-stock facings with a tick for each checkout incident. Click or drag the timeline to jump to a time.
 - On-shelf availability, out-of-stock facings, shoppers in the store, staffed lanes open, line length, average wait, checkout incidents waiting for review and what the robot is doing, all at the chosen time.
