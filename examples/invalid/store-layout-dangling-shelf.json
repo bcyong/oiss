@@ -2,10 +2,10 @@
   "specversion": "1.0",
   "id": "map-demo-001-2026-11-A",
   "source": "urn:oiss:demo-001:sim:map",
-  "type": "oiss.StoreMap",
+  "type": "oiss.StoreLayout",
   "time": "2026-11-25T06:00:00-08:00",
   "subject": "demo-001",
-  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/store-map.schema.json",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/store-layout.schema.json",
   "datacontenttype": "application/json",
   "oissversion": "0.1",
   "oissstore": "demo-001",
@@ -17,7 +17,9 @@
     },
     "store": {
       "id": "demo-001",
-      "name": "Demo Grocery",
+      "storeNumber": "0001",
+      "banner": "Demo Grocery",
+      "name": "Demo Grocery, Main Street",
       "timezone": "America/Los_Angeles",
       "floor": {
         "width": 60,
@@ -51,9 +53,9 @@
         ]
       },
       {
-        "id": "checkout",
-        "name": "Checkout",
-        "kind": "checkout",
+        "id": "front-end",
+        "name": "Front end",
+        "kind": "front_end",
         "polygon": [
           {
             "x": 5,
@@ -78,7 +80,7 @@
       {
         "id": "A07-L",
         "zone": "aisle-07",
-        "kind": "shelving",
+        "kind": "gondola",
         "footprint": [
           {
             "x": 20,
@@ -100,7 +102,7 @@
       },
       {
         "id": "lane-03",
-        "zone": "checkout",
+        "zone": "front-end",
         "kind": "checkout_lane",
         "footprint": [
           {
@@ -125,7 +127,7 @@
     "shelves": [
       {
         "id": "A07-L-S3",
-        "fixture": "A07-L",
+        "fixture": "A08-L",
         "level": 3,
         "height": 1.2
       }
@@ -134,11 +136,12 @@
       {
         "id": "A07-L-S3-F05",
         "shelf": "A07-L-S3",
-        "position": 5,
+        "sequence": 5,
         "width": 0.3,
         "gtin": "02000000001012",
+        "facings": 2,
         "capacity": 12,
-        "price": {
+        "shelfPrice": {
           "amount": 3.49,
           "currency": "USD"
         }
@@ -146,11 +149,12 @@
       {
         "id": "A07-L-S3-F06",
         "shelf": "A07-L-S3",
-        "position": 6,
+        "sequence": 6,
         "width": 0.3,
         "gtin": "02000000002026",
+        "facings": 2,
         "capacity": 12,
-        "price": {
+        "shelfPrice": {
           "amount": 4.99,
           "currency": "USD"
         }
@@ -170,7 +174,8 @@
         "vfov": 55,
         "range": 25,
         "covers": [
-          "aisle-07"
+          "aisle-07",
+          "front-end"
         ]
       }
     ]

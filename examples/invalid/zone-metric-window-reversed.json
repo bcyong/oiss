@@ -4,7 +4,7 @@
   "source": "urn:oiss:demo-001:sim:analytics",
   "type": "oiss.ZoneMetric",
   "time": "2026-11-25T17:30:00-08:00",
-  "subject": "checkout",
+  "subject": "front-end",
   "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/zone-metric.schema.json",
   "datacontenttype": "application/json",
   "oissversion": "0.1",
@@ -24,15 +24,15 @@
       "end": "2026-11-25T17:30:00-08:00"
     },
     "location": {
-      "zone": "checkout"
+      "zone": "front-end"
     },
     "metrics": {
-      "entries": 41,
-      "occupancyMean": 14.2,
-      "occupancyMax": 19,
+      "traffic": 41,
+      "avgOccupancy": 14.2,
+      "peakOccupancy": 19,
       "queueLength": 7,
-      "waitSecondsMean": 212,
-      "laneOpen": true
+      "avgWaitSeconds": 212,
+      "openLanes": 4
     },
     "confidence": 0.85
   }

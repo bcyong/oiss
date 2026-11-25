@@ -2,7 +2,7 @@
 
 A record passes when it validates against schemas/<version>/envelope.schema.json
 and against the rules in this module that JSON Schema can't express (time
-order, store-map references, synthetic GTINs).
+order, store-layout references, synthetic GTINs).
 """
 
 from __future__ import annotations
@@ -153,15 +153,15 @@ def _rule_problems(record: dict) -> Iterator[Problem]:
         if zone != record["subject"]:
             yield Problem("data.location.zone", "must be present and equal subject (the zone id)", "subject-matches-location")
 
-    elif rtype == "oiss.StoreMap":
-        yield from _store_map_problems(record)
+    elif rtype == "oiss.StoreLayout":
+        yield from _store_layout_problems(record)
 
-    elif rtype == "oiss.Trajectory":
-        yield from _trajectory_problems(data)
+    elif rtype == "oiss.ShopperPath":
+        yield from _shopper_path_problems(data)
 
 
 def _gtins(data: dict) -> Iterator[tuple[str, str]]:
-    for key in ("gtin", "expectedGtin"):
+    for key in ("observedGtin", "planogramGtin"):
         if key in data:
             yield f"data.{key}", data[key]
     for i, gtin in enumerate(data.get("gtins", [])):
@@ -171,7 +171,7 @@ def _gtins(data: dict) -> Iterator[tuple[str, str]]:
             yield f"data.facings[{i}].gtin", facing["gtin"]
 
 
-def _store_map_problems(record: dict) -> Iterator[Problem]:
+def _store_layout_problems(record: dict) -> Iterator[Problem]:
     data = record["data"]
     if data["store"]["id"] != record["oissstore"] or record["subject"] != record["oissstore"]:
         yield Problem("data.store.id", "store id, subject and oissstore must all match", "store-id")
@@ -203,12 +203,12 @@ def _store_map_problems(record: dict) -> Iterator[Problem]:
                     yield Problem(f"data.{kind}[{i}].{field}[{j}]", "point is outside the floor plan", "on-floor")
 
 
-def _trajectory_problems(data: dict) -> Iterator[Problem]:
+def _shopper_path_problems(data: dict) -> Iterator[Problem]:
     times = [parse_time(p["t"]) for p in data["points"]]
     if any(b < a for a, b in zip(times, times[1:])):
-        yield Problem("data.points", "points must be in time order", "trajectory-order")
+        yield Problem("data.points", "points must be in time order", "path-order")
     start, end = parse_time(data["window"]["start"]), parse_time(data["window"]["end"])
     if times and (times[0] < start or times[-1] > end):
-        yield Problem("data.points", "points must fall inside the window", "trajectory-window")
+        yield Problem("data.points", "points must fall inside the window", "path-window")
     if parse_time(data["idValidUntil"]) < times[-1]:
-        yield Problem("data.idValidUntil", "track id expired before the last point; rotate the id", "track-rotation")
+        yield Problem("data.idValidUntil", "path id expired before the last point; rotate the id", "path-id-rotation")

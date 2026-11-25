@@ -1,16 +1,16 @@
 # OISS specification, v0.1 draft
 
-The Open Intelligent Store Specification (OISS) is a draft open interchange standard for store-intelligence data. Its goal is to let a retailer combine data from several vendors with complementary services and its own in-house systems to run its stores better. Shelf scanners, shopper analytics, loss-prevention vision and planogram systems each publish what they saw as OISS records, so any consumer, including an AI agent, can read one record set for the whole store.
+The Open Intelligent Store Specification (OISS) is a draft open interchange standard for store-intelligence data. Its goal is to let a retailer combine data from several vendors with complementary services and its own in-house systems to run its stores better. Shelf-scanning robots and cameras, people-counting and shopper analytics, loss-prevention vision and space planning systems each publish what they saw as OISS records, so any consumer, including an AI agent, reads one record set for the whole store.
 
-This folder holds the M0 skeleton of the spec:
+It is written for retail technology leaders and their integration teams: what each record means for store operations, and what a vendor or in-house system has to send.
 
 | Document | What it defines |
 | --- | --- |
 | [envelope.md](envelope.md) | How every record maps onto a CloudEvents 1.0 event, and the fields all records share |
-| [spatial-model.md](spatial-model.md) | The floor-plan frame, the store → zone → fixture → shelf → facing hierarchy, and camera poses |
+| [store-layout.md](store-layout.md) | The floor plan, the store → zone → fixture → shelf → facing hierarchy, the planogram, and camera placement |
 | [record-types.md](record-types.md) | The seven record types and what each one says |
-| [vocabularies.md](vocabularies.md) | Controlled values: shelf status, incident types, task states, privacy classes and object classes |
-| [identifiers.md](identifiers.md) | GTINs, GLNs, OISS ids, and synthetic identifiers that can't collide with real products |
+| [vocabularies.md](vocabularies.md) | Controlled values: shelf conditions, zone and fixture types, incident types, task types and states, privacy classes |
+| [identifiers.md](identifiers.md) | Store numbers, GTINs, GLNs, OISS ids, and synthetic identifiers that can't collide with real items |
 
 The machine-readable form is in [`schemas/v0.1`](../schemas/v0.1), with examples in [`examples`](../examples) and a validator in [`validator`](../validator).
 

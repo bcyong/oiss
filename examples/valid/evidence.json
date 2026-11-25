@@ -24,7 +24,7 @@
       "end": "2026-11-25T17:42:10-08:00"
     },
     "location": {
-      "zone": "checkout",
+      "zone": "front-end",
       "fixture": "lane-03",
       "camera": "cam-12"
     },
@@ -33,7 +33,7 @@
     "redaction": "people_blurred",
     "retainUntil": "2026-12-25T00:00:00-08:00",
     "accessRoles": [
-      "loss_prevention",
+      "asset_protection",
       "store_manager"
     ]
   }

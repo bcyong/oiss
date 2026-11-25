@@ -24,7 +24,7 @@
       "end": "2026-11-25T17:42:10-08:00"
     },
     "location": {
-      "zone": "checkout",
+      "zone": "front-end",
       "fixture": "lane-03",
       "camera": "cam-12"
     },
@@ -32,7 +32,7 @@
     "uri": "evidence/ev-0002.mp4",
     "redaction": "people_blurred",
     "accessRoles": [
-      "loss_prevention",
+      "asset_protection",
       "store_manager"
     ]
   }

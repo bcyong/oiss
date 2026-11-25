@@ -12,7 +12,7 @@
   "oissprivacy": "operational",
   "data": {
     "provenance": {
-      "system": "Mock shelf scanner",
+      "system": "Mock shelf-scanning robot",
       "vendor": "Mock vendor A",
       "model": {
         "name": "shelf-detector",
@@ -35,18 +35,18 @@
       "facing": "A07-L-S3-F05",
       "camera": "cam-12"
     },
-    "status": "low",
+    "status": "low_stock",
     "flags": [
-      "mispriced"
+      "price_mismatch"
     ],
-    "gtin": "02000000001013",
-    "expectedGtin": "02000000001012",
-    "fillRatio": 0.2,
-    "observedPrice": {
+    "observedGtin": "02000000001013",
+    "planogramGtin": "02000000001012",
+    "fillLevel": 0.2,
+    "tagPrice": {
       "amount": 3.99,
       "currency": "USD"
     },
-    "expectedPrice": {
+    "systemPrice": {
       "amount": 3.49,
       "currency": "USD"
     },

@@ -13,16 +13,16 @@ INVALID = sorted((ROOT / "examples" / "invalid").glob("*.json"))
 
 # What each invalid example must be rejected for.
 EXPECTED = {
-    "store-map-dangling-shelf.json": ("map-references", "A08-L"),
+    "store-layout-dangling-shelf.json": ("map-references", "A08-L"),
     "shelf-observation-bad-check-digit.json": ("schema", "gtin"),
     "zone-metric-window-reversed.json": ("window-order", "start is after end"),
-    "trajectory-face-field.json": ("schema", "faceEmbedding"),
+    "shopper-path-face-field.json": ("schema", "faceEmbedding"),
     "incident-wrong-privacy.json": ("schema", "restricted"),
     "evidence-no-retention.json": ("schema", "retainUntil"),
     "task-verified-without-proof.json": ("schema", "verifiedBy"),
 }
 
-RECORD_TYPES = {"StoreMap", "ShelfObservation", "ZoneMetric", "Trajectory", "Incident", "Evidence", "Task"}
+RECORD_TYPES = {"StoreLayout", "ShelfObservation", "ZoneMetric", "ShopperPath", "Incident", "Evidence", "Task"}
 
 
 @pytest.fixture(scope="module")
@@ -64,17 +64,17 @@ def test_gtin_check_digit():
 def test_synthetic_records_need_restricted_circulation_gtins(validator):
     record = load(ROOT / "examples" / "valid" / "shelf-observation.json")
     real_looking = copy.deepcopy(record)
-    real_looking["data"]["gtin"] = "04006381333931"
+    real_looking["data"]["observedGtin"] = "04006381333931"
     assert any(p.rule == "synthetic-gtin" for p in validator.problems(real_looking))
     real_looking["data"]["provenance"]["synthetic"] = False
-    real_looking["data"]["expectedGtin"] = "04006381333931"
+    real_looking["data"]["planogramGtin"] = "04006381333931"
     assert validator.problems(real_looking) == []
 
 
-def test_trajectory_points_must_be_in_time_order(validator):
-    record = load(ROOT / "examples" / "valid" / "trajectory.json")
+def test_shopper_path_points_must_be_in_time_order(validator):
+    record = load(ROOT / "examples" / "valid" / "shopper-path.json")
     record["data"]["points"].reverse()
-    assert any(p.rule == "trajectory-order" for p in validator.problems(record))
+    assert any(p.rule == "path-order" for p in validator.problems(record))
 
 
 def test_shelf_observation_subject_is_the_facing(validator):

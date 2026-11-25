@@ -2,18 +2,53 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shelf-observation.schema.json",
   "title": "OISS v0.1 ShelfObservation data",
-  "description": "What a source saw at one facing. subject is the facing id.",
+  "description": "What a shelf scan or audit found at one facing: on-shelf availability, planogram compliance and price integrity. subject is the facing id.",
   "type": "object",
-  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
   "properties": {
-    "status": { "$ref": "vocab.schema.json#/$defs/shelfStatus" },
-    "flags": { "type": "array", "items": { "$ref": "vocab.schema.json#/$defs/shelfFlag" }, "uniqueItems": true },
-    "gtin": { "$ref": "defs.schema.json#/$defs/gtin", "description": "The product seen at the facing, if identified." },
-    "expectedGtin": { "$ref": "defs.schema.json#/$defs/gtin", "description": "The product the planogram expects." },
-    "fillRatio": { "type": "number", "minimum": 0, "maximum": 1 },
-    "observedPrice": { "$ref": "defs.schema.json#/$defs/money" },
-    "expectedPrice": { "$ref": "defs.schema.json#/$defs/money" }
+    "status": {
+      "$ref": "vocab.schema.json#/$defs/shelfStatus",
+      "description": "On-shelf availability."
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "$ref": "vocab.schema.json#/$defs/shelfFlag"
+      },
+      "uniqueItems": true
+    },
+    "observedGtin": {
+      "$ref": "defs.schema.json#/$defs/gtin",
+      "description": "The item seen at the facing, if identified."
+    },
+    "planogramGtin": {
+      "$ref": "defs.schema.json#/$defs/gtin",
+      "description": "The item the planogram assigns to the facing."
+    },
+    "fillLevel": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "How full the facing is, from 0 (empty) to 1 (at capacity)."
+    },
+    "tagPrice": {
+      "$ref": "defs.schema.json#/$defs/money",
+      "description": "The price on the shelf tag or electronic shelf label."
+    },
+    "systemPrice": {
+      "$ref": "defs.schema.json#/$defs/money",
+      "description": "The price in the retailer's price file or POS."
+    }
   },
-  "required": ["status", "location", "confidence", "window"],
+  "required": [
+    "status",
+    "location",
+    "confidence",
+    "window"
+  ],
   "unevaluatedProperties": false
 }

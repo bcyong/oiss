@@ -2,17 +2,50 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/incident.schema.json",
   "title": "OISS v0.1 Incident data",
-  "description": "A checkout or loss-prevention exception. It is a signal with a confidence for a person to review, not an accusation. subject is the incident id.",
+  "description": "A loss-prevention exception or store safety incident. It is a signal with a confidence for a person to review, not an accusation. subject is the incident id.",
   "type": "object",
-  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
   "properties": {
-    "incidentType": { "$ref": "vocab.schema.json#/$defs/incidentType" },
-    "severity": { "$ref": "vocab.schema.json#/$defs/severity" },
-    "status": { "$ref": "vocab.schema.json#/$defs/incidentStatus" },
-    "gtins": { "type": "array", "items": { "$ref": "defs.schema.json#/$defs/gtin" }, "uniqueItems": true, "description": "Products involved." },
-    "tracks": { "type": "array", "items": { "$ref": "defs.schema.json#/$defs/id" }, "uniqueItems": true, "description": "Trajectory subjects involved." },
-    "summary": { "type": "string", "maxLength": 500 }
+    "incidentType": {
+      "$ref": "vocab.schema.json#/$defs/incidentType"
+    },
+    "severity": {
+      "$ref": "vocab.schema.json#/$defs/severity"
+    },
+    "status": {
+      "$ref": "vocab.schema.json#/$defs/incidentStatus"
+    },
+    "gtins": {
+      "type": "array",
+      "items": {
+        "$ref": "defs.schema.json#/$defs/gtin"
+      },
+      "uniqueItems": true,
+      "description": "Items involved."
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "$ref": "defs.schema.json#/$defs/id"
+      },
+      "uniqueItems": true,
+      "description": "ShopperPath subjects involved."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500
+    }
   },
-  "required": ["incidentType", "status", "confidence", "location", "window"],
+  "required": [
+    "incidentType",
+    "status",
+    "confidence",
+    "location",
+    "window"
+  ],
   "unevaluatedProperties": false
 }

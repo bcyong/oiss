@@ -25,19 +25,19 @@
       "end": "2026-11-25T17:42:10-08:00"
     },
     "location": {
-      "zone": "checkout",
+      "zone": "front-end",
       "fixture": "lane-03"
     },
-    "incidentType": "missed_scan",
+    "incidentType": "non_scan",
     "severity": "medium",
     "status": "open",
     "gtins": [
       "02000000003030"
     ],
-    "tracks": [
-      "trk-7f3a"
+    "paths": [
+      "path-7f3a"
     ],
-    "summary": "An item left the scan area without a scan.",
+    "summary": "An item passed the scanner without a scan.",
     "confidence": 0.67,
     "evidence": [
       "ev-0002"

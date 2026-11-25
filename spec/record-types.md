@@ -2,21 +2,21 @@
 
 Each record type has its own schema for `data` in [`schemas/v0.1`](../schemas/v0.1), and a valid and an invalid example in [`examples`](../examples).
 
-| Record | `subject` | What it says | Typical sources | Privacy floor |
+| Record | About (`subject`) | What it says | Typical sources | Privacy floor |
 | --- | --- | --- | --- | --- |
-| StoreMap | store id | Zones, fixtures, shelves, facings, cameras and planogram | Retailer, planogram system, ESL and item-location platforms | operational |
-| ShelfObservation | facing id | A facing is in stock, low, out or unknown, with flags such as misplaced or mispriced, and the GTIN seen | Shelf robots and cameras | operational |
-| ZoneMetric | zone id | Entries, occupancy, dwell, queue length and wait for one zone over one interval | Shopper analytics, Metropolis pipelines | aggregate |
-| Trajectory | track id | An anonymous path on the floor plan | Multi-camera tracking; off by default | anonymous_track |
-| Incident | incident id | A checkout or loss-prevention exception, with a confidence, for a person to review | Loss-prevention vision | restricted |
-| Evidence | evidence id | A reference to an image or clip, with redaction, retention date and who may see it | Any vendor | restricted |
-| Task | task id | A recommended or assigned action and its state | Task tools, agents | operational |
+| StoreLayout | the store | Zones, fixtures, shelves and facings, with the planogram and camera placement | Space planning and planogram systems, ESL and item-location platforms | operational |
+| ShelfObservation | a facing | On-shelf availability (in stock, low stock, out of stock), planogram compliance and price integrity | Shelf-scanning robots, fixed shelf cameras, associate audits | operational |
+| ZoneMetric | a zone | Traffic, dwell, queue length, wait time and open lanes over one interval | People counting, shopper analytics, video analytics | aggregate |
+| ShopperPath | an anonymous path | One shopper's path on the floor plan | Multi-camera tracking; off by default | anonymous_path |
+| Incident | an incident | A loss-prevention exception or safety incident, with a confidence | Loss-prevention and front-end vision, safety detection | restricted |
+| Evidence | an evidence item | A clip or image reference, with redaction, retention date and access roles | Any vendor | restricted |
+| Task | a task | A store task, such as replenish, recover or fix a shelf tag, and its status | Task management, agents | operational |
 
 ## Rules worth calling out
 
-- **ShelfObservation** needs `status`, `location` (with the facing), `confidence` and `window`. `gtin` is what was seen and `expectedGtin` what the planogram expects, so a misplaced item is visible in the data.
-- **ZoneMetric** is aggregate only: counts and averages, never individuals.
-- **Trajectory** carries an anonymous track id that rotates. `idValidUntil` says when the producer must switch to a new id, and every point must come before it. Points are in time order and inside the window. No appearance, face or other biometric field is allowed.
-- **Incident** is a signal, not an accusation. Its `status` starts at `open` and only a person moves it to `confirmed` or `dismissed`.
-- **Evidence** points to media in an evidence store. It MUST give a `redaction` level, a `retainUntil` date and the `accessRoles` that may view it.
-- **Task** state changes are new records with the same `subject`. A task with `verification.required` closes at `verified`, and a `verified` task MUST name the record that showed the fix in `verification.verifiedBy`.
+- **ShelfObservation** needs `status`, `location` (with the facing), `confidence` and the scan `window`. `observedGtin` is the item seen and `planogramGtin` the item the planogram assigns, so a misplaced item shows in the data. `tagPrice` is what the shelf tag or ESL shows and `systemPrice` what the price file or POS charges, so a price mismatch shows too.
+- **ZoneMetric** is aggregate only: counts and averages, never individual shoppers.
+- **ShopperPath** carries an anonymous path id that rotates. `idValidUntil` says when the producer must switch to a new id, and every point must come before it. Points are in time order and inside the window. No appearance, face or other biometric field is allowed.
+- **Incident** is a signal, not an accusation. Its `status` starts at `open`, and only a person moves it to `confirmed` or `dismissed`.
+- **Evidence** points to media held in an evidence store. It MUST give a `redaction` level, a `retainUntil` date and the `accessRoles` that may view it, such as asset protection or the store manager.
+- **Task** status changes are new records with the same `subject`. A task with `verification.required` closes at `verified`, and a `verified` task MUST name the record that showed the fix in `verification.verifiedBy`, such as the next shelf scan.

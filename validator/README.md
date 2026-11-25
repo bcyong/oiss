@@ -6,10 +6,10 @@ Checks OISS records against the JSON Schemas in [`schemas/v0.1`](../schemas/v0.1
 | --- | --- |
 | `schema` | The envelope and the record type's `data` schema, including GTIN and GLN check digits and RFC 3339 timestamps with offsets |
 | `window-order` | `window.start` is not after `window.end` |
-| `synthetic-gtin` | Records marked `synthetic` only use GS1 restricted-circulation GTINs (prefixes 20–29) |
+| `synthetic-gtin` | Records marked `synthetic` only use GS1 restricted-circulation numbers (prefixes 20–29) |
 | `subject-matches-location` | A ShelfObservation's subject is its facing, a ZoneMetric's is its zone |
-| `store-id`, `unique-ids`, `map-references`, `on-floor` | A StoreMap's ids are unique, every parent it names exists, and shapes sit on the floor plan |
-| `trajectory-order`, `trajectory-window`, `track-rotation` | Trajectory points are in time order, inside the window, and before the track id expires |
+| `store-id`, `unique-ids`, `map-references`, `on-floor` | A StoreLayout's ids are unique, every parent it names exists, and shapes sit on the floor plan |
+| `path-order`, `path-window`, `path-id-rotation` | ShopperPath points are in time order, inside the window, and before the path id expires |
 
 ## Use
 

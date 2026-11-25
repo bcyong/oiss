@@ -5,46 +5,151 @@
   "description": "Controlled values shared by the OISS record types. See spec/vocabularies.md.",
   "$defs": {
     "recordType": {
-      "enum": ["oiss.StoreMap", "oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.Trajectory", "oiss.Incident", "oiss.Evidence", "oiss.Task"]
+      "enum": [
+        "oiss.StoreLayout",
+        "oiss.ShelfObservation",
+        "oiss.ZoneMetric",
+        "oiss.ShopperPath",
+        "oiss.Incident",
+        "oiss.Evidence",
+        "oiss.Task"
+      ]
     },
     "privacyClass": {
-      "description": "Ordered from least to most sensitive: operational, aggregate, anonymous_track, restricted.",
-      "enum": ["operational", "aggregate", "anonymous_track", "restricted"]
+      "description": "Ordered from least to most sensitive: operational, aggregate, anonymous_path, restricted.",
+      "enum": [
+        "operational",
+        "aggregate",
+        "anonymous_path",
+        "restricted"
+      ]
     },
     "shelfStatus": {
-      "enum": ["in_stock", "low", "out_of_stock", "unknown"]
+      "enum": [
+        "in_stock",
+        "low_stock",
+        "out_of_stock",
+        "unknown"
+      ]
     },
     "shelfFlag": {
-      "enum": ["misplaced", "mispriced", "label_missing", "wrong_facing_count", "damaged", "planogram_mismatch"]
+      "description": "Shelf conditions found during a scan or audit.",
+      "enum": [
+        "misplaced_item",
+        "price_mismatch",
+        "missing_tag",
+        "facing_count_mismatch",
+        "needs_recovery",
+        "damaged_item",
+        "planogram_noncompliant"
+      ]
     },
     "zoneKind": {
-      "enum": ["aisle", "endcap", "checkout", "self_checkout", "entrance", "exit", "produce", "deli", "bakery", "service", "backroom", "other"]
+      "enum": [
+        "aisle",
+        "endcap",
+        "front_end",
+        "self_checkout",
+        "entrance",
+        "exit",
+        "produce",
+        "deli",
+        "bakery",
+        "meat_and_seafood",
+        "dairy",
+        "frozen",
+        "pharmacy",
+        "service_counter",
+        "backroom",
+        "other"
+      ]
     },
     "fixtureKind": {
-      "enum": ["shelving", "endcap", "cooler", "freezer", "display", "bin", "checkout_lane", "self_checkout_station", "other"]
+      "enum": [
+        "gondola",
+        "endcap",
+        "wall_section",
+        "cooler",
+        "freezer",
+        "display",
+        "pallet_display",
+        "bin",
+        "checkout_lane",
+        "self_checkout",
+        "other"
+      ]
     },
     "objectClass": {
-      "description": "Human, Vehicle, Bicycle and Animal follow ONVIF's analytics object type names. Cart, Basket, Bag and Product are OISS additions for retail. ONVIF's HumanFace and LicensePlate are left out on purpose.",
-      "enum": ["Human", "Vehicle", "Bicycle", "Animal", "Cart", "Basket", "Bag", "Product"]
+      "description": "Human, Vehicle, Bicycle and Animal follow ONVIF's analytics object type names. Cart, Basket, Bag and Item are OISS additions for retail. ONVIF's HumanFace and LicensePlate are left out on purpose.",
+      "enum": [
+        "Human",
+        "Vehicle",
+        "Bicycle",
+        "Animal",
+        "Cart",
+        "Basket",
+        "Bag",
+        "Item"
+      ]
     },
     "incidentType": {
-      "enum": ["missed_scan", "ticket_switch", "bottom_of_basket", "unpaid_exit", "high_shrink_removal", "spill_or_hazard", "other"]
+      "description": "Loss-prevention exceptions and store safety incidents.",
+      "enum": [
+        "non_scan",
+        "ticket_switching",
+        "bottom_of_basket",
+        "sweethearting",
+        "push_out",
+        "shelf_sweep",
+        "safety_hazard",
+        "other"
+      ]
     },
     "incidentStatus": {
-      "enum": ["open", "under_review", "confirmed", "dismissed"]
+      "enum": [
+        "open",
+        "under_review",
+        "confirmed",
+        "dismissed"
+      ]
     },
     "severity": {
-      "enum": ["low", "medium", "high"]
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
     },
     "taskKind": {
-      "enum": ["restock", "face_up", "fix_price_label", "relocate_item", "open_lane", "review_incident", "clean_hazard", "other"]
+      "enum": [
+        "replenish",
+        "recover",
+        "fix_shelf_tag",
+        "go_back",
+        "open_lane",
+        "review_exception",
+        "cleanup",
+        "other"
+      ]
     },
     "taskState": {
-      "description": "open → assigned → in_progress → done → verified. A task that needs verification closes only at verified. cancelled can follow any state.",
-      "enum": ["open", "assigned", "in_progress", "done", "verified", "cancelled"]
+      "description": "open \u2192 assigned \u2192 in_progress \u2192 done \u2192 verified. A task that needs verification closes only at verified. cancelled can follow any state.",
+      "enum": [
+        "open",
+        "assigned",
+        "in_progress",
+        "done",
+        "verified",
+        "cancelled"
+      ]
     },
     "redaction": {
-      "enum": ["none", "people_blurred", "people_masked", "cropped_to_shelf"]
+      "enum": [
+        "none",
+        "people_blurred",
+        "people_masked",
+        "cropped_to_shelf"
+      ]
     }
   }
 }

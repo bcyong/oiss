@@ -2,14 +2,14 @@
   "specversion": "1.0",
   "id": "tr-0001",
   "source": "urn:oiss:demo-001:sim:tracker",
-  "type": "oiss.Trajectory",
+  "type": "oiss.ShopperPath",
   "time": "2026-11-25T17:20:30-08:00",
-  "subject": "trk-7f3a",
-  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/trajectory.schema.json",
+  "subject": "path-7f3a",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shopper-path.schema.json",
   "datacontenttype": "application/json",
   "oissversion": "0.1",
   "oissstore": "demo-001",
-  "oissprivacy": "anonymous_track",
+  "oissprivacy": "anonymous_path",
   "data": {
     "provenance": {
       "system": "oiss-sim",
@@ -42,6 +42,11 @@
         "y": 22.0
       }
     ],
-    "confidence": 0.8
+    "confidence": 0.8,
+    "faceEmbedding": [
+      0.12,
+      0.98,
+      0.33
+    ]
   }
 }
