@@ -1,4 +1,5 @@
 import type { MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
+import type { Injection, ShelfFault } from "@oiss/sim";
 import type { DayRecords, ItemMaster } from "./oiss.ts";
 
 export interface DayFiles {
@@ -15,6 +16,11 @@ export interface DayFiles {
   vendorFeeds?: { mockLpAlerts?: MockLpAlert[] };
   /** How long the browser took to simulate the day, for a day made in the browser. */
   simulatedInMs?: number;
+  /**
+   * Faults the visitor injected, as the simulator played them out. Not OISS: this is what really
+   * happened on the shelf, kept so the demo can show whether any record has caught each one yet.
+   */
+  injected?: ShelfFault[];
 }
 
 const base = import.meta.env.BASE_URL;
@@ -58,18 +64,18 @@ export async function loadGoldenDay(): Promise<DayFiles> {
 }
 
 /** Runs the store simulator in a web worker, so a new day never blocks the page. */
-export function simulateInBrowser(seed: number, date: string): Promise<DayFiles> {
+export function simulateInBrowser(seed: number, date: string, injections: Injection[] = []): Promise<DayFiles> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (e: MessageEvent<{ records: DayRecords; itemMaster: ItemMaster; vendorFeeds: DayFiles["vendorFeeds"]; ms: number } | { error: string }>) => {
+    worker.onmessage = (e: MessageEvent<{ records: DayRecords; itemMaster: ItemMaster; vendorFeeds: DayFiles["vendorFeeds"]; injected: ShelfFault[]; ms: number } | { error: string }>) => {
       worker.terminate();
       if ("error" in e.data) return reject(new Error(e.data.error));
-      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, vendorFeeds: e.data.vendorFeeds, simulatedInMs: e.data.ms });
+      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, vendorFeeds: e.data.vendorFeeds, simulatedInMs: e.data.ms, injected: e.data.injected });
     };
     worker.onerror = (e) => {
       worker.terminate();
       reject(new Error(e.message || "The simulator stopped"));
     };
-    worker.postMessage({ seed, date });
+    worker.postMessage({ seed, date, injections });
   });
 }

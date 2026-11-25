@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { arrivedCount, clock, clockOf, incidentsUpTo, indexDay, latestObservation, recentRecords, robotAt, shoppersAt, statusesAt, zoneMetricAt, type IndexedDay } from "./day.ts";
-import { checkoutName, duration, humanize, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import type { FaultKind, Injection } from "@oiss/sim";
+import { arrivedCount, clock, clockOf, faultSeen, flagsAt, incidentsUpTo, indexDay, latestObservation, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type IndexedDay } from "./day.ts";
+import { checkoutName, duration, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
@@ -8,6 +9,8 @@ import type { AnyRecord, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
 
 const SPEEDS = [
+  { label: "Real time", value: 1 },
+  { label: "10 s/s", value: 10 },
   { label: "1 min/s", value: 60 },
   { label: "5 min/s", value: 300 },
   { label: "15 min/s", value: 900 },
@@ -18,7 +21,21 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "now" | "stream" | "sources";
+export type Tab = "now" | "faults" | "stream" | "sources";
+
+/** The faults a visitor can inject, in a store team's words. */
+const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
+  { kind: "misplaced_item", button: "Misplace an item", what: "A shopper leaves something else on the facing, a go-back." },
+  { kind: "price_mismatch", button: "Mistag the price", what: "The shelf tag stops matching the price file." },
+  { kind: "phantom_inventory", button: "Empty it without a sale", what: "The units go missing, but the system still counts them: phantom inventory." },
+];
+
+/** Where a shelf observation came from, in a few words. */
+function observer(r: { source: string; data: { location: { camera?: string } } }): string {
+  if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
+  if (r.source.endsWith(":robot-1")) return "the robot";
+  return r.source;
+}
 
 /** The thing on the floor plan that a record is about, so picking a record also picks it on the map. */
 function selectionFor(day: IndexedDay, r: AnyRecord): Selection | null {
@@ -59,6 +76,8 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
   const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
   const [streamType, setStreamType] = useState<string>("");
+  /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
     if (start) return;
@@ -78,7 +97,7 @@ export function App({ start }: { start?: AppStart } = {}) {
       setT((prev) => {
         const next = prev + dt * speed;
         if (next >= day.close) {
-          setPlaying(false);
+          if (!live) setPlaying(false);
           return day.close;
         }
         return next;
@@ -90,7 +109,24 @@ export function App({ start }: { start?: AppStart } = {}) {
       cancelAnimationFrame(raf);
       last.current = null;
     };
-  }, [playing, speed, day]);
+  }, [playing, speed, day, live]);
+
+  // A live store doesn't stop at close: the next day starts at opening.
+  useEffect(() => {
+    if (!live || !day || busy || t < day.close) return;
+    const date = nextDate(day.files.date);
+    setBusy(true);
+    simulateInBrowser(liveSeed(day.files.store, date), date)
+      .then((files) => {
+        const next = indexDay(files);
+        setSelection(null);
+        setPinned(null);
+        setDay(next);
+        setT(next.open);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  }, [live, day, busy, t]);
 
   // Facing colors change only when a new observation lands, so keep the same array until then.
   const statusRef = useRef<(ShelfStatus | "none")[]>([]);
@@ -100,6 +136,16 @@ export function App({ start }: { start?: AppStart } = {}) {
     const prev = statusRef.current;
     if (prev.length === next.length && prev.every((s, i) => s === next[i])) return prev;
     statusRef.current = next;
+    return next;
+  }, [day, t]);
+
+  const flagRef = useRef<boolean[]>([]);
+  const flagged = useMemo(() => {
+    if (!day) return [];
+    const next = flagsAt(day, t);
+    const prev = flagRef.current;
+    if (prev.length === next.length && prev.every((f, i) => f === next[i])) return prev;
+    flagRef.current = next;
     return next;
   }, [day, t]);
 
@@ -185,6 +231,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   const runNewDay = () => {
     setBusy(true);
     setPlaying(false);
+    setLive(false);
     const seed = Math.floor(Math.random() * 1e9);
     simulateInBrowser(seed, day.files.date)
       .then((files) => {
@@ -196,7 +243,57 @@ export function App({ start }: { start?: AppStart } = {}) {
       .finally(() => setBusy(false));
   };
 
+  // Live: today's store day, the same for everyone watching, from the store's clock now.
+  const goLive = () => {
+    const now = storeNow(day.layout.store.timezone);
+    setBusy(true);
+    setPlaying(false);
+    simulateInBrowser(liveSeed(day.files.store, now.date), now.date)
+      .then((files) => {
+        const next = indexDay(files);
+        setSelection(null);
+        setPinned(null);
+        setDay(next);
+        setT(Math.min(Math.max(now.t, next.open), next.close));
+        setSpeed(1);
+        setLive(true);
+        setPlaying(true);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+
+  // Injecting a fault replays the day with it from now on. Every record sent before now stays the same.
+  const injected = day.files.injected ?? [];
+  const selectedFacing = selection?.kind === "facing" ? selection.index : null;
+  const inject = (kind: FaultKind) => {
+    const index = selectedFacing ?? Math.floor(Math.random() * day.facings.length);
+    const injections: Injection[] = [...injected.map((f) => ({ kind: f.kind, facing: f.facing, t: f.start })), { kind, facing: day.facings[index]!.facing.id, t: Math.floor(t) }];
+    const wasPlaying = playing;
+    setPlaying(false);
+    setBusy(true);
+    simulateInBrowser(day.files.seed, day.files.date, injections)
+      .then((files) => {
+        setDay(indexDay({ ...files, origin: day.files.origin }));
+        setSelection({ kind: "facing", index });
+        setPinned(null);
+        setPlaying(wasPlaying);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+  const faultText = (f: (typeof injected)[number]) => {
+    const own = itemNameAt(day, f.facing);
+    if (f.kind === "misplaced_item") return `${(f.gtin && day.items.get(f.gtin)?.name) || "Another item"} left on the ${own} facing`;
+    if (f.kind === "price_mismatch") {
+      const gtin = day.facings[day.facingById.get(f.facing) ?? 0]!.facing.gtin;
+      return `${own} tagged ${money({ amount: f.tagPrice ?? 0, currency: "USD" })}, price file ${money(day.items.get(gtin)?.price)}`;
+    }
+    return `${own} emptied without a sale`;
+  };
+
   // The selection's card, and the record the inspector shows.
+  const injectedCount = injected.length ? `, ${injected.length} injected ${injected.length === 1 ? "fault" : "faults"}` : "";
   let selectionCard: ReactNode = null;
   let following: AnyRecord | undefined;
   let related: AnyRecord[] = [];
@@ -222,6 +319,14 @@ export function App({ start }: { start?: AppStart } = {}) {
           </dd>
           <dt>On the shelf</dt>
           <dd>{obs ? `${STATUS_LABEL[obs.data.status]}${obs.data.fillLevel !== undefined ? `, ${pct(obs.data.fillLevel)} full` : ""}, at ${clockOf(day, obs.data.window.end)}` : "Not observed yet today"}</dd>
+          {obs?.data.flags?.length ? (
+            <>
+              <dt>Flagged</dt>
+              <dd>
+                {obs.data.flags.map(flagName).join(", ")}: {flagDetail(day, obs.data)}
+              </dd>
+            </>
+          ) : null}
           {item?.promo && (
             <>
               <dt>Promotion</dt>
@@ -345,21 +450,29 @@ export function App({ start }: { start?: AppStart } = {}) {
         <div>
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
-            A synthetic grocery day, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, replayed only from{" "}
+            A synthetic grocery day{live ? " running live" : ""}, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, {live ? "simulated" : "replayed"} only from{" "}
             <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor and a mock loss prevention vendor. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
-          <span>{day.files.origin === "golden" ? "Golden day" : `Simulated in your browser in ${((day.files.simulatedInMs ?? 0) / 1000).toFixed(1)} s`}, seed {day.files.seed}</span>
-          <button type="button" onClick={runNewDay} disabled={busy}>
-            {busy ? "Simulating…" : "Simulate another day"}
-          </button>
+          <span>
+            {live ? "Today, live" : day.files.origin === "golden" ? "Golden day" : `Simulated in your browser in ${((day.files.simulatedInMs ?? 0) / 1000).toFixed(1)} s`}, seed {day.files.seed}
+            {injectedCount}
+          </span>
+          <div className="day-buttons">
+            <button type="button" onClick={goLive} disabled={busy || live}>
+              {live ? "Live" : "Go live"}
+            </button>
+            <button type="button" onClick={runNewDay} disabled={busy}>
+              {busy ? "Simulating…" : "Simulate another day"}
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="layout">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
+          <FloorPlan day={day} statuses={statuses} flagged={flagged} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
           <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
@@ -367,6 +480,10 @@ export function App({ start }: { start?: AppStart } = {}) {
                 {STATUS_LABEL[s]}
               </span>
             ))}
+            <span>
+              <i className="swatch flag-swatch" />
+              Flagged by a shelf scan
+            </span>
             <span>
               <i className="swatch dot" />
               Shopper
@@ -390,7 +507,8 @@ export function App({ start }: { start?: AppStart } = {}) {
               {playing ? "❚❚" : "▶"}
             </button>
             <span className="clock">{clock(t)}</span>
-            <input type="range" min={day.open} max={day.close} step={30} value={t} onChange={(e) => setT(Number(e.target.value))} aria-label="Time of day" />
+            {live && <span className={`live-pill${speed === 1 ? "" : " fast"}`}>{speed === 1 ? "Live" : "Continuous"}</span>}
+            <input type="range" min={day.open} max={day.close} step={1} value={t} onChange={(e) => setT(Number(e.target.value))} aria-label="Time of day" />
             <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Playback speed">
               {SPEEDS.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -441,6 +559,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
                 At {clock(t)}
               </button>
+              <button type="button" role="tab" aria-selected={tab === "faults"} onClick={() => setTab("faults")}>
+                Shelf faults
+              </button>
               <button type="button" role="tab" aria-selected={tab === "stream"} onClick={() => setTab("stream")}>
                 Record stream
               </button>
@@ -459,6 +580,14 @@ export function App({ start }: { start?: AppStart } = {}) {
                   <div>
                     <b>{counts.out_of_stock}</b>
                     <span>Facings out of stock</span>
+                  </div>
+                  <div>
+                    <b>{flagged.filter(Boolean).length}</b>
+                    <span>Facings flagged: misplaced items or wrong tags</span>
+                  </div>
+                  <div>
+                    <b>{sco?.queueLength ?? "–"}</b>
+                    <span>In line at self-checkout</span>
                   </div>
                   <div>
                     <b>{shoppers.length}</b>
@@ -488,8 +617,70 @@ export function App({ start }: { start?: AppStart } = {}) {
                   </div>
                 </div>
                 <p className="note">
-                  {known} of {day.facings.length} facings observed so far. Self-checkout: {sco?.queueLength ?? 0} in line. Front-end figures are from the last 15-minute ZoneMetric.
+                  {known} of {day.facings.length} facings observed so far. Front-end figures are from the last 15-minute ZoneMetric.
                 </p>
+              </>
+            )}
+
+            {tab === "faults" && (
+              <>
+                <p className="note top">
+                  Make something go wrong at {clock(t)}, then play on to see whether the robot or the shelf cameras report it. Every record sent before {clock(t)} stays exactly the same. The day already has its own go-backs, wrong tags and phantom inventory, as any store does.
+                </p>
+                <p className="target">
+                  {selectedFacing !== null ? (
+                    <>
+                      On <b>{itemNameAt(day, day.facings[selectedFacing]!.facing.id)}</b>, the facing you picked.
+                    </>
+                  ) : (
+                    "On a random facing. Tap a facing on the floor plan to pick one."
+                  )}
+                </p>
+                <div className="inject">
+                  {FAULTS.map((f) => (
+                    <button key={f.kind} type="button" onClick={() => inject(f.kind)} disabled={busy || t >= day.close}>
+                      <b>{f.button}</b>
+                      <span>{f.what}</span>
+                    </button>
+                  ))}
+                </div>
+                {busy && <p className="note">Replaying the day with your fault…</p>}
+                {injected.length > 0 && (
+                  <>
+                    <h3>Your faults</h3>
+                    <ul className="records">
+                      {injected.map((f) => {
+                        const seen = faultSeen(day, f, t);
+                        const status =
+                          seen.kind === "caught"
+                            ? `Caught by ${observer(seen.record)} at ${clock(seen.at)}, ${duration(seen.at - f.start)} later`
+                            : seen.kind === "cleared"
+                              ? `An associate put it back at ${clock(seen.at)}, before any scan saw it`
+                              : seen.kind === "ahead"
+                                ? `Happens at ${clock(f.start)}`
+                                : "Not in any record yet";
+                        return (
+                          <li key={f.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const index = day.facingById.get(f.facing);
+                                if (index !== undefined) select({ kind: "facing", index });
+                                if (seen.kind === "caught") inspect(seen.record.id);
+                              }}
+                            >
+                              <span className="time">{clock(f.start)}</span>
+                              <span>
+                                {faultText(f)}
+                                <span className={`seen seen-${seen.kind}`}>{status}</span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
               </>
             )}
 

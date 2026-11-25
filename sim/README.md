@@ -16,15 +16,20 @@ It is plain TypeScript with no Node-only code, so the same source runs in Node f
 - Shelves deplete as items sell. Associates run recovery rounds at 11 AM, 3 PM and 7 PM from backroom stock; a few items have a supply issue and no backroom stock.
 - The front-end lead opens a lane when lines grow and closes one when they shrink.
 - Every checkout is a transaction with what the shopper bought. A small share of them carry a checkout exception: a non-scan, bottom of basket, ticket switch or sweethearting, at rates that differ between staffed lanes and self-checkout. These are ground truth, which a real store never sees directly.
+- Shelf faults that the store's own systems don't see, also ground truth, at set rates each day:
+  - **Misplaced items** (about 16 a day): go-backs, left on another item's facing as traffic allows. An associate clears most of them in the next recovery round.
+  - **Price mismatches** (about 6 a day): a price change that took effect overnight but wasn't re-tagged, so the shelf tag disagrees with the price file all day.
+  - **Phantom inventory** (about 3 a day): the units on a facing go missing without a sale and the backroom has none. The system still counts them, so no replenishment comes and the facing stays empty.
+- A visitor can **inject** any of these faults at a set facing and time. An injected fault changes the day only from that time on: every record sent before it stays exactly the same, so the demo can replay the day with the fault and carry on where it was.
 
 ## The sources
 
 | Source | Records | What it reports |
 | --- | --- | --- |
 | Demo Grocery space planning | StoreLayout | The floor plan, fixtures, shelves, facings, planogram and cameras |
-| Mock shelf-scanning robot (mock vendor A) | ShelfObservation | Every facing, every two hours from 8 AM to 8 PM, with fill level and shelf tag price |
-| Store shelf cameras (in-house) | ShelfObservation | Aisle 3 and the dairy wall every 5 minutes, reported on change |
-| Shelf scanner and shelf cameras | Evidence | A shelf image reference for each low-stock or out-of-stock observation, cropped to the shelf, kept 30 days and viewable by store and department managers. The synthetic store has no images, so the demo draws a placeholder |
+| Mock shelf-scanning robot (mock vendor A) | ShelfObservation | Every facing, every two hours from 8 AM to 8 PM, with fill level and shelf tag price. Flags a misplaced item most of the time it passes one, and every shelf tag that disagrees with the price file |
+| Store shelf cameras (in-house) | ShelfObservation | Aisle 3 and the dairy wall every 5 minutes, reported on change. Flags most misplaced items; can't read shelf tags |
+| Shelf scanner and shelf cameras | Evidence | A shelf image reference for each low-stock, out-of-stock or flagged observation, cropped to the shelf, kept 30 days and viewable by store and department managers. The synthetic store has no images, so the demo draws a placeholder |
 | Mock people-counting system (mock vendor C) | ZoneMetric | Traffic, occupancy, dwell, line length, wait and open lanes per zone every 15 minutes |
 | Mock multi-camera tracker (mock vendor C) | ShopperPath | Anonymous paths with ids that rotate every 15 minutes |
 | Mock loss prevention (mock vendor B) | Incident, Evidence | Alerts about checkout exceptions, in the vendor's own format, written as OISS by the [`mock-lp-alerts` adapter](../adapters/README.md). The vendor catches most real exceptions, misses some and raises some false alerts, each with a 20-second clip kept 90 days |

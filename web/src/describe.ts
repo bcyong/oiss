@@ -9,6 +9,21 @@ export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
   none: "Not yet observed",
 };
 
+/** Shelf observation flags, in the words a store team uses. */
+export const FLAG_LABEL: Record<string, string> = {
+  misplaced_item: "Misplaced item",
+  price_mismatch: "Price mismatch",
+};
+export const flagName = (f: string) => FLAG_LABEL[f] ?? humanize(f);
+
+/** What a flagged shelf observation found, in a sentence fragment, such as "the tag says $3.49 and the price file $3.99". */
+export function flagDetail(day: IndexedDay, d: ShelfObservationData): string {
+  const parts: string[] = [];
+  if (d.flags?.includes("misplaced_item")) parts.push(`${(d.observedGtin && day.items.get(d.observedGtin)?.name) || "another item"} is on the facing`);
+  if (d.flags?.includes("price_mismatch")) parts.push(`the shelf tag says ${money(d.tagPrice)} and the price file ${money(d.systemPrice)}`);
+  return parts.join(", and ");
+}
+
 export const PRIVACY: Record<string, { label: string; meaning: string }> = {
   operational: { label: "Operational", meaning: "Nothing about people. For store teams and agents." },
   aggregate: { label: "Aggregate", meaning: "Counts and averages over people, never individuals." },
@@ -80,7 +95,8 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
   switch (r.type) {
     case "oiss.ShelfObservation": {
       const d = (r as OissRecord<ShelfObservationData>).data;
-      return `${itemNameAt(day, d.location.facing)}: ${STATUS_LABEL[d.status].toLowerCase()}`;
+      const flags = d.flags?.length ? `, ${d.flags.map((f) => flagName(f).toLowerCase()).join(", ")}` : "";
+      return `${itemNameAt(day, d.location.facing)}: ${STATUS_LABEL[d.status].toLowerCase()}${flags}`;
     }
     case "oiss.ZoneMetric": {
       const d = (r as OissRecord<ZoneMetricData>).data;
