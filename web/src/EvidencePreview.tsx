@@ -19,7 +19,7 @@ function Placeholder({ seed, fill, status }: { seed: string; fill: number; statu
   const h = hash(seed);
   const levels = 4;
   const cols = 6;
-  const target = { level: h % levels, col: (h >> 4) % cols };
+  const target = { level: h % levels, col: (h >>> 4) % cols };
   const boxes: ReactElement[] = [];
   for (let l = 0; l < levels; l++) {
     for (let c = 0; c < cols; c++) {
