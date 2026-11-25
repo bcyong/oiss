@@ -11,12 +11,13 @@ It is written for retail technology leaders and their integration teams: what ea
 | [record-types.md](record-types.md) | The seven record types and what each one says |
 | [vocabularies.md](vocabularies.md) | Controlled values: shelf conditions, zone and fixture types, incident types, task types and states, privacy classes |
 | [identifiers.md](identifiers.md) | Store numbers, GTINs, GLNs, OISS ids, and synthetic identifiers that can't collide with real items |
+| [versioning.md](versioning.md) | What a version number promises, compatible and breaking changes, deprecation, and drafts before 1.0 |
 
 The machine-readable form is in [`schemas/v0.1`](../schemas/v0.1), with examples in [`examples`](../examples) and a validator in [`validator`](../validator).
 
 ## Status
 
-Draft v0.1, not stable. Field names and values may still change. Versioning rules, the transport binding (MQTT and HTTP), the query API and conformance levels come in later milestones.
+Draft v0.1, not stable. Field names and values may still change, under the draft rules in [versioning.md](versioning.md#drafts-before-10). The transport binding (MQTT and HTTP), the query API and conformance levels come in later milestones.
 
 The key words MUST, MUST NOT, SHOULD and MAY are used as described in RFC 2119.
 

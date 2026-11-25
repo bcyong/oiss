@@ -74,6 +74,7 @@
         "display",
         "pallet_display",
         "bin",
+        "service_counter",
         "checkout_lane",
         "self_checkout",
         "other"

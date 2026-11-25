@@ -30,3 +30,31 @@ jobs:
         run: "! oiss-validate -q examples/invalid"
       - name: Tests
         run: pytest validator/tests
+
+  demo:
+    # The same build Netlify runs, plus the simulator's tests and a check that every
+    # generated record is valid OISS.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Simulator tests
+        run: npm test
+      - name: Golden day matches its manifest
+        run: npm run golden:check
+      - name: Build the site
+        run: npm run build:web
+      - name: Every generated record is valid OISS
+        run: |
+          pip install -e validator
+          oiss-validate -q web/public/data/demo-001/2026-11-17/store-layout.json web/public/data/demo-001/2026-11-17/*.jsonl

@@ -23,7 +23,7 @@ Conditions (`flags`, any number): `misplaced_item`, `price_mismatch`, `missing_t
 
 Zones: `aisle`, `endcap`, `front_end`, `self_checkout`, `entrance`, `exit`, `produce`, `deli`, `bakery`, `meat_and_seafood`, `dairy`, `frozen`, `pharmacy`, `service_counter`, `backroom`, `other`.
 
-Fixtures: `gondola`, `endcap`, `wall_section`, `cooler`, `freezer`, `display`, `pallet_display`, `bin`, `checkout_lane`, `self_checkout`, `other`.
+Fixtures: `gondola`, `endcap`, `wall_section`, `cooler`, `freezer`, `display`, `pallet_display`, `bin`, `service_counter` (a staffed counter such as the deli), `checkout_lane`, `self_checkout`, `other`.
 
 ## Object classes
 
