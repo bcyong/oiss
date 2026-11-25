@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { IndexedDay, RobotAt, ShopperDot } from "./day.ts";
 import type { Camera, Point, ShelfStatus } from "./oiss.ts";
 
@@ -244,7 +244,8 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
   const queueZones = day.layout.zones.filter((z) => queues.has(z.id));
 
   return (
-    <div className="plan-wrap">
+    // The store's outer wall sits 1 m inside the plan's edge; the controls sit just inside the wall at any width.
+    <div className="plan-wrap" style={{ "--wall-x": `${(100 * -full.x) / full.w}%`, "--wall-y": `${(100 * -full.y) / full.h}%` } as CSSProperties}>
       <svg
         ref={svgRef}
         className={`plan${view.k > 1 ? " zoomed" : ""}`}
