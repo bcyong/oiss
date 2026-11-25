@@ -8,6 +8,7 @@
  *   shelf-observations.jsonl  ShelfObservation records, one per line, in time order
  *   zone-metrics.jsonl        ZoneMetric records
  *   shopper-paths.jsonl       ShopperPath records
+ *   evidence.jsonl            Evidence records: shelf images behind low-stock and out-of-stock reads
  *   item-master.json          the synthetic item master (not an OISS record)
  *   summary.json              ground-truth totals for the day (not an OISS record)
  * plus DIR/index.json listing the days written.
@@ -44,6 +45,7 @@ const files: Record<string, { text: string; records?: number }> = {
   "shelf-observations.jsonl": { text: jsonl(day.records.shelfObservations), records: day.records.shelfObservations.length },
   "zone-metrics.jsonl": { text: jsonl(day.records.zoneMetrics), records: day.records.zoneMetrics.length },
   "shopper-paths.jsonl": { text: jsonl(day.records.shopperPaths), records: day.records.shopperPaths.length },
+  "evidence.jsonl": { text: jsonl(day.records.evidence), records: day.records.evidence.length },
   "item-master.json": { text: JSON.stringify(day.itemMaster, null, 2) + "\n" },
   "summary.json": { text: JSON.stringify(day.summary, null, 2) + "\n" },
 };

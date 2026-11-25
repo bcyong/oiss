@@ -4,7 +4,7 @@ OISS is a draft open interchange standard for store-intelligence data. Its goal 
 
 Each source publishes what it saw as OISS records, so any consumer, from a store operations dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and raise store tasks, so the value shows right away.
 
-> **Status:** v0.1 draft, milestone M1 (synthetic store and demo preview). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
+> **Status:** v0.1 draft, milestone M2 (synthetic store and full demo replay). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
 
 ## Why a retailer would adopt it
 
@@ -80,7 +80,7 @@ Data moves top to bottom, in five layers:
 - **Access control.** Each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system.
 - **Traceability.** Every record carries its source system, model and version, a confidence and links to evidence, so every agent answer can cite where it came from.
 
-Today the spec, schemas, examples, validator, store simulator and a preview of the demo are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
+Today the spec, schemas, examples, validator, store simulator, the demo replay with its record inspector, and a browsable spec are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
 
 ## Record types
 
@@ -103,7 +103,7 @@ Today the spec, schemas, examples, validator, store simulator and a preview of t
 | [`examples`](examples) | One valid and one invalid record per type | M0 |
 | [`validator`](validator) | `oiss-validate`, a Python validator for vendors and integration teams | M0 |
 | [`sim`](sim) | Synthetic grocery store simulator that writes a day of OISS records from a seed | M1 |
-| [`web`](web) | The site: the OISS landing page at `/` and the demo store at `/demo/` (preview now, full replay in M2) | M1–M2 |
+| [`web`](web) | The site: the OISS landing page at `/`, the demo store replay at `/demo/` and the spec browser at `/spec/` | M1–M2 |
 | [`adapters`](adapters) | Mock vendor exports and adapters into OISS | M3 |
 | [`server`](server) | Ingest, storage and the query API | M3–M4 |
 | [`mcp`](mcp) | MCP server and the Store Operations Assistant | M4 |
@@ -115,7 +115,7 @@ Needs Node 22.18 or later.
 
 ```sh
 npm install
-npm run dev             # the site at http://localhost:5173, the demo store at /demo/
+npm run dev             # the site at http://localhost:5173, the demo store at /demo/, the spec at /spec/
 npm test                # simulator tests
 npm run golden:check    # the golden day still matches its manifest
 ```

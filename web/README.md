@@ -4,16 +4,20 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 
 - **`/`**: the OISS landing page, laid out like a blueprint card: overview, architecture diagram, key features, record types, what adoption takes, software used, ethical considerations and license. Plain HTML and CSS in [`index.html`](index.html) and [`src/landing.css`](src/landing.css).
 - **`/demo/`**: the demo store, built with React and SVG. It reads only OISS records and the retailer's item master, the same way any OISS consumer would.
+- **`/spec/`**: the spec browser. Every record type with its fields, rules, vocabularies and the valid example, read straight from `schemas/v0.1` and `examples/valid` at build time.
 
-## The demo store (M1 preview)
+## The demo store
 
-- A floor plan of store `demo-001` with every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, and shopper dots moving along anonymous ShopperPaths.
-- A playback bar for the store day, at 1, 5 or 15 minutes of store time per second.
+- A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, and cameras with their fields of view (toggle **Cameras**).
+- **Zoom** with the +, − and **Reset** buttons, ctrl or ⌘ and the scroll wheel, a trackpad pinch or a two-finger pinch on a phone. Drag to pan when zoomed in. **Reset** goes back to the whole store.
+- A playback bar for the store day, at 1, 5 or 15 minutes of store time per second, and a day timeline of out-of-stock and low-stock facings. Click or drag the timeline to jump to a time.
 - On-shelf availability, out-of-stock facings, shoppers in the store, staffed lanes open, line length and average wait, all at the chosen time.
-- Tap a facing to see its item, planogram facings and capacity, and the latest observation with its source and confidence.
+- Tap a facing, zone, shopper or camera to open the **record inspector** on its latest record at the playback time. It shows a plain summary, the raw JSON, provenance (system, vendor, model and adapter), the privacy class and a link to the schema in the spec browser. A record picked from the stream or from a link stays put while playback runs; close it to go back to following the selection.
+- A low-stock or out-of-stock observation links to its **Evidence**: a shelf image reference with its redaction, retention date and access roles. The synthetic store has no camera frames yet, so the preview is a drawn placeholder, labeled as one.
+- The **record stream** lists the latest records as they arrive, filterable by record type. Tap one to inspect it.
 - **Simulate another day** runs the store simulator in the browser, in a web worker, with a new seed.
 
-Milestone M2 adds the full replay with a record inspector and a spec browser.
+The day is about 6,200 records and is indexed in memory in the browser, so the demo doesn't use DuckDB-WASM or Parquet. They arrive with the server and query API (M3 and M4), where weeks of history make them worth it.
 
 ## Run it
 

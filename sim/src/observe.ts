@@ -9,19 +9,28 @@
  * - Store shelf cameras (in-house): aisle 3 and the dairy wall every 5 minutes, reporting changes.
  * - Mock vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
  * - Mock vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
+ *
+ * Shelf images back every low-stock and out-of-stock read from the robot and the shelf cameras, as
+ * Evidence records cropped to the shelf. The demo has no real frames yet, so each Evidence record
+ * points to an image that does not exist, and the demo app draws a labeled placeholder instead.
  */
 import type { Ground, TrackPoint } from "./model.ts";
 import { inPolygon, round } from "./geometry.ts";
 import { byTime, idMaker, type OissRecord, type Provenance, record } from "./records.ts";
 import { Rng } from "./rng.ts";
-import { hours } from "./time.ts";
+import { hours, storeClock } from "./time.ts";
 
 export interface ObservedDay {
   storeLayout: OissRecord;
   shelfObservations: OissRecord[];
   zoneMetrics: OissRecord[];
   shopperPaths: OissRecord[];
+  evidence: OissRecord[];
 }
+
+/** How long shelf images are kept, and who may view them. */
+const EVIDENCE_RETENTION_DAYS = 30;
+const EVIDENCE_ROLES = ["store_manager", "department_manager"];
 
 const MODEL = { name: "store-sim", version: "0.1.0" };
 
@@ -98,7 +107,10 @@ export function observeDay(g: Ground): ObservedDay {
 
   // ---- ShelfObservation: the robot ----
   const shelfObservations: OissRecord[] = [];
+  const evidence: OissRecord[] = [];
   const soId = idMaker("so", date);
+  const evId = idMaker("ev", date);
+  const retainUntil = retentionDate(date, clock.timezone, EVIDENCE_RETENTION_DAYS);
   const robotRng = rng.fork("robot");
   const location = (facing: string, camera?: string) => {
     const slot = slotById.get(facing)!;
@@ -109,6 +121,33 @@ export function observeDay(g: Ground): ObservedDay {
     const pos = catalog.byFacing.get(facing)!;
     const seen = read.status !== "unknown" && read.status !== "out_of_stock";
     const price = itemPrice(pos.gtin);
+    const window = { start: clock.iso(t - windowSeconds), end: clock.iso(t) };
+    // A shelf image backs every low-stock and out-of-stock read.
+    const refs: string[] = [];
+    if (read.status === "low_stock" || read.status === "out_of_stock") {
+      const id = evId();
+      refs.push(id);
+      evidence.push(
+        record("Evidence", {
+          id,
+          source: source.replace(/:[^:]+$/, ":evidence"),
+          time: clock.iso(t),
+          subject: id,
+          store,
+          privacy: "restricted",
+          data: {
+            provenance,
+            window,
+            location: location(facing, camera),
+            mediaType: "image/jpeg",
+            uri: `evidence/${date}/${id}.jpg`,
+            redaction: "cropped_to_shelf",
+            retainUntil,
+            accessRoles: EVIDENCE_ROLES,
+          },
+        }),
+      );
+    }
     return record("ShelfObservation", {
       id: soId(),
       source,
@@ -118,7 +157,7 @@ export function observeDay(g: Ground): ObservedDay {
       privacy: "operational",
       data: {
         provenance,
-        window: { start: clock.iso(t - windowSeconds), end: clock.iso(t) },
+        window,
         location: location(facing, camera),
         status: read.status,
         ...(seen ? { observedGtin: pos.gtin } : {}),
@@ -126,6 +165,7 @@ export function observeDay(g: Ground): ObservedDay {
         ...(read.fill !== undefined ? { fillLevel: read.fill } : {}),
         ...(withPrice && read.status !== "unknown" ? { tagPrice: usd(price), systemPrice: usd(price) } : {}),
         confidence: read.confidence,
+        ...(refs.length ? { evidence: refs } : {}),
       },
     });
   };
@@ -189,6 +229,7 @@ export function observeDay(g: Ground): ObservedDay {
     }
   }
   shelfObservations.sort(byTime);
+  evidence.sort(byTime);
 
   // ---- ZoneMetric ----
   const zones = layout.zones.filter((z) => z.public);
@@ -330,7 +371,13 @@ export function observeDay(g: Ground): ObservedDay {
   }
   shopperPaths.sort(byTime);
 
-  return { storeLayout, shelfObservations, zoneMetrics, shopperPaths };
+  return { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence };
+}
+
+/** Midnight at the store a number of days after the store date, with the offset in force on that date. */
+function retentionDate(date: string, timezone: string, days: number): string {
+  const later = new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  return storeClock(later, timezone).iso(0);
 }
 
 function positionAt(points: TrackPoint[], seg: number, t: number): { x: number; y: number } {

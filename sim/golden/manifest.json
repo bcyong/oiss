@@ -11,8 +11,8 @@
     },
     "shelf-observations.jsonl": {
       "records": 2494,
-      "bytes": 2310430,
-      "sha256": "edb4eafb6af7d505afdf0bd6a16d1b9d89bcecbc0f9a96273d34052fcfd6476c"
+      "bytes": 2321684,
+      "sha256": "746b20e5f28fff862b171d66469ce476e9850bd1234e243b6a31583fc4f3bc8a"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
@@ -23,6 +23,11 @@
       "records": 2333,
       "bytes": 6354859,
       "sha256": "aa3cd6cf92c818ff0b16e00cb64bc566086605e71a246f67330fc0da802a5583"
+    },
+    "evidence.jsonl": {
+      "records": 331,
+      "bytes": 307139,
+      "sha256": "0a72067d9d1100a6e92fc20d4fa71daa406e13a3d49edc344fc400d811a0f6f4"
     },
     "item-master.json": {
       "bytes": 300731,
