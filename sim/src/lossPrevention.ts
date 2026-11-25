@@ -122,7 +122,9 @@ export function lossPreventionDay(ground: Ground): LossPreventionDay {
   const ean = (gtin: string) => gtin.slice(1);
   const raw: (Omit<MockLpAlert, "alert_id"> & { truth: boolean })[] = [];
 
-  const alert = (lane: string, t: number, type: ExceptionType, score: number, items: { gtin: string; qty: number }[], truth: boolean) => {
+  // False alerts draw from their own stream, so a change to one checkout late in the day leaves earlier alerts as they were.
+  const falseRng = new Rng(ground.config.seed).fork("mock-vendor-b:false-alerts");
+  const alert = (lane: string, t: number, type: ExceptionType, score: number, items: { gtin: string; qty: number }[], truth: boolean, rng: Rng) => {
     const eventMs = clock.epochMs(t);
     raw.push({
       site: MOCK_LP_SITE,
@@ -142,15 +144,15 @@ export function lossPreventionDay(ground: Ground): LossPreventionDay {
   for (const ex of exceptions) {
     if (!rng.chance(RECALL[ex.type])) continue;
     caught++;
-    alert(ex.lane, ex.t + rng.uniform(-3, 3), ex.type, rng.normal(80, 9), ex.items, true);
+    alert(ex.lane, ex.t + rng.uniform(-3, 3), ex.type, rng.normal(80, 9), ex.items, true, rng);
   }
   const confused = new Set(exceptions.map((e) => `${e.shopper}`));
   for (const txn of ground.transactions) {
-    if (txn.lines.length === 0 || confused.has(`${txn.shopper}`) || !rng.chance(FALSE_ALERT_RATE[txn.kind])) continue;
+    if (txn.lines.length === 0 || confused.has(`${txn.shopper}`) || !falseRng.chance(FALSE_ALERT_RATE[txn.kind])) continue;
     const types: ExceptionType[] = txn.kind === "self" ? ["non_scan", "ticket_switching"] : ["non_scan", "bottom_of_basket", "sweethearting"];
-    const type = rng.pick(types);
-    const line = rng.pick(txn.lines);
-    alert(txn.lane, txn.start + rng.uniform(0.2, 0.9) * (txn.end - txn.start), type, rng.normal(56, 12), [{ gtin: line.gtin, qty: 1 }], false);
+    const type = falseRng.pick(types);
+    const line = falseRng.pick(txn.lines);
+    alert(txn.lane, txn.start + falseRng.uniform(0.2, 0.9) * (txn.end - txn.start), type, falseRng.normal(56, 12), [{ gtin: line.gtin, qty: 1 }], false, falseRng);
   }
 
   raw.sort((a, b) => a.alert_ts - b.alert_ts);
