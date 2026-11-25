@@ -1,0 +1,48 @@
+{
+  "store": "demo-001",
+  "date": "2026-11-17",
+  "seed": 20261117,
+  "generator": "oiss-sim 0.1.0",
+  "files": {
+    "store-layout.json": {
+      "records": 1,
+      "bytes": 337504,
+      "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
+    },
+    "shelf-observations.jsonl": {
+      "records": 2494,
+      "bytes": 2310430,
+      "sha256": "edb4eafb6af7d505afdf0bd6a16d1b9d89bcecbc0f9a96273d34052fcfd6476c"
+    },
+    "zone-metrics.jsonl": {
+      "records": 1054,
+      "bytes": 810461,
+      "sha256": "c69ea25453e2a23ab31d8db037b4a44e820042ddf19162c841792e8254a7016f"
+    },
+    "shopper-paths.jsonl": {
+      "records": 2333,
+      "bytes": 6354859,
+      "sha256": "aa3cd6cf92c818ff0b16e00cb64bc566086605e71a246f67330fc0da802a5583"
+    },
+    "item-master.json": {
+      "bytes": 300731,
+      "sha256": "6d11ce219737e3c2052e94d73ebf0c8916c64887d4123bb75df3a8ade95684e6"
+    },
+    "summary.json": {
+      "bytes": 405,
+      "sha256": "b3a6af5736210f11d3ce9e9410ea5b02b771ad39d3eeaa5ca2649752f1dd679e"
+    }
+  },
+  "stats": {
+    "shoppers": 1626,
+    "unitsSold": 24824,
+    "unitsMissed": 1210,
+    "salesDollars": 153713.36,
+    "missedDollars": 7868,
+    "avgWaitStaffedSeconds": 89,
+    "avgWaitSelfSeconds": 0,
+    "maxStaffedWaiting": 16,
+    "facingsOutOfStockAtClose": 123,
+    "recoveryUnits": 11568
+  }
+}

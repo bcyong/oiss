@@ -1,0 +1,18 @@
+{
+  "name": "@oiss/sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic simulator of a synthetic grocery store that writes OISS records",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "golden": "node src/cli.ts --out ../web/public/data",
+    "golden:check": "node src/cli.ts --out out/check --check golden/manifest.json",
+    "golden:update": "node src/cli.ts --out out/check --write-manifest golden/manifest.json",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p ."
+  }
+}

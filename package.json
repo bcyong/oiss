@@ -1,0 +1,26 @@
+{
+  "name": "oiss",
+  "private": true,
+  "description": "Open Intelligent Store Specification: spec, simulator and demo app",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "workspaces": [
+    "sim",
+    "web"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "golden": "npm run golden -w sim",
+    "golden:check": "npm run golden:check -w sim",
+    "dev": "npm run golden && npm run dev -w web",
+    "build:web": "npm run golden && npm run build -w web"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.7",
+    "typescript": "5.9.3"
+  }
+}
