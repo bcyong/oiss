@@ -97,7 +97,7 @@ export function EvidencePreview({ day, evidence, observation, onInspect }: { day
         <ClipPlaceholder seed={evidence.id} seconds={seconds} self={d.location.fixture?.startsWith("sco-") ?? false} />
         <figcaption>
           <span>
-            {checkoutName(d.location.fixture)}, {clockOf(day, d.window.start)} to {clockOf(day, d.window.end)}. {humanize(d.redaction)}, kept until {kept}, viewable by {viewers}.
+            {checkoutName(d.location.fixture)}, a {Math.round(seconds)}-second clip from {clockOf(day, d.window.start)}. {humanize(d.redaction)}, kept until {kept}, viewable by {viewers}.
           </span>
           <span className="muted">A drawn placeholder: the synthetic store has no camera footage.</span>
           {onInspect && (

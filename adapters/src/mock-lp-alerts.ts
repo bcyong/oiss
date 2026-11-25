@@ -64,8 +64,8 @@ export const ADAPTER = { name: "mock-lp-alerts", version: "0.1.0" };
 /** The mapping the retailer keeps for store demo-001. */
 export function demo001Config(): LpAdapterConfig {
   const registers: LpAdapterConfig["registers"] = {};
-  for (let i = 1; i <= 8; i++) registers[`R${String(i).padStart(2, "0")}`] = { fixture: `lane-${String(i).padStart(2, "0")}`, zone: "front-end", name: `lane ${i}` };
-  for (let i = 1; i <= 6; i++) registers[`SCO${String(i).padStart(2, "0")}`] = { fixture: `sco-${String(i).padStart(2, "0")}`, zone: "self-checkout", name: `self-checkout station ${i}` };
+  for (let i = 1; i <= 8; i++) registers[`R${String(i).padStart(2, "0")}`] = { fixture: `lane-${String(i).padStart(2, "0")}`, zone: "front-end", name: `Lane ${i}` };
+  for (let i = 1; i <= 6; i++) registers[`SCO${String(i).padStart(2, "0")}`] = { fixture: `sco-${String(i).padStart(2, "0")}`, zone: "self-checkout", name: `Self-checkout ${i}` };
   return {
     store: "demo-001",
     timezone: "America/Los_Angeles",

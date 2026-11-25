@@ -31,8 +31,8 @@
     },
     "incidents.jsonl": {
       "records": 25,
-      "bytes": 24630,
-      "sha256": "3c0584a04e456d8540a82a3094f5597b9f6a82d2cd2bf693d243be10064df8e6"
+      "bytes": 24566,
+      "sha256": "ebfe332263cfffe45c68661626b1198a99118149ff399f571276cddca72a85f4"
     },
     "vendor/mock-vendor-b-lp-alerts.ndjson": {
       "bytes": 8462,

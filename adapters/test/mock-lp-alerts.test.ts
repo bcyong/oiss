@@ -32,7 +32,7 @@ test("an alert becomes an open Incident and an Evidence clip in the store's term
   assert.equal(inc!.data.confidence, 0.82);
   assert.deepEqual(inc!.data.gtins, ["02000000003030"]);
   assert.deepEqual(inc!.data.evidence, [ev!.id]);
-  assert.match(inc!.data.summary as string, /^Possible non-scan at lane 3: 1 item, \$4\.99/);
+  assert.match(inc!.data.summary as string, /^Possible non-scan at Lane 3: 1 item, \$4\.99/);
   assert.equal(out.incidentFor["MVB-TEST-1"], inc!.id);
   assert.deepEqual(ev!.data.location, { zone: "front-end", fixture: "lane-03", camera: "cam-fe-1" });
   assert.deepEqual(ev!.data.window, { start: "2026-11-17T17:41:55-08:00", end: "2026-11-17T17:42:15-08:00" });
