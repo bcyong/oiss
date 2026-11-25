@@ -303,7 +303,14 @@ h1 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .zoom button.fit {
-  font-size: 13px;
+  display: grid;
+  place-items: center;
+}
+.zoom button.fit svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 .zoom button:disabled {
   cursor: default;

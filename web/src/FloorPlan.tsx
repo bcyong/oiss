@@ -346,8 +346,10 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
         <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={view.k <= 1} aria-label="Zoom out" title="Zoom out">
           −
         </button>
-        <button type="button" className="fit" onClick={() => setView(home)} disabled={view.k === 1} title="Show the whole store">
-          Reset
+        <button type="button" className="fit" onClick={() => setView(home)} disabled={view.k === 1} aria-label="Show the whole store" title="Show the whole store">
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path d="M2 6V4.5A2.5 2.5 0 0 1 4.5 2H6M10 2h1.5A2.5 2.5 0 0 1 14 4.5V6M14 10v1.5a2.5 2.5 0 0 1-2.5 2.5H10M6 14H4.5A2.5 2.5 0 0 1 2 11.5V10" />
+          </svg>
         </button>
       </div>
       {view.k > 1 && <span className="zoom-level">{Math.round(view.k * 100)}%</span>}

@@ -400,7 +400,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             </select>
           </div>
           <p className="note">
-            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press Reset to see the whole store.
+            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press the corners button to see the whole store.
           </p>
         </section>
 
