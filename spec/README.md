@@ -1,6 +1,6 @@
 # OISS specification, v0.1 draft
 
-The Open Intelligent Store Specification (OISS) is a draft open format for store-intelligence data. Shelf scanners, shopper analytics, loss-prevention vision and planogram systems each publish what they saw as OISS records, so any consumer, including an AI agent, can read one record set for the whole store.
+The Open Intelligent Store Specification (OISS) is a draft open interchange standard for store-intelligence data. Its goal is to let a retailer combine data from several vendors with complementary services and its own in-house systems to run its stores better. Shelf scanners, shopper analytics, loss-prevention vision and planogram systems each publish what they saw as OISS records, so any consumer, including an AI agent, can read one record set for the whole store.
 
 This folder holds the M0 skeleton of the spec:
 

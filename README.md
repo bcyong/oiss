@@ -1,6 +1,8 @@
 # OISS: Open Intelligent Store Specification
 
-OISS is a draft open format for store-intelligence data, plus a reference app where agents act on it. Shelf scanners, shopper analytics, loss-prevention vision and planogram systems each publish what they saw as OISS records, so any consumer, from a dashboard to an AI agent, reads one record set for the whole store.
+OISS is a draft open interchange standard for store-intelligence data. Its goal is to let a retailer combine data from several vendors with complementary services, such as shelf scanning, shopper analytics and loss prevention, with its own in-house systems, and use the result to run its stores better.
+
+Each source publishes what it saw as OISS records, so any consumer, from a dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and act on them, so the value shows right away.
 
 OISS composes existing standards rather than replacing them: a [CloudEvents](https://cloudevents.io/) envelope, GS1 identifiers (GTIN for products, GLN for stores), and object classes that line up with ONVIF Profile M.
 
