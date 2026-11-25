@@ -1,0 +1,178 @@
+{
+  "specversion": "1.0",
+  "id": "map-demo-001-2026-11-A",
+  "source": "urn:oiss:demo-001:sim:map",
+  "type": "oiss.StoreMap",
+  "time": "2026-11-25T06:00:00-08:00",
+  "subject": "demo-001",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/store-map.schema.json",
+  "datacontenttype": "application/json",
+  "oissversion": "0.1",
+  "oissstore": "demo-001",
+  "oissprivacy": "operational",
+  "data": {
+    "provenance": {
+      "system": "oiss-sim",
+      "synthetic": true
+    },
+    "store": {
+      "id": "demo-001",
+      "name": "Demo Grocery",
+      "timezone": "America/Los_Angeles",
+      "floor": {
+        "width": 60,
+        "depth": 40,
+        "units": "m"
+      }
+    },
+    "planogramVersion": "2026-11-A",
+    "zones": [
+      {
+        "id": "aisle-07",
+        "name": "Aisle 7, snacks",
+        "kind": "aisle",
+        "polygon": [
+          {
+            "x": 20,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 30
+          },
+          {
+            "x": 20,
+            "y": 30
+          }
+        ]
+      },
+      {
+        "id": "checkout",
+        "name": "Checkout",
+        "kind": "checkout",
+        "polygon": [
+          {
+            "x": 5,
+            "y": 32
+          },
+          {
+            "x": 55,
+            "y": 32
+          },
+          {
+            "x": 55,
+            "y": 38
+          },
+          {
+            "x": 5,
+            "y": 38
+          }
+        ]
+      }
+    ],
+    "fixtures": [
+      {
+        "id": "A07-L",
+        "zone": "aisle-07",
+        "kind": "shelving",
+        "footprint": [
+          {
+            "x": 20,
+            "y": 6
+          },
+          {
+            "x": 20.6,
+            "y": 6
+          },
+          {
+            "x": 20.6,
+            "y": 29
+          },
+          {
+            "x": 20,
+            "y": 29
+          }
+        ]
+      },
+      {
+        "id": "lane-03",
+        "zone": "checkout",
+        "kind": "checkout_lane",
+        "footprint": [
+          {
+            "x": 20,
+            "y": 33
+          },
+          {
+            "x": 22,
+            "y": 33
+          },
+          {
+            "x": 22,
+            "y": 37
+          },
+          {
+            "x": 20,
+            "y": 37
+          }
+        ]
+      }
+    ],
+    "shelves": [
+      {
+        "id": "A07-L-S3",
+        "fixture": "A07-L",
+        "level": 3,
+        "height": 1.2
+      }
+    ],
+    "facings": [
+      {
+        "id": "A07-L-S3-F05",
+        "shelf": "A07-L-S3",
+        "position": 5,
+        "width": 0.3,
+        "gtin": "02000000001012",
+        "capacity": 12,
+        "price": {
+          "amount": 3.49,
+          "currency": "USD"
+        }
+      },
+      {
+        "id": "A07-L-S3-F06",
+        "shelf": "A07-L-S3",
+        "position": 6,
+        "width": 0.3,
+        "gtin": "02000000002026",
+        "capacity": 12,
+        "price": {
+          "amount": 4.99,
+          "currency": "USD"
+        }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "cam-12",
+        "position": {
+          "x": 21.5,
+          "y": 4,
+          "z": 3.2
+        },
+        "yaw": 90,
+        "pitch": -25,
+        "hfov": 90,
+        "vfov": 55,
+        "range": 25,
+        "covers": [
+          "aisle-07"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/defs.schema.json",
+  "title": "OISS v0.1 shared definitions",
+  "$defs": {
+    "id": {
+      "description": "An identifier, unique within its store and record type. Letters, digits and . _ : - only.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "gtin": {
+      "description": "A GTIN written as 14 digits, padded with leading zeros, with a valid check digit.",
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "format": "gtin"
+    },
+    "gln": {
+      "description": "A 13-digit GS1 Global Location Number with a valid check digit.",
+      "type": "string",
+      "pattern": "^[0-9]{13}$",
+      "format": "gtin"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window": {
+      "description": "The time span an observation covers. start must not be after end.",
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/timestamp" },
+        "end": { "$ref": "#/$defs/timestamp" }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "point": {
+      "description": "A point in the store's floor-plan frame, in meters.",
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    },
+    "polygon": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/point" },
+      "minItems": 3
+    },
+    "location": {
+      "description": "Where a record applies, as ids from the StoreMap, from coarse to fine, plus an optional point.",
+      "type": "object",
+      "properties": {
+        "zone": { "$ref": "#/$defs/id" },
+        "fixture": { "$ref": "#/$defs/id" },
+        "shelf": { "$ref": "#/$defs/id" },
+        "facing": { "$ref": "#/$defs/id" },
+        "camera": { "$ref": "#/$defs/id" },
+        "point": { "$ref": "#/$defs/point" }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "provenance": {
+      "description": "Who produced the record and how.",
+      "type": "object",
+      "properties": {
+        "system": { "type": "string", "minLength": 1, "description": "The producing product or pipeline." },
+        "vendor": { "type": "string", "minLength": 1 },
+        "model": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        },
+        "adapter": {
+          "description": "The adapter that mapped a vendor export into OISS, if any.",
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "version"],
+          "additionalProperties": false
+        },
+        "synthetic": {
+          "description": "True for simulated data. Synthetic records must not be mixed with real ones without this flag.",
+          "type": "boolean"
+        }
+      },
+      "required": ["system"],
+      "additionalProperties": false
+    },
+    "evidenceRefs": {
+      "description": "Ids of Evidence records that back this record.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/id" },
+      "uniqueItems": true
+    },
+    "recordRefs": {
+      "description": "CloudEvents ids of other OISS records.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "money": {
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+      },
+      "required": ["amount", "currency"],
+      "additionalProperties": false
+    },
+    "common": {
+      "description": "Fields every record's data may carry. Each record type says which are required.",
+      "type": "object",
+      "properties": {
+        "window": { "$ref": "#/$defs/window" },
+        "location": { "$ref": "#/$defs/location" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "evidence": { "$ref": "#/$defs/evidenceRefs" }
+      },
+      "required": ["provenance"]
+    }
+  }
+}

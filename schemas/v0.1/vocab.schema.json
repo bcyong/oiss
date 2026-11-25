@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/vocab.schema.json",
+  "title": "OISS v0.1 vocabularies",
+  "description": "Controlled values shared by the OISS record types. See spec/vocabularies.md.",
+  "$defs": {
+    "recordType": {
+      "enum": ["oiss.StoreMap", "oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.Trajectory", "oiss.Incident", "oiss.Evidence", "oiss.Task"]
+    },
+    "privacyClass": {
+      "description": "Ordered from least to most sensitive: operational, aggregate, anonymous_track, restricted.",
+      "enum": ["operational", "aggregate", "anonymous_track", "restricted"]
+    },
+    "shelfStatus": {
+      "enum": ["in_stock", "low", "out_of_stock", "unknown"]
+    },
+    "shelfFlag": {
+      "enum": ["misplaced", "mispriced", "label_missing", "wrong_facing_count", "damaged", "planogram_mismatch"]
+    },
+    "zoneKind": {
+      "enum": ["aisle", "endcap", "checkout", "self_checkout", "entrance", "exit", "produce", "deli", "bakery", "service", "backroom", "other"]
+    },
+    "fixtureKind": {
+      "enum": ["shelving", "endcap", "cooler", "freezer", "display", "bin", "checkout_lane", "self_checkout_station", "other"]
+    },
+    "objectClass": {
+      "description": "Human, Vehicle, Bicycle and Animal follow ONVIF's analytics object type names. Cart, Basket, Bag and Product are OISS additions for retail. ONVIF's HumanFace and LicensePlate are left out on purpose.",
+      "enum": ["Human", "Vehicle", "Bicycle", "Animal", "Cart", "Basket", "Bag", "Product"]
+    },
+    "incidentType": {
+      "enum": ["missed_scan", "ticket_switch", "bottom_of_basket", "unpaid_exit", "high_shrink_removal", "spill_or_hazard", "other"]
+    },
+    "incidentStatus": {
+      "enum": ["open", "under_review", "confirmed", "dismissed"]
+    },
+    "severity": {
+      "enum": ["low", "medium", "high"]
+    },
+    "taskKind": {
+      "enum": ["restock", "face_up", "fix_price_label", "relocate_item", "open_lane", "review_incident", "clean_hazard", "other"]
+    },
+    "taskState": {
+      "description": "open → assigned → in_progress → done → verified. A task that needs verification closes only at verified. cancelled can follow any state.",
+      "enum": ["open", "assigned", "in_progress", "done", "verified", "cancelled"]
+    },
+    "redaction": {
+      "enum": ["none", "people_blurred", "people_masked", "cropped_to_shelf"]
+    }
+  }
+}

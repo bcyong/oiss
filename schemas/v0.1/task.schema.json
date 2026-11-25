@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/task.schema.json",
+  "title": "OISS v0.1 Task data",
+  "description": "A recommended or assigned action in the store and where it stands. subject is the task id; each state change is a new record with the same subject.",
+  "type": "object",
+  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "properties": {
+    "kind": { "$ref": "vocab.schema.json#/$defs/taskKind" },
+    "state": { "$ref": "vocab.schema.json#/$defs/taskState" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "createdBy": { "type": "string", "minLength": 1, "description": "The person, agent or system that raised it." },
+    "assignee": { "type": "string", "minLength": 1 },
+    "due": { "$ref": "defs.schema.json#/$defs/timestamp" },
+    "basedOn": { "$ref": "defs.schema.json#/$defs/recordRefs", "description": "Records that led to the task." },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "required": { "type": "boolean" },
+        "verifiedBy": { "type": "string", "minLength": 1, "description": "CloudEvents id of the record that showed the fix." }
+      },
+      "required": ["required"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["kind", "state", "title", "createdBy", "location"],
+  "if": { "properties": { "state": { "const": "verified" } }, "required": ["state"] },
+  "then": { "properties": { "verification": { "required": ["required", "verifiedBy"] } }, "required": ["verification"] },
+  "unevaluatedProperties": false
+}

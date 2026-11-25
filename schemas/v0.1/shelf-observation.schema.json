@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shelf-observation.schema.json",
+  "title": "OISS v0.1 ShelfObservation data",
+  "description": "What a source saw at one facing. subject is the facing id.",
+  "type": "object",
+  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "properties": {
+    "status": { "$ref": "vocab.schema.json#/$defs/shelfStatus" },
+    "flags": { "type": "array", "items": { "$ref": "vocab.schema.json#/$defs/shelfFlag" }, "uniqueItems": true },
+    "gtin": { "$ref": "defs.schema.json#/$defs/gtin", "description": "The product seen at the facing, if identified." },
+    "expectedGtin": { "$ref": "defs.schema.json#/$defs/gtin", "description": "The product the planogram expects." },
+    "fillRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "observedPrice": { "$ref": "defs.schema.json#/$defs/money" },
+    "expectedPrice": { "$ref": "defs.schema.json#/$defs/money" }
+  },
+  "required": ["status", "location", "confidence", "window"],
+  "unevaluatedProperties": false
+}

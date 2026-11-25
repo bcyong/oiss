@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/zone-metric.schema.json",
+  "title": "OISS v0.1 ZoneMetric data",
+  "description": "Aggregate measures for one zone over one interval. subject is the zone id.",
+  "type": "object",
+  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "properties": {
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "entries": { "type": "integer", "minimum": 0, "description": "People who entered the zone." },
+        "occupancyMean": { "type": "number", "minimum": 0 },
+        "occupancyMax": { "type": "integer", "minimum": 0 },
+        "dwellSecondsMean": { "type": "number", "minimum": 0 },
+        "queueLength": { "type": "integer", "minimum": 0, "description": "People in line at the end of the window." },
+        "waitSecondsMean": { "type": "number", "minimum": 0 },
+        "laneOpen": { "type": "boolean" }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    }
+  },
+  "required": ["metrics", "window", "location"],
+  "unevaluatedProperties": false
+}

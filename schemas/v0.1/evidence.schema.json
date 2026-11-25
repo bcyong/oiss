@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/evidence.schema.json",
+  "title": "OISS v0.1 Evidence data",
+  "description": "A reference to an image or clip, with its retention and access policy. The media itself stays in the evidence store. subject is the evidence id.",
+  "type": "object",
+  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "properties": {
+    "mediaType": { "type": "string", "pattern": "^(image|video)/[a-z0-9.+-]+$" },
+    "uri": { "type": "string", "format": "uri-reference" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "redaction": { "$ref": "vocab.schema.json#/$defs/redaction" },
+    "retainUntil": { "$ref": "defs.schema.json#/$defs/timestamp" },
+    "accessRoles": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true }
+  },
+  "required": ["mediaType", "uri", "redaction", "retainUntil", "accessRoles", "window", "location"],
+  "unevaluatedProperties": false
+}

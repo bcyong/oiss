@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/trajectory.schema.json",
+  "title": "OISS v0.1 Trajectory data",
+  "description": "An anonymous path on the floor plan. subject is the track id, which rotates and never encodes identity. Off by default.",
+  "type": "object",
+  "allOf": [{ "$ref": "defs.schema.json#/$defs/common" }],
+  "properties": {
+    "objectClass": { "$ref": "vocab.schema.json#/$defs/objectClass" },
+    "idValidUntil": { "$ref": "defs.schema.json#/$defs/timestamp", "description": "After this time the producer must issue a new track id for the same object." },
+    "points": {
+      "type": "array", "minItems": 2,
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": { "$ref": "defs.schema.json#/$defs/timestamp" },
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        },
+        "required": ["t", "x", "y"],
+        "additionalProperties": false
+      },
+      "description": "In time order."
+    }
+  },
+  "required": ["objectClass", "idValidUntil", "points", "window"],
+  "unevaluatedProperties": false
+}

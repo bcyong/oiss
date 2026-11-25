@@ -1,0 +1,39 @@
+{
+  "specversion": "1.0",
+  "id": "ev-0002",
+  "source": "urn:oiss:demo-001:sim:evidence",
+  "type": "oiss.Evidence",
+  "time": "2026-11-25T17:42:10-08:00",
+  "subject": "ev-0002",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/evidence.schema.json",
+  "datacontenttype": "application/json",
+  "oissversion": "0.1",
+  "oissstore": "demo-001",
+  "oissprivacy": "restricted",
+  "data": {
+    "provenance": {
+      "system": "oiss-sim",
+      "model": {
+        "name": "store-sim",
+        "version": "0.1.0"
+      },
+      "synthetic": true
+    },
+    "window": {
+      "start": "2026-11-25T17:41:50-08:00",
+      "end": "2026-11-25T17:42:10-08:00"
+    },
+    "location": {
+      "zone": "checkout",
+      "fixture": "lane-03",
+      "camera": "cam-12"
+    },
+    "mediaType": "video/mp4",
+    "uri": "evidence/ev-0002.mp4",
+    "redaction": "people_blurred",
+    "accessRoles": [
+      "loss_prevention",
+      "store_manager"
+    ]
+  }
+}
