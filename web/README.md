@@ -8,16 +8,18 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 
 ## The demo store
 
-- A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, and cameras with their fields of view (toggle **Cameras**).
+- A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, loss prevention incidents at each checkout lane and self-checkout station, the shelf-scanning robot and its route during a scan run, and cameras with their fields of view (toggle **Cameras**).
 - **Zoom** with the +, − and **Reset** buttons, ctrl or ⌘ and the scroll wheel, a trackpad pinch or a two-finger pinch on a phone. Drag to pan when zoomed in. **Reset** goes back to the whole store.
-- A playback bar for the store day, at 1, 5 or 15 minutes of store time per second, and a day timeline of out-of-stock and low-stock facings. Click or drag the timeline to jump to a time.
-- On-shelf availability, out-of-stock facings, shoppers in the store, staffed lanes open, line length and average wait, all at the chosen time.
-- Tap a facing, zone, shopper or camera to open the **record inspector** on its latest record at the playback time. It shows a plain summary, the raw JSON, provenance (system, vendor, model and adapter), the privacy class and a link to the schema in the spec browser. A record picked from the stream or from a link stays put while playback runs; close it to go back to following the selection.
+- A playback bar for the store day, at 1, 5 or 15 minutes of store time per second, and a day timeline of out-of-stock and low-stock facings with a tick for each checkout incident. Click or drag the timeline to jump to a time.
+- On-shelf availability, out-of-stock facings, shoppers in the store, staffed lanes open, line length, average wait, checkout incidents waiting for review and what the robot is doing, all at the chosen time.
+- Tap a facing, zone, shopper, camera, checkout incident marker or the robot to open the **record inspector** on its latest record at the playback time. It shows a plain summary, the raw JSON, provenance (system, vendor, model and adapter), the privacy class and a link to the schema in the spec browser. A record picked from the stream or from a link stays put while playback runs; close it to go back to following the selection.
 - A low-stock or out-of-stock observation links to its **Evidence**: a shelf image reference with its redaction, retention date and access roles. The synthetic store has no camera frames yet, so the preview is a drawn placeholder, labeled as one.
+- A checkout **Incident** shows the exception, lane, items, severity, status and confidence, its 20-second clip (a drawn placeholder) and, under **What Mock vendor B sent**, the vendor's raw alert before the adapter. The demo finds that alert by running the same adapter on the vendor's feed in the browser.
+- The robot's route is drawn only from its ShelfObservation records: each bay column it photographs is a stop. No separate location feed is needed.
 - The **record stream** lists the latest records as they arrive, filterable by record type. Tap one to inspect it.
 - **Simulate another day** runs the store simulator in the browser, in a web worker, with a new seed.
 
-The day is about 6,200 records and is indexed in memory in the browser, so the demo doesn't use DuckDB-WASM or Parquet. They arrive with the server and query API (M3 and M4), where weeks of history make them worth it.
+The day is about 6,300 records and is indexed in memory in the browser, so the demo doesn't use DuckDB-WASM or Parquet. They arrive with the server and query API (M3 and M4), where weeks of history make them worth it.
 
 ## Run it
 

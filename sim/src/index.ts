@@ -6,3 +6,4 @@ export { syntheticGtin, checkDigit } from "./catalog.ts";
 export { storeClock, clockLabel, hours } from "./time.ts";
 export { Rng } from "./rng.ts";
 export * from "./records.ts";
+export { lossPreventionDay, checkoutExceptions, type CheckoutException, type MockLpAlert } from "./lossPrevention.ts";

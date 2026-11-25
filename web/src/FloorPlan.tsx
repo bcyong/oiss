@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { IndexedDay, ShopperDot } from "./day.ts";
+import type { IndexedDay, RobotAt, ShopperDot } from "./day.ts";
 import type { Camera, Point, ShelfStatus } from "./oiss.ts";
 
 const pts = (ps: Point[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
@@ -11,7 +11,19 @@ function centroid(ps: Point[]): Point {
 }
 
 /** What the visitor has picked on the floor plan. */
-export type Selection = { kind: "facing"; index: number } | { kind: "zone"; id: string } | { kind: "shopper"; path: number } | { kind: "camera"; id: string };
+export type Selection =
+  | { kind: "facing"; index: number }
+  | { kind: "zone"; id: string }
+  | { kind: "shopper"; path: number }
+  | { kind: "camera"; id: string }
+  | { kind: "checkout"; id: string }
+  | { kind: "robot" };
+
+/** Incidents so far at one checkout lane or station, and whether one came in the last few minutes. */
+export interface CheckoutIncidents {
+  count: number;
+  recent: boolean;
+}
 
 /** Zones, fixtures and labels: the parts of the floor plan that never change during the day. */
 const StaticPlan = memo(function StaticPlan({ day }: { day: IndexedDay }) {
@@ -116,11 +128,15 @@ interface Props {
   shoppers: ShopperDot[];
   queues: Map<string, number>;
   showCameras: boolean;
+  incidents: Map<string, CheckoutIncidents>;
+  robot: RobotAt | null;
   selection: Selection | null;
   onSelect: (s: Selection | null) => void;
 }
 
-export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, selection, onSelect }: Props) {
+const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
+
+export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, incidents, robot, selection, onSelect }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -274,6 +290,41 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
               </text>
             );
           })}
+        </g>
+        {robot && (
+          <g className={`robot${sel?.kind === "robot" ? " selected" : ""}`}>
+            {robot.route.map((piece, i) => (
+              <polyline key={`r${i}`} className="robot-route" points={line(piece)} />
+            ))}
+            {robot.trail.map((piece, i) => (
+              <polyline key={`t${i}`} className="robot-trail" points={line(piece)} />
+            ))}
+            <g className="robot-body" transform={`translate(${robot.x} ${robot.y})`} onClick={() => onSelect({ kind: "robot" })}>
+              <rect x={-0.55} y={-0.55} width={1.1} height={1.1} rx={0.25} />
+              <text className="robot-label" textAnchor="middle" dominantBaseline="central">
+                R
+              </text>
+            </g>
+          </g>
+        )}
+        <g className="incidents">
+          {day.layout.fixtures
+            .filter((f) => incidents.has(f.id))
+            .map((f) => {
+              const n = incidents.get(f.id)!;
+              const c = centroid(f.footprint);
+              const lane = f.kind === "checkout_lane";
+              const y = lane ? Math.min(...f.footprint.map((p) => p.y)) - 0.7 : c.y;
+              const picked = sel?.kind === "checkout" && sel.id === f.id;
+              return (
+                <g key={f.id} className={`incident${n.recent ? " recent" : ""}${picked ? " selected" : ""}`} transform={`translate(${c.x} ${y})`} onClick={() => onSelect({ kind: "checkout", id: f.id })}>
+                  <path d="M0,-0.62 L0.62,0 L0,0.62 L-0.62,0 Z" />
+                  <text textAnchor="middle" dominantBaseline="central">
+                    {n.count}
+                  </text>
+                </g>
+              );
+            })}
         </g>
         {selectedPath && <polyline className="path-trace" points={selectedPath.x.map((x, i) => `${x},${selectedPath.y[i]}`).join(" ")} />}
         <g className="shoppers">

@@ -1,5 +1,5 @@
 import { clockOf, type IndexedDay } from "./day.ts";
-import type { AnyRecord, EvidenceData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
 
 export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
   in_stock: "In stock",
@@ -43,6 +43,34 @@ export function itemNameAt(day: IndexedDay, facingId: string | undefined): strin
   return (gtin && day.items.get(gtin)?.name) || facingId;
 }
 
+/** A checkout lane or self-checkout station the way store staff say it, such as "Lane 3". */
+export function checkoutName(id: string | undefined): string {
+  if (!id) return "";
+  const lane = /^lane-0*(\d+)$/.exec(id);
+  if (lane) return `Lane ${lane[1]}`;
+  const sco = /^sco-0*(\d+)$/.exec(id);
+  if (sco) return `Self-checkout ${sco[1]}`;
+  return id;
+}
+
+export const INCIDENT_LABEL: Record<string, string> = {
+  non_scan: "Non-scan",
+  ticket_switching: "Ticket switching",
+  bottom_of_basket: "Bottom of basket",
+  sweethearting: "Sweethearting",
+  push_out: "Push-out",
+  shelf_sweep: "Shelf sweep",
+  safety_hazard: "Safety hazard",
+  other: "Other",
+};
+
+export const INCIDENT_STATUS: Record<string, string> = {
+  open: "Open, waiting for review",
+  under_review: "Under review",
+  confirmed: "Confirmed by a reviewer",
+  dismissed: "Dismissed by a reviewer",
+};
+
 export function zoneName(day: IndexedDay, id: string | undefined): string {
   return (id && day.zones.get(id)?.name) || id || "";
 }
@@ -67,7 +95,12 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
     }
     case "oiss.Evidence": {
       const d = (r as OissRecord<EvidenceData>).data;
+      if (d.mediaType.startsWith("video/")) return `Checkout clip: ${checkoutName(d.location.fixture)}`;
       return `Shelf image: ${itemNameAt(day, d.location.facing)}`;
+    }
+    case "oiss.Incident": {
+      const d = (r as OissRecord<IncidentData>).data;
+      return `Possible ${(INCIDENT_LABEL[d.incidentType] ?? humanize(d.incidentType)).toLowerCase()} at ${checkoutName(d.location.fixture)}, for review`;
     }
     case "oiss.StoreLayout": {
       const d = (r as OissRecord<StoreLayoutData>).data;

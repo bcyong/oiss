@@ -4,7 +4,7 @@ OISS is a draft open interchange standard for store-intelligence data. Its goal 
 
 Each source publishes what it saw as OISS records, so any consumer, from a store operations dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and raise store tasks, so the value shows right away.
 
-> **Status:** v0.1 draft, milestone M2 (synthetic store and full demo replay). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
+> **Status:** v0.1 draft, milestone M3 in progress (vendor feeds and adapters; loss prevention is in). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
 
 ## Why a retailer would adopt it
 

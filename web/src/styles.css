@@ -14,6 +14,8 @@
   --unknown: #8a8f86;
   --none: #e3e6df;
   --shopper: #2251a8;
+  --incident: #8a3ffc;
+  --robot: #0f7f80;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -33,6 +35,8 @@
     --unknown: #7d8379;
     --none: #2b3028;
     --shopper: #8fb4ff;
+  --incident: #b78cff;
+  --robot: #3cc8c4;
     color-scheme: dark;
   }
 }
@@ -52,6 +56,8 @@
   --unknown: #7d8379;
   --none: #2b3028;
   --shopper: #8fb4ff;
+  --incident: #b78cff;
+  --robot: #3cc8c4;
   color-scheme: dark;
 }
 
@@ -822,4 +828,111 @@ code {
   .spec-page {
     padding: 16px;
   }
+}
+
+/* M3: checkout incidents and the shelf-scanning robot */
+.incident {
+  cursor: pointer;
+}
+.incident path {
+  fill: var(--panel);
+  stroke: var(--incident);
+  stroke-width: 0.14;
+}
+.incident text {
+  font: 700 0.62px system-ui, sans-serif;
+  fill: var(--incident);
+  pointer-events: none;
+}
+.incident.recent path {
+  fill: var(--incident);
+}
+.incident.recent text {
+  fill: var(--panel);
+}
+.incident.selected path {
+  stroke: var(--text);
+  stroke-width: 0.2;
+}
+.robot-route,
+.robot-trail {
+  fill: none;
+  stroke: var(--robot);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.robot-route {
+  stroke-width: 0.12;
+  stroke-dasharray: 0.3 0.3;
+  opacity: 0.45;
+}
+.robot-trail {
+  stroke-width: 0.22;
+  opacity: 0.85;
+}
+.robot-body {
+  cursor: pointer;
+}
+.robot-body rect {
+  fill: var(--robot);
+  stroke: var(--panel);
+  stroke-width: 0.12;
+}
+.robot.selected .robot-body rect {
+  stroke: var(--text);
+  stroke-width: 0.2;
+}
+.robot-label {
+  font: 700 0.7px system-ui, sans-serif;
+  fill: var(--panel);
+  pointer-events: none;
+}
+.incident-swatch {
+  background: var(--incident);
+  transform: rotate(45deg) scale(0.8);
+  border-radius: 1px;
+}
+.robot-swatch {
+  background: var(--robot);
+}
+.tl-incident {
+  stroke: var(--incident);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ev-belt {
+  fill: #3b4038;
+}
+.ev-counter {
+  fill: #575e52;
+}
+.ev-person {
+  fill: #c9a98f;
+  opacity: 0.85;
+}
+.ev-bar {
+  fill: #ffffff;
+  opacity: 0.25;
+}
+.ev-bar-done,
+.ev-play {
+  fill: #ffffff;
+  opacity: 0.8;
+}
+.ev-time {
+  font: 11px ui-monospace, Menlo, monospace;
+  fill: #ffffff;
+  opacity: 0.8;
+}
+.vendor-raw {
+  margin-top: 12px;
+}
+.vendor-raw summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.vendor-raw .note {
+  margin-bottom: 8px;
 }

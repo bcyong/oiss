@@ -1,0 +1,15 @@
+{
+  "name": "@oiss/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adapters from mock vendor exports into OISS records",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./mock-lp-alerts": "./src/mock-lp-alerts.ts"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p ."
+  }
+}

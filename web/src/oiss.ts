@@ -139,6 +139,20 @@ export interface EvidenceData {
   accessRoles: string[];
 }
 
+export interface IncidentData {
+  provenance: Provenance;
+  window: Window;
+  location: { zone?: string; fixture?: string; camera?: string };
+  incidentType: string;
+  severity?: "low" | "medium" | "high";
+  status: "open" | "under_review" | "confirmed" | "dismissed";
+  gtins?: string[];
+  paths?: string[];
+  summary?: string;
+  confidence: number;
+  evidence?: string[];
+}
+
 /** The retailer's item master. Not an OISS record: OISS refers to items by GTIN. */
 export interface ItemMaster {
   store: string;
@@ -153,6 +167,8 @@ export interface DayRecords {
   shopperPaths: OissRecord<ShopperPathData>[];
   /** Shelf images behind low-stock and out-of-stock reads. Days written before M2 have none. */
   evidence?: OissRecord<EvidenceData>[];
+  /** Loss prevention incidents for review. Days written before M3 have none. */
+  incidents?: OissRecord<IncidentData>[];
 }
 
 export type AnyRecord =
@@ -160,4 +176,5 @@ export type AnyRecord =
   | OissRecord<ShelfObservationData>
   | OissRecord<ZoneMetricData>
   | OissRecord<ShopperPathData>
-  | OissRecord<EvidenceData>;
+  | OissRecord<EvidenceData>
+  | OissRecord<IncidentData>;

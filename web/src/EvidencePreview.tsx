@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
-import type { IndexedDay } from "./day.ts";
-import { humanize, itemNameAt } from "./describe.ts";
+import { clockOf, type IndexedDay } from "./day.ts";
+import { checkoutName, humanize, itemNameAt } from "./describe.ts";
 import type { EvidenceData, OissRecord, ShelfObservationData } from "./oiss.ts";
 
 /** A small deterministic number from a string, so a placeholder looks the same every time. */
@@ -47,15 +47,75 @@ function Placeholder({ seed, fill, status }: { seed: string; fill: number; statu
   );
 }
 
+/**
+ * A drawn stand-in for a checkout clip: the lane from above, the belt with the order on it, a
+ * blurred shopper and cashier, and a playback bar. There is no footage behind it.
+ */
+function ClipPlaceholder({ seed, seconds, self }: { seed: string; seconds: number; self: boolean }) {
+  const h = hash(seed);
+  const items: ReactElement[] = [];
+  const count = 5 + (h % 4);
+  for (let i = 0; i < count; i++) {
+    const w = 12 + ((h >>> (i * 3)) & 7) * 2;
+    items.push(<rect key={i} className={i === (h >>> 8) % count ? "ev-item target" : "ev-item"} x={70 + i * 26} y={self ? 64 : 58 + ((h >>> i) & 3) * 3} width={w} height={14 + ((h >>> (i + 5)) & 3) * 3} rx={2} />);
+  }
+  const length = `0:${String(Math.round(seconds)).padStart(2, "0")}`;
+  return (
+    <svg className="ev-image" viewBox="0 0 320 180" role="img" aria-label="Placeholder checkout clip">
+      <defs>
+        <filter id="ev-blur">
+          <feGaussianBlur stdDeviation="6" />
+        </filter>
+      </defs>
+      <rect className="ev-bg" width={320} height={180} />
+      <rect className="ev-belt" x={56} y={52} width={self ? 120 : 210} height={40} rx={3} />
+      <rect className="ev-counter" x={self ? 186 : 274} y={44} width={self ? 60 : 36} height={56} rx={3} />
+      {items}
+      <ellipse className="ev-person" cx={150} cy={124} rx={26} ry={18} filter="url(#ev-blur)" />
+      {!self && <ellipse className="ev-person" cx={292} cy={28} rx={18} ry={14} filter="url(#ev-blur)" />}
+      <rect className="ev-bar" x={10} y={150} width={300} height={4} rx={2} />
+      <rect className="ev-bar-done" x={10} y={150} width={225} height={4} rx={2} />
+      <path className="ev-play" d="M14,160 L14,172 L24,166 Z" />
+      <text className="ev-time" x={306} y={170} textAnchor="end">
+        0:15 / {length}
+      </text>
+      <text className="ev-watermark" x={160} y={24} textAnchor="middle">
+        PLACEHOLDER CLIP
+      </text>
+    </svg>
+  );
+}
+
 export function EvidencePreview({ day, evidence, observation, onInspect }: { day: IndexedDay; evidence: OissRecord<EvidenceData>; observation?: OissRecord<ShelfObservationData>; onInspect?: (id: string) => void }) {
   const d = evidence.data;
+  const kept = new Date(d.retainUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const viewers = d.accessRoles.map(humanize).join(" and ").toLowerCase();
+  if (d.mediaType.startsWith("video/")) {
+    const seconds = (Date.parse(d.window.end) - Date.parse(d.window.start)) / 1000;
+    return (
+      <figure className="evidence">
+        <ClipPlaceholder seed={evidence.id} seconds={seconds} self={d.location.fixture?.startsWith("sco-") ?? false} />
+        <figcaption>
+          <span>
+            {checkoutName(d.location.fixture)}, {clockOf(day, d.window.start)} to {clockOf(day, d.window.end)}. {humanize(d.redaction)}, kept until {kept}, viewable by {viewers}.
+          </span>
+          <span className="muted">A drawn placeholder: the synthetic store has no camera footage.</span>
+          {onInspect && (
+            <button type="button" className="link" onClick={() => onInspect(evidence.id)}>
+              Inspect Evidence {evidence.id}
+            </button>
+          )}
+        </figcaption>
+      </figure>
+    );
+  }
   const fill = observation?.data.fillLevel ?? (observation?.data.status === "out_of_stock" ? 0 : 0.15);
   return (
     <figure className="evidence">
       <Placeholder seed={evidence.id} fill={fill} status={observation?.data.status ?? "low_stock"} />
       <figcaption>
         <span>
-          {itemNameAt(day, d.location.facing)}. {humanize(d.redaction)}, kept until {new Date(d.retainUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}, viewable by {d.accessRoles.map(humanize).join(" and ").toLowerCase()}.
+          {itemNameAt(day, d.location.facing)}. {humanize(d.redaction)}, kept until {kept}, viewable by {viewers}.
         </span>
         <span className="muted">A drawn placeholder: the synthetic store has no camera frames yet.</span>
         {onInspect && (

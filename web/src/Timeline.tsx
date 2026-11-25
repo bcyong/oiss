@@ -20,6 +20,9 @@ const Areas = memo(function Areas({ day }: { day: IndexedDay }) {
       {hours.map((t) => (
         <line key={t} className="tl-tick" x1={x(t)} x2={x(t)} y1={0} y2={H} />
       ))}
+      {day.incidents.t.map((t, i) => (
+        <line key={`i${i}`} className="tl-incident" x1={x(t)} x2={x(t)} y1={H - 9} y2={H} />
+      ))}
     </>
   );
 });
@@ -44,7 +47,10 @@ export function Timeline({ day, t, onSeek }: { day: IndexedDay; t: number; onSee
         <span>
           <i className="swatch s-low_stock" /> Low stock
         </span>
-        <span className="muted">facings through the day</span>
+        <span>
+          <i className="swatch incident-swatch" /> Checkout incident
+        </span>
+        <span className="muted">through the day</span>
       </div>
       <svg
         ref={ref}
