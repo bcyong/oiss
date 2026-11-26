@@ -66,6 +66,8 @@ for (const t of TIMES) {
     console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}`);
     for (const f of r.findings) console.log(`        ${f.check}: ${f.detail}`);
     if (r.error) console.log(`        ${r.error}`);
+    // A failed answer's own words, so the log shows what the check caught.
+    if (r.findings.length && r.text) for (const line of r.text.split("\n")) console.log(`        | ${line}`);
   }
 }
 

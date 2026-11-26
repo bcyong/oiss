@@ -1,5 +1,5 @@
 import { clock, type IndexedDay } from "../day.ts";
-import { AGENTS, LIMITS, parseRoute, type AgentId } from "./agents.ts";
+import { AGENTS, LIMITS, parseRoute, TOOLS, type AgentId } from "./agents.ts";
 import type { ChatMessage, StepReply, StepRequest, ToolCall } from "./proxy.ts";
 import { idsIn, runTool, type ToolArgs } from "./tools.ts";
 
@@ -82,6 +82,19 @@ export function clean(text: string): string {
     .trim();
 }
 
+/**
+ * Takes tool names out of square brackets, so "[checkout_incidents]" doesn't show as if it were a
+ * citation. A bracket that also holds record ids keeps them.
+ */
+export function dropToolCitations(text: string): string {
+  return text.replace(/ ?\[([^\]\n]+)\](?!\()/g, (whole, inner: string) => {
+    const parts = inner.split(/\s*[,;]\s*/);
+    const kept = parts.filter((p) => !Object.hasOwn(TOOLS, p.trim()));
+    if (kept.length === parts.length) return whole;
+    return kept.length ? `${whole.startsWith(" ") ? " " : ""}[${kept.join(", ")}]` : "";
+  });
+}
+
 /** Record ids cited in square brackets, such as [so-20261117-000123] or [so-…, task-…-v2]. */
 export function citations(text: string): string[] {
   const out = new Set<string>();
@@ -130,7 +143,7 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     const { message } = await step({ step: "agent", agent, store, now, messages, final });
     const wanted = final ? [] : (message.tool_calls ?? []).slice(0, MAX_CALLS_PER_TURN);
     if (!wanted.length) {
-      text = clean(message.content ?? "");
+      text = dropToolCitations(clean(message.content ?? ""));
       break;
     }
     messages.push({ role: "assistant", content: message.content ?? null, tool_calls: wanted });

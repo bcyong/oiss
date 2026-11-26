@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, TOOLS } from "../src/assistant/agents.ts";
 import { DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
-import { ask, citations, clean } from "../src/assistant/run.ts";
+import { ask, citations, clean, dropToolCitations } from "../src/assistant/run.ts";
 import { idsIn, runTool } from "../src/assistant/tools.ts";
 import { incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
 import type { DayFiles } from "../src/load.ts";
@@ -161,6 +161,8 @@ test("the router's reply picks the agent, and keywords pick one when it can't be
 
 test("answers keep only cited ids and drop shown reasoning", () => {
   assert.deepEqual(citations("Milk is out [so-20261117-000123] and [task-20261117-000004-v2, inc-20261117-000001]. See [ev-lp-20261117-000002]. Not [this]."), ["so-20261117-000123", "task-20261117-000004-v2", "inc-20261117-000001", "ev-lp-20261117-000002"]);
+  assert.equal(dropToolCitations("Two need review [checkout_incidents]. One is open [inc-20261117-000001; checkout_incidents]."), "Two need review. One is open [inc-20261117-000001].");
+  assert.equal(dropToolCitations("Out [so-20261117-000123]. See [the board](/demo/)."), "Out [so-20261117-000123]. See [the board](/demo/).");
   assert.equal(clean("<think>hmm</think>\nAnswer."), "Answer.");
 });
 
