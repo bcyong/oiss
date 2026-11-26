@@ -83,7 +83,7 @@ function VendorRawView({ day, record, raw }: { day: IndexedDay; record: AnyRecor
   );
 }
 
-function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void }) {
+function Details({ day, record, onInspect, t }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; t?: number }) {
   switch (record.type) {
     case "oiss.ShelfObservation": {
       const d = (record as OissRecord<ShelfObservationData>).data;
@@ -231,6 +231,8 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
     case "oiss.Task": {
       const d = (record as OissRecord<TaskData>).data;
       const view = day.taskBySubject.get(record.subject);
+      // Only the status changes made by the playback time, so the inspector doesn't show the future.
+      const history = view ? view.versions.filter((v, i) => v.id === record.id || t === undefined || view.times[i]! <= t) : [];
       const where = d.location.facing ? `${itemNameAt(day, d.location.facing)}, ${zoneName(day, d.location.zone)}` : d.location.fixture ? `${checkoutName(d.location.fixture)}, ${zoneName(day, d.location.zone)}` : zoneName(day, d.location.zone);
       const link = (id: string) => {
         const r = day.byId.get(id);
@@ -276,12 +278,12 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
               <dd>{d.verification.verifiedBy ? <>Confirmed by {link(d.verification.verifiedBy)}</> : d.verification.required ? "Closes only when a later record shows the fix" : "No check needed"}</dd>
             </>
           )}
-          {view && view.versions.length > 1 && (
+          {history.length > 1 && (
             <>
               <dt>History</dt>
               <dd>
                 <ol className="task-history">
-                  {view.versions.map((v) => (
+                  {history.map((v) => (
                     <li key={v.id}>
                       {v.id === record.id ? (
                         <strong>
@@ -323,7 +325,7 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
   }
 }
 
-export function Inspector({ day, record, onInspect, onClose, following }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; onClose?: () => void; following: boolean }) {
+export function Inspector({ day, record, onInspect, onClose, following, t }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; onClose?: () => void; following: boolean; /** The playback time, so a task's history stops there. */ t?: number }) {
   const [tab, setTab] = useState<"summary" | "json">("summary");
   const [copied, setCopied] = useState(false);
   const privacy = PRIVACY[record.oissprivacy];
@@ -382,7 +384,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
           <dl>
             <dt>Time</dt>
             <dd>{timeOf(day, record)}</dd>
-            <Details day={day} record={record} onInspect={onInspect} />
+            <Details day={day} record={record} onInspect={onInspect} t={t} />
             {provenance && <ProvenanceRows p={provenance} />}
             <dt>Source</dt>
             <dd className="mono small">{record.source}</dd>

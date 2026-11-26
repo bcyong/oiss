@@ -695,7 +695,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper, the robot, a checkout incident or a camera to see the OISS records behind it, or pick a record from the stream.</p>
           )}
 
-          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} />}
+          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} t={t} />}
 
           <section className="card">
             <div className="tabs" role="tablist">
