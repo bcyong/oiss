@@ -56,7 +56,7 @@ export const httpStep =
     return body;
   };
 
-const MAX_TOOL_CHARS = 6000;
+const MAX_TOOL_CHARS = 9000;
 const MAX_CALLS_PER_TURN = 4;
 
 /** A tool result as the model reads it, cut short when it is long. */

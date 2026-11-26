@@ -50,6 +50,55 @@ test("shelf gaps list out-of-stock facings with the record that reported each", 
   for (const f of dairy.facings) assert.equal(f.department, "dairy");
 });
 
+test("shelf tags fixed after the read that flagged them aren't counted as wrong on the shelf", () => {
+  const tags = tool("price_and_label", "shelf_tag_issues", { limit: 25 }, 9 * 3600);
+  // At 9 AM on the golden day two tags are still wrong and four fixes wait for the robot's next read.
+  assert.deepEqual({ ...tags.counts, fixesConfirmedToday: undefined }, { wrongOnShelf: 2, fixedWaitingForRead: 4, flaggedAgainAfterFix: 0, fixesConfirmedToday: undefined });
+  for (const row of tags.tags) {
+    const task = row.fixTask && day.byId.get(row.fixTask.id);
+    if (row.status.startsWith("Fix marked done")) {
+      assert.ok(task && ["done", "verified"].includes((task.data as { state: string }).state));
+      assert.ok(secondsOf(day, task!.time) >= secondsOf(day, day.byId.get(row.robotTagRead.record)!.time), "the fix came after the read that flagged it");
+    } else assert.match(row.status, /^Wrong on the shelf/);
+  }
+  // By 1 PM every fix has been confirmed by a later read.
+  assert.equal(tool("price_and_label", "shelf_tag_issues", {}, 13 * 3600).counts.wrongOnShelf, 0);
+});
+
+test("shelf gaps say where replenishment stands, including tasks cancelled with no reason given", () => {
+  const g = tool("availability", "shelf_gaps", { status: "both", limit: 100 }, 13 * 3600);
+  assert.equal(Object.values(g.replenishment as Record<string, number>).reduce((a, b) => a + b, 0), g.total);
+  assert.ok(g.replenishment.cancelled > 0, "the golden day has cancelled replenishment at 1 PM");
+  for (const f of g.facings) {
+    if (f.replenishment.startsWith("Replenishment task cancelled")) {
+      assert.equal(f.replenishmentTask.state, "Cancelled");
+      assert.match(f.replenishment, /doesn't say why/);
+    }
+    if (f.replenishment.startsWith("No replenishment task")) assert.equal(f.replenishmentTask, undefined);
+  }
+});
+
+test("checkout incidents give the store's own review status apart from the vendor's", () => {
+  const c = tool("loss_prevention", "checkout_incidents", { limit: 25 });
+  assert.equal(c.reviews.notReviewed + c.reviews.reviewed + c.reviews.reviewCancelled, c.total);
+  for (const i of c.incidents) {
+    if (!i.review.startsWith("Reviewed")) continue;
+    const task = day.byId.get(i.reviewTask.id)!.data as { kind: string; state: string; basedOn: string[] };
+    assert.equal(task.kind, "review_exception");
+    assert.ok(task.basedOn.includes(i.id));
+    assert.match(i.review, /don't say what the reviewer found/);
+  }
+  const s = tool("availability", "store_summary");
+  assert.deepEqual(s.checkoutIncidentReviews, c.reviews);
+});
+
+test("the front end gives the lane count and the rule for opening another lane", () => {
+  const f = tool("front_end", "front_end_status", { hours: 1 });
+  assert.equal(f.now.of, f.staffedLanesInStore);
+  assert.match(f.openLaneRule, /3 minutes/);
+  assert.ok(f.staffedLanesInStore > 0);
+});
+
 test("no tool reads a record from after the time asked about", () => {
   const t = 11 * 3600;
   const calls: [string, Record<string, unknown>][] = [

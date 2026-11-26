@@ -32,13 +32,13 @@ const limit = { type: "integer", minimum: 1, maximum: 25, description: "Most row
 export const TOOLS: Record<ToolName, ToolSpec> = {
   store_summary: {
     name: "store_summary",
-    description: "The store at the current time: facings out of stock and low, open store tasks by kind, checkout incidents so far, and the front end's latest line, wait and open lanes.",
+    description: "The store at the current time: facings out of stock, low, not readable and not yet observed; store tasks by kind split into open, marked done but not yet confirmed, confirmed, done with no confirmation needed, and cancelled; checkout incidents so far and how many the store has reviewed; and the front end's latest line, wait and open lanes out of the lanes the store has.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   shelf_gaps: {
     name: "shelf_gaps",
     description:
-      "Facings whose latest shelf observation is out of stock or low stock, highest priority first: promoted items, then items in the busiest zones, then the longest empty. Each row has the item, GTIN, location, since when, the record that reported it and any open store task for it.",
+      "Facings whose latest shelf observation is out of stock or low stock, highest priority first: promoted items, then out of stock ahead of low stock, then the busiest zones, then the longest short. Each row has the item, location, since when, when it was last in stock, the record that reported it, and where replenishment stands (no task, task open, marked done but not confirmed, or cancelled). Counts by replenishment status cover every facing, not only the rows shown.",
     parameters: {
       type: "object",
       properties: {
@@ -51,12 +51,12 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
   },
   find_item: {
     name: "find_item",
-    description: "Find facings by item name, GTIN or facing id, with the latest report from each source that watches it (shelf-scanning robot, shelf cameras, shelf labels) and any store tasks on it.",
+    description: "Find facings by item name, GTIN or facing id, with the shelf status now, whether its shelf tag has a price problem, the latest report from each source that watches it (shelf-scanning robot, shelf cameras, shelf labels) and any store tasks on it.",
     parameters: { type: "object", properties: { query: { type: "string", description: "Part of an item name, a GTIN or a facing id." }, limit }, required: ["query"], additionalProperties: false },
   },
   store_tasks: {
     name: "store_tasks",
-    description: "Store tasks raised by the store's task management system so far, as they stand now, most recently changed first.",
+    description: "Store tasks raised by the store's task management system so far, as they stand now, most recently changed first, with counts by state. Done means an associate marked it done; Verified means a later record confirmed the fix.",
     parameters: {
       type: "object",
       properties: {
@@ -69,12 +69,12 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
   },
   shelf_tag_issues: {
     name: "shelf_tag_issues",
-    description: "Shelf tags whose price doesn't match the price file, from the robot's tag reads and the electronic shelf labels' own reports, including where the two sources disagree, as they stand now.",
+    description: "Shelf tags whose latest read shows a price other than the register price, with counts: still wrong on the shelf, fix marked done and waiting for the robot's next read, flagged again after a fix, and fixes confirmed today. Each tag has its status, who flagged it, the robot's read, the shelf label's report and its fix task.",
     parameters: { type: "object", properties: { limit }, additionalProperties: false },
   },
   front_end_status: {
     name: "front_end_status",
-    description: "The staffed lanes and self-checkout over the last hours: line length, average wait and open lanes per 15-minute interval, newest first.",
+    description: "The front end now and over the last hours: line length, average wait and open lanes per 15-minute interval, newest first, for staffed lanes and self-checkout; how many lanes the store has; the rule for opening another staffed lane and whether it is met now; and the latest open-lane tasks.",
     parameters: { type: "object", properties: { hours: { type: "number", minimum: 0.25, maximum: 16, description: "How far back to look. Default 2." } }, additionalProperties: false },
   },
   zone_traffic: {
@@ -84,7 +84,7 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
   },
   checkout_incidents: {
     name: "checkout_incidents",
-    description: "Checkout exceptions the loss prevention vendor flagged so far, newest first: type, severity, lane, status, evidence ids and the review task. Evidence is restricted; only its id and retention are shown.",
+    description: "Checkout exceptions the loss prevention vendor flagged so far, those not yet reviewed first: type, severity, lane, the store's review status from its review task, the vendor's own status, evidence ids and counts by review status. Evidence is restricted; only its id and retention are shown.",
     parameters: {
       type: "object",
       properties: { severity: { type: "string", enum: ["low", "medium", "high"] }, limit },
@@ -111,7 +111,7 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
     id: "price_and_label",
     name: "Price and label agent",
     handles: "Shelf tag prices, electronic shelf labels, sale signs left up, price mismatches and disagreements between the robot and the labels.",
-    role: "You find shelf tags that don't match the price file, explain the likely cause, and check whether the fix task closed.",
+    role: "You find shelf tags that don't match the register price and say where each fix stands, telling tags still wrong on the shelf apart from fixes that wait for the robot's next read.",
     tools: ["shelf_tag_issues", "find_item", "store_tasks", "get_record"],
     start: [{ name: "shelf_tag_issues", args: { limit: 10 } }],
   },
@@ -119,7 +119,7 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
     id: "front_end",
     name: "Front-end agent",
     handles: "Checkout lines, wait times, open lanes, self-checkout, staffing the front end, shopper traffic and busy zones.",
-    role: "You watch lines and waits at the front end and say when another staffed lane should open.",
+    role: "You watch lines and waits at the front end and say, by the store's open-lane rule, whether another staffed lane should open.",
     tools: ["front_end_status", "zone_traffic", "store_tasks", "store_summary", "get_record"],
     start: [{ name: "front_end_status", args: { hours: 1 } }],
   },
@@ -155,6 +155,9 @@ export function agentPrompt(id: AgentId, store: string, now: string): string {
     "Use standard retail terms (facing, out of stock, replenishment, go-back, shelf tag, front end, shrink). Your reader is a store or retail operations manager.",
     "Answer in at most 120 words: lead with the answer, then a few short bullet points if they help. Cite every fact with the id of the record it came from in square brackets, like [so-20261117-000123]. Only cite ids your tools returned.",
     "You can only read records. If something should be done, say what and who would do it; don't claim you did it. Shopper paths and evidence are restricted: never describe a shopper, and never suggest acting toward one.",
+    "Your tools work out every status, count and priority. Use them as given: never recount, add up or regroup them, and never call something wrong, open or done when its status says otherwise.",
+    "Say why something happened only when a record says why. Otherwise say the records don't say, and name who could find out, using a team your tools returned.",
+    "Name people, teams and vendors only as your tools return them; never make up a name or a role.",
     "If your tools can't answer, say so plainly.",
   ].join("\n");
 }

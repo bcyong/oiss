@@ -46,3 +46,11 @@ npm run preview -w web # serves web/dist
 ```
 
 The local dev server has no functions, so **Ask the store** says the assistant runs on the deployed site. To try it locally, run the site with the Netlify CLI (`netlify dev`) with `NVIDIA_API_KEY` set in your shell.
+
+## Check the assistant's answers
+
+The **Assistant answer check** workflow (`.github/workflows/assistant-eval.yml`) asks the four sample questions at 9 AM, 1 PM and 6 PM on the golden day, about 30 model calls, and checks every answer against the records its tools returned. An answer fails when it cites a record the tools didn't return, states a number, time or price that isn't in the tool results, gives a cause the records don't, or names a team no tool returned. The results land in the run's summary.
+
+It runs on pull requests that change the assistant, from the Actions tab, and every Monday. It needs the same key as the site, as a repository secret: **Settings → Secrets and variables → Actions → New repository secret**, named `NVIDIA_API_KEY`. Without it the workflow says so and passes. A repository variable `NVIDIA_MODEL` picks another model, as on Netlify.
+
+To run it yourself: `NVIDIA_API_KEY=... npm run eval:assistant -w web`, or point it at a deployed site's assistant with `EVAL_URL=https://<site>/api/assistant`.
