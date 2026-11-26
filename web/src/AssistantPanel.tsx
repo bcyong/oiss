@@ -12,18 +12,19 @@ export type ChatEntry = { id: number; question: string; t: number } & ({ state: 
 
 const proposalKey = (p: Proposal) => `${p.kind}:${p.facing}`;
 
-/** One line of an answer, with **bold** and [record id] citations. A cited id opens the record when it exists by the time asked. */
+/** One line of an answer, with **bold**, *italics* and [record id] citations. A cited id opens the record when it exists by the time asked. */
 function inline(text: string, day: IndexedDay, t: number, onInspect: (id: string) => void, key: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*|\[([^\]\n]{3,200})\]/g;
+  const re = /\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s](?:[^*]*[^*\s])?)\*(?![\w*])|\[([^\]\n]{3,200})\]/g;
   let last = 0;
   let n = 0;
   for (const m of text.matchAll(re)) {
     if (m.index! > last) out.push(text.slice(last, m.index));
     // Bold text can hold citations too.
     if (m[1] !== undefined) out.push(<b key={`${key}-${n++}`}>{inline(m[1], day, t, onInspect, `${key}-${n}`)}</b>);
+    else if (m[2] !== undefined) out.push(<i key={`${key}-${n++}`}>{inline(m[2], day, t, onInspect, `${key}-${n}`)}</i>);
     else {
-      const ids = m[2]!.split(/[,;\s]+/).filter(Boolean);
+      const ids = m[3]!.split(/[,;\s]+/).filter(Boolean);
       const records = ids.map((id) => day.byId.get(id));
       if (records.every((r) => r && secondsOf(day, r.time) <= t)) {
         out.push(
