@@ -1,9 +1,11 @@
 # Web app
 
-The public site, deployed to Netlify from this repository (see [deploy-netlify.md](../docs/deploy-netlify.md)):
+The public site, deployed to Netlify from this repository (see [deploy-netlify.md](../docs/deploy-netlify.md)). Every page shares one header, with RFC and Demo on the left and GitHub on the right, and no header link leaves the site. The header and footer live in [`site/layout.ts`](site/layout.ts), and a Vite plugin, [`site/plugin.ts`](site/plugin.ts), puts them into each page at build time.
 
 - **`/`**: the OISS landing page, laid out like a blueprint card: overview, architecture diagram, key features, record types, what adoption takes, software used, ethical considerations and license. Plain HTML and CSS in [`index.html`](index.html) and [`src/landing.css`](src/landing.css).
 - **`/demo/`**: the demo store, built with React and SVG. It reads only OISS records and the retailer's item master, the same way any OISS consumer would.
+- **`/rfc/`**: the OISS RFC, rendered at build time from [`docs/rfc/OISS-RFC.md`](../docs/rfc/OISS-RFC.md) by a small Markdown renderer in [`site/markdown.ts`](site/markdown.ts). Edit the Markdown to change the page.
+- **`/github/`**: an overview of the repository, with links out to GitHub from the page itself.
 - **`/spec/`**: the spec browser. Every record type with its fields, rules, vocabularies and the valid example, read straight from `schemas/v0.1` and `examples/valid` at build time.
 
 ## The demo store

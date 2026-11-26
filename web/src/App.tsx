@@ -561,9 +561,6 @@ export function App({ start }: { start?: AppStart } = {}) {
 
   return (
     <div className="app">
-      <nav className="crumbs" aria-label="Breadcrumb">
-        <a href="/">OISS</a> <span aria-hidden="true">/</span> Demo store <span aria-hidden="true">·</span> <a href="/spec/">Spec browser</a>
-      </nav>
       <header>
         <div>
           <h1>{day.layout.store.name}</h1>

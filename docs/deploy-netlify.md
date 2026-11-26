@@ -1,6 +1,6 @@
 # Deploy the demo on Netlify
 
-The site is static: the OISS landing page at `/` and the demo store at `/demo/`. Netlify builds it from this repository on every push, using the settings in [`netlify.toml`](../netlify.toml), so there is nothing to configure in the Netlify dashboard beyond linking the repo.
+The site is static: the OISS landing page at `/`, the RFC at `/rfc/`, the demo store at `/demo/`, the spec browser at `/spec/` and the repository overview at `/github/`. Netlify builds it from this repository on every push, using the settings in [`netlify.toml`](../netlify.toml), so there is nothing to configure in the Netlify dashboard beyond linking the repo.
 
 ## Link the repository (once)
 
