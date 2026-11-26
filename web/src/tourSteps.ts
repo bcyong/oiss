@@ -76,7 +76,7 @@ export function markSeen() {
 }
 
 const GAP = 12;
-export const CARD_W = 340;
+export const CARD_W = 380;
 
 export interface Box {
   top: number;
