@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { applyTheme, storedTheme, type Theme } from "./theme.ts";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, tasksAt, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
 import { assigneeName, checkoutName, duration, TASK_KIND, TASK_OUTCOME, TASK_STATE, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
@@ -136,6 +137,13 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
+  const [theme, setTheme] = useState<Theme>(() => (typeof document === "undefined" ? "dark" : storedTheme()));
+  const switchTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
+    setMoreOpen(false);
+  };
   const [panel, setPanel] = useState<Panel | null>(start?.panel ?? null);
   /** The view to go back to after inspecting a record from it. */
   const [back, setBack] = useState<Panel | null>(null);
@@ -740,6 +748,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               <div className="menu" role="menu">
                 <button type="button" role="menuitem" onClick={startTour}>
                   Take the tour
+                </button>
+                <button type="button" role="menuitem" onClick={switchTheme}>
+                  {theme === "dark" ? "Light theme, for screenshots" : "Dark theme"}
                 </button>
                 <hr />
                 {MORE_PANELS.map((x) => (

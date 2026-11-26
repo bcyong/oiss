@@ -20,49 +20,27 @@
   --robot: #0f7f80;
   --flag: #c2185b;
   --task: #b35c00;
+  --on-accent: #ffffff;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #121411;
-    --panel: #1b1e19;
-    --text: #e8ebe4;
-    --muted: #a2a99d;
-    --line: #30352d;
-    --floor: #171a15;
-    --fixture: #3a4036;
-    --accent: #8fd11c;
-    --zone: #5b93ff;
-    --in: #4fae53;
-  --facing-in: #4b5a45;
-    --low: #e7ad33;
-    --out: #f0625a;
-    --unknown: #7d8379;
-    --none: #2b3028;
-    --shopper: #8fb4ff;
-  --incident: #b78cff;
-  --robot: #3cc8c4;
-  --flag: #ff6fa8;
-  --task: #ff9d3d;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #121411;
-  --panel: #1b1e19;
-  --text: #e8ebe4;
-  --muted: #a2a99d;
-  --line: #30352d;
-  --floor: #171a15;
-  --fixture: #3a4036;
-  --accent: #8fd11c;
-  --zone: #5b93ff;
-  --in: #4fae53;
-  --facing-in: #4b5a45;
+/* Dark is the default, like the rest of the site. data-theme="light" (More > Light theme) is for screenshots. */
+:root:not([data-theme="light"]) {
+  --bg: #0d0d0d;
+  --panel: #1a1a1a;
+  --text: #eeeeee;
+  --muted: #a7a7a7;
+  --line: #333333;
+  --floor: #141414;
+  --fixture: #3b3b3b;
+  --accent: #76b900;
+  --on-accent: #000000;
+  --zone: #5ab4dc;
+  --in: #8fd11c;
+  --facing-in: #4d5748;
   --low: #e7ad33;
   --out: #f0625a;
-  --unknown: #7d8379;
-  --none: #2b3028;
+  --unknown: #7f7f7f;
+  --none: #262626;
   --shopper: #8fb4ff;
   --incident: #b78cff;
   --robot: #3cc8c4;
@@ -1345,7 +1323,7 @@ ol.chat .answer {
 .ask-button {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .ask-button[aria-pressed="true"] {
@@ -1433,7 +1411,7 @@ ol.chat .answer {
   line-height: 1;
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 10px;
 }
 .timebar .play:hover {
@@ -1804,7 +1782,7 @@ ol.chat .answer {
 .tour-card button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .tour-skip {
