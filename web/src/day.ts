@@ -58,8 +58,25 @@ export interface IncidentSeries {
   recs: OissRecord<IncidentData>[];
 }
 
+/**
+ * Two sources reporting different things about the same facing: what the robot read on a pass, against
+ * what a shelf camera or the shelf labels still said about that facing at that moment.
+ */
+export interface Disagreement {
+  /** When the robot read the facing, in seconds since store midnight. */
+  t: number;
+  /** Index into facings. */
+  facing: number;
+  kind: "availability" | "misplaced_item" | "price";
+  robot: OissRecord<ShelfObservationData>;
+  other: OissRecord<ShelfObservationData>;
+}
+
 export interface IndexedDay {
+  /** The day's records from the feeds that are on. */
   files: DayFiles;
+  /** Source systems whose records are left out. */
+  off: Set<string>;
   layout: StoreLayoutData;
   /** Epoch milliseconds of midnight at the store, in its own UTC offset. */
   midnightMs: number;
@@ -73,7 +90,10 @@ export interface IndexedDay {
   maxDensity: number;
   paths: PathView[];
   items: Map<string, DayFiles["itemMaster"]["items"][number]>;
+  /** Every source system and record type in the day, with full-day counts whether or not the feed is on. */
   sources: { system: string; vendor?: string; type: string; records: number }[];
+  /** Where the robot and another source disagree about a facing, ascending by time. */
+  disagreements: Disagreement[];
   /** Index into facings by facing id. */
   facingById: Map<string, number>;
   /** Every record of the day, in time order, with its time in seconds since store midnight. */
@@ -127,8 +147,13 @@ export function lastAtOrBefore(xs: number[], v: number): number {
   return ans;
 }
 
-export function indexDay(files: DayFiles): IndexedDay {
-  const { records } = files;
+export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): IndexedDay {
+  const full = allFiles.records;
+  const on = <R extends AnyRecord>(rs: R[] | undefined): R[] => (rs ?? []).filter((r) => !off.has(r.data.provenance.system));
+  const records: DayFiles["records"] = off.size
+    ? { ...full, shelfObservations: on(full.shelfObservations), zoneMetrics: on(full.zoneMetrics), shopperPaths: on(full.shopperPaths), evidence: on(full.evidence), incidents: on(full.incidents) }
+    : full;
+  const files: DayFiles = off.size ? { ...allFiles, records } : allFiles;
   const layout = records.storeLayout.data;
   const offset = records.storeLayout.time.slice(19) || "Z";
   const midnightMs = Date.parse(`${files.date}T00:00:00${offset}`);
@@ -206,8 +231,9 @@ export function indexDay(files: DayFiles): IndexedDay {
     return { record: r, start: sec(r.data.window.start), end: sec(r.data.window.end), t: pts.map((p) => sec(p.t)), x: pts.map((p) => p.x), y: pts.map((p) => p.y) };
   });
 
-  const starts = records.zoneMetrics.map((r) => sec(r.data.window.start));
-  const ends = records.zoneMetrics.map((r) => sec(r.data.window.end));
+  // Opening hours come from the people-counting windows, whether or not that feed is on.
+  const starts = full.zoneMetrics.map((r) => sec(r.data.window.start));
+  const ends = full.zoneMetrics.map((r) => sec(r.data.window.end));
   const open = starts.length ? Math.floor(Math.min(...starts) / 3600) * 3600 : 7 * 3600;
   const close = ends.length ? Math.ceil(Math.max(...ends) / 3600) * 3600 : 22 * 3600;
 
@@ -239,7 +265,8 @@ export function indexDay(files: DayFiles): IndexedDay {
   }
   const sourceCounts = new Map<string, { system: string; vendor?: string; type: string; records: number }>();
   const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList, ...incidentList];
-  for (const r of all) {
+  const everything: AnyRecord[] = off.size ? [full.storeLayout, ...full.shelfObservations, ...full.zoneMetrics, ...full.shopperPaths, ...(full.evidence ?? []), ...(full.incidents ?? [])] : all;
+  for (const r of everything) {
     const key = `${r.data.provenance.system}|${r.type}`;
     const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0 };
     entry.records++;
@@ -265,9 +292,11 @@ export function indexDay(files: DayFiles): IndexedDay {
   }
 
   const robot = robotRoute(records.shelfObservations, facingIndex, zones, sec);
+  const disagreements = findDisagreements(facings);
 
   return {
     files,
+    off,
     layout,
     midnightMs,
     offset,
@@ -281,6 +310,7 @@ export function indexDay(files: DayFiles): IndexedDay {
     paths,
     items: new Map(files.itemMaster.items.map((i) => [i.gtin, i])),
     sources: [...sourceCounts.values()],
+    disagreements,
     facingById,
     stream,
     streamTimes,
@@ -295,6 +325,35 @@ export function indexDay(files: DayFiles): IndexedDay {
 }
 
 export const ROBOT_SOURCE_SUFFIX = ":robot-1";
+export const LABEL_SOURCE_SUFFIX = ":esl";
+
+/**
+ * At each robot read, compare it with what the shelf camera and the shelf labels last said about the same
+ * facing. A camera reports only changes and the labels report only when they confirm or fail, so their last
+ * report is what they still say. Only feeds that are on take part.
+ */
+function findDisagreements(facings: FacingView[]): Disagreement[] {
+  const out: Disagreement[] = [];
+  const oos = (r: OissRecord<ShelfObservationData>) => r.data.status === "out_of_stock";
+  const misplaced = (r: OissRecord<ShelfObservationData>) => r.data.flags?.includes("misplaced_item") ?? false;
+  facings.forEach((v, facing) => {
+    let camera: OissRecord<ShelfObservationData> | undefined;
+    let label: OissRecord<ShelfObservationData> | undefined;
+    v.obs.forEach((r, i) => {
+      if (r.data.location.camera) camera = r;
+      else if (r.source.endsWith(LABEL_SOURCE_SUFFIX)) label = r;
+      else if (r.source.endsWith(ROBOT_SOURCE_SUFFIX)) {
+        const t = v.times[i]!;
+        if (camera && camera.data.status && r.data.status && oos(camera) !== oos(r)) out.push({ t, facing, kind: "availability", robot: r, other: camera });
+        if (camera && misplaced(camera) !== misplaced(r)) out.push({ t, facing, kind: "misplaced_item", robot: r, other: camera });
+        const a = r.data.tagPrice;
+        const b = label?.data.tagPrice;
+        if (label && a && b && a.amount !== b.amount) out.push({ t, facing, kind: "price", robot: r, other: label });
+      }
+    });
+  });
+  return out.sort((a, b) => a.t - b.t || a.facing - b.facing);
+}
 /** A gap longer than this between two robot stops starts a new scan run. */
 const RUN_GAP = 600;
 /** How far from the fixture's face the robot drives, in meters. */
@@ -533,4 +592,32 @@ export function faultSeen(day: IndexedDay, fault: { kind: string; facing: string
   }
   if (fault.end !== null && fault.end <= t) return { kind: "cleared", at: fault.end };
   return { kind: "waiting" };
+}
+
+/** Disagreements found by time t, ascending. */
+export function disagreementsUpTo(day: IndexedDay, t: number): Disagreement[] {
+  let n = 0;
+  while (n < day.disagreements.length && day.disagreements[n]!.t <= t) n++;
+  return day.disagreements.slice(0, n);
+}
+
+/** Disagreements about the same facing and the same thing, folded into one: the latest, when it began, and on how many robot passes. */
+export interface DisagreementGroup {
+  latest: Disagreement;
+  first: number;
+  passes: number;
+}
+
+/** One group per facing and kind of disagreement, the most recent first. */
+export function groupDisagreements(list: Disagreement[]): DisagreementGroup[] {
+  const groups = new Map<string, DisagreementGroup>();
+  for (const d of list) {
+    const key = `${d.facing}|${d.kind}`;
+    const g = groups.get(key);
+    if (g) {
+      g.latest = d;
+      g.passes++;
+    } else groups.set(key, { latest: d, first: d.t, passes: 1 });
+  }
+  return [...groups.values()].sort((a, b) => b.latest.t - a.latest.t || a.latest.facing - b.latest.facing);
 }

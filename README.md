@@ -4,7 +4,7 @@ OISS is a draft open interchange standard for store-intelligence data. Its goal 
 
 Each source publishes what it saw as OISS records, so any consumer, from a store operations dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and raise store tasks, so the value shows right away.
 
-> **Status:** v0.1 draft, milestone M3 in progress (vendor feeds and adapters; loss prevention, shelf faults and the live store are in). Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
+> **Status:** v0.1 draft, the website part of milestone M3 is in (vendor feeds and adapters, feed toggles and the disagreement view, loss prevention, shelf faults and the live store); M3's server pieces are deferred until the website is complete. Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
 
 ## Why a retailer would adopt it
 
@@ -105,7 +105,7 @@ Today the spec, schemas, examples, validator, store simulator, the demo replay w
 | [`sim`](sim) | Synthetic grocery store simulator that writes a day of OISS records from a seed | M1 |
 | [`web`](web) | The site: the OISS landing page at `/`, the demo store replay at `/demo/` and the spec browser at `/spec/` | M1–M2 |
 | [`adapters`](adapters) | Mock vendor exports and adapters into OISS | M3 |
-| [`server`](server) | Ingest, storage and the query API | M3–M4 |
+| [`server`](server) | Ingest, storage and the query API | Deferred until after the website |
 | [`mcp`](mcp) | MCP server and the Store Operations Assistant | M4 |
 | [`docs`](docs) | Demo decisions, the Netlify deployment guide and other notes | ongoing |
 

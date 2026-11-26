@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
-import { arrivedCount, clock, clockOf, faultSeen, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type IndexedDay } from "./day.ts";
+import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
 import { checkoutName, duration, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
@@ -21,7 +21,7 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "now" | "faults" | "stream" | "sources";
+export type Tab = "now" | "faults" | "disagreements" | "stream" | "sources";
 
 /** The faults a visitor can inject, in a store team's words. */
 const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
@@ -33,10 +33,26 @@ const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
 /** Where a shelf observation came from, in a few words. */
 function observer(r: { source: string; data: { location: { camera?: string } } }): string {
   if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
-  if (r.source.endsWith(":robot-1")) return "the robot";
-  if (r.source.endsWith(":esl")) return "the shelf labels";
+  if (r.source.endsWith(ROBOT_SOURCE_SUFFIX)) return "the robot";
+  if (r.source.endsWith(LABEL_SOURCE_SUFFIX)) return "the shelf labels";
   return r.source;
 }
+
+/** What two sources said about a facing, in a store team's words. */
+function disagreementText(day: IndexedDay, d: Disagreement): string {
+  const other = observer(d.other);
+  if (d.kind === "price") return `The robot read a tag of ${money(d.robot.data.tagPrice)}, but ${other} show ${money(d.other.data.tagPrice)}`;
+  if (d.kind === "misplaced_item") {
+    const robotSees = d.robot.data.flags?.includes("misplaced_item");
+    return robotSees ? `The robot saw a misplaced item, ${other} didn't` : `${capital(other)} saw a misplaced item, the robot didn't`;
+  }
+  const said = (r: OissRecord<ShelfObservationData>) => (r.data.status ? STATUS_LABEL[r.data.status].toLowerCase() : "no status");
+  return `The robot says ${said(d.robot)}, ${other} says ${said(d.other)}`;
+}
+
+const capital = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
+const DISAGREEMENT_KIND: Record<Disagreement["kind"], string> = { availability: "Availability", misplaced_item: "Misplaced item", price: "Shelf price" };
 
 /** The thing on the floor plan that a record is about, so picking a record also picks it on the map. */
 function selectionFor(day: IndexedDay, r: AnyRecord): Selection | null {
@@ -62,10 +78,16 @@ export interface AppStart {
   pinned?: string;
   tab?: Tab;
   showCameras?: boolean;
+  /** Source systems switched off. */
+  off?: string[];
 }
 
 export function App({ start }: { start?: AppStart } = {}) {
-  const [day, setDay] = useState<IndexedDay | null>(start?.day ?? null);
+  /** The whole day, every feed on. */
+  const [base, setDay] = useState<IndexedDay | null>(start?.day ?? null);
+  /** Source systems the visitor switched off. The demo shows only what the feeds that are on report. */
+  const [off, setOff] = useState<Set<string>>(() => new Set(start?.off ?? []));
+  const day = useMemo(() => (base && off.size ? indexDay(base.files, off) : base), [base, off]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [replaying, setReplaying] = useState(false);
@@ -228,6 +250,25 @@ export function App({ start }: { start?: AppStart } = {}) {
   const total = day.stream.length;
   const forReview = incidentsUpTo(day.incidents, t).filter((r) => r.data.status === "open" || r.data.status === "under_review").length;
   const nextRun = day.robot.runs.find((r) => r.start > t);
+  const disputes = groupDisagreements(disagreementsUpTo(day, t));
+
+  // Each source system is one feed the visitor can switch off. The store layout is the frame every
+  // record refers to, so it stays on.
+  const feeds: { system: string; vendor?: string; types: { type: string; records: number }[] }[] = [];
+  for (const src of day.sources) {
+    let f = feeds.find((x) => x.system === src.system);
+    if (!f) feeds.push((f = { system: src.system, vendor: src.vendor, types: [] }));
+    f.types.push({ type: src.type, records: src.records });
+  }
+  const toggleFeed = (system: string) => {
+    const next = new Set(off);
+    if (next.has(system)) next.delete(system);
+    else next.add(system);
+    setOff(next);
+    setPinned(null);
+    // A facing is still there with any feed off; a shopper, camera, zone or incident may not be.
+    if (selection && selection.kind !== "facing") setSelection(null);
+  };
   const arrived = arrivedCount(day, t);
 
   const runNewDay = () => {
@@ -310,7 +351,8 @@ export function App({ start }: { start?: AppStart } = {}) {
     const item = day.items.get(v.facing.gtin);
     following = latest;
     related = v.obs.filter((_, i) => v.times[i]! <= t).reverse();
-    const label = related.find((r) => r.source.endsWith(":esl")) as OissRecord<ShelfObservationData> | undefined;
+    const label = related.find((r) => r.source.endsWith(LABEL_SOURCE_SUFFIX)) as OissRecord<ShelfObservationData> | undefined;
+    const disputes = groupDisagreements(disagreementsUpTo(day, t).filter((d) => d.facing === selection.index));
     selectionCard = (
       <>
         <h2>{item?.name ?? v.facing.gtin}</h2>
@@ -344,6 +386,19 @@ export function App({ start }: { start?: AppStart } = {}) {
               </dd>
             </>
           ) : null}
+          {disputes.length > 0 && (
+            <>
+              <dt>Sources disagree</dt>
+              {disputes.map((g) => (
+                <dd key={g.latest.kind}>
+                  <button type="button" className="link" onClick={() => inspect(g.latest.robot.id)}>
+                    {disagreementText(day, g.latest)}
+                  </button>
+                  , since {clock(g.first)}
+                </dd>
+              ))}
+            </>
+          )}
           {item?.promo && (
             <>
               <dt>Promotion</dt>
@@ -579,6 +634,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               <button type="button" role="tab" aria-selected={tab === "faults"} onClick={() => setTab("faults")}>
                 Shelf faults
               </button>
+              <button type="button" role="tab" aria-selected={tab === "disagreements"} onClick={() => setTab("disagreements")}>
+                Disagreements{disputes.length ? ` (${disputes.length})` : ""}
+              </button>
               <button type="button" role="tab" aria-selected={tab === "stream"} onClick={() => setTab("stream")}>
                 Record stream
               </button>
@@ -701,6 +759,40 @@ export function App({ start }: { start?: AppStart } = {}) {
               </>
             )}
 
+            {tab === "disagreements" && (
+              <>
+                <p className="note top">
+                  Where two systems watching the same shelf don't agree, someone should look. Each robot pass is checked against what the shelf cameras and the shelf labels last reported for that facing. OISS makes this a simple comparison, because every vendor reports the same facing ids in the same format.
+                </p>
+                {disputes.length ? (
+                  <ul className="records">
+                    {disputes.map((g) => (
+                      <li key={`${g.latest.facing}|${g.latest.kind}`}>
+                        <button
+                          type="button"
+                          className={g.latest.robot.id === shown?.id ? "current" : undefined}
+                          onClick={() => {
+                            select({ kind: "facing", index: g.latest.facing });
+                            setPinned(g.latest.robot.id);
+                          }}
+                        >
+                          <span className="time">{clock(g.latest.t)}</span>
+                          <span>
+                            <span className="type">{DISAGREEMENT_KIND[g.latest.kind]}</span> {itemNameAt(day, day.facings[g.latest.facing]!.facing.id)}: {disagreementText(day, g.latest)}
+                            <span className="seen">{g.passes === 1 ? `First seen at ${clock(g.first)}` : `Since ${clock(g.first)}, on ${g.passes} robot passes`}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="note">
+                    {off.size && [...off].some((x) => /robot|camera|label/i.test(x)) ? "No disagreements by " + clock(t) + " among the feeds that are on. Disagreements need the robot and a shelf camera or the shelf labels." : `No disagreements by ${clock(t)}.`}
+                  </p>
+                )}
+              </>
+            )}
+
             {tab === "stream" && (
               <>
                 <select className="filter" value={streamType} onChange={(e) => setStreamType(e.target.value)} aria-label="Record type">
@@ -729,28 +821,45 @@ export function App({ start }: { start?: AppStart } = {}) {
 
             {tab === "sources" && (
               <>
-                <table>
+                <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day.</p>
+                <table className="feeds">
                   <thead>
                     <tr>
-                      <th>Source</th>
-                      <th>Record type</th>
-                      <th className="num">Records</th>
+                      <th>Feed</th>
+                      <th>Records</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {day.sources.map((s) => (
-                      <tr key={`${s.system}|${s.type}`}>
-                        <td>
-                          {s.system}
-                          {s.vendor ? <span className="vendor">{s.vendor}</span> : null}
-                        </td>
-                        <td>{s.type}</td>
-                        <td className="num">{s.records.toLocaleString("en-US")}</td>
-                      </tr>
-                    ))}
+                    {feeds.map((f) => {
+                      const fixed = f.types.every((x) => x.type === "StoreLayout");
+                      const isOn = !off.has(f.system);
+                      return (
+                        <tr key={f.system} className={isOn ? undefined : "off"}>
+                          <td>
+                            <label className="feed">
+                              <input type="checkbox" checked={isOn} disabled={fixed || busy} onChange={() => toggleFeed(f.system)} />
+                              <span>
+                                {f.system}
+                                {f.vendor ? <span className="vendor">{f.vendor}</span> : null}
+                                {fixed ? <span className="vendor">Always on: every record refers to it</span> : null}
+                              </span>
+                            </label>
+                          </td>
+                          <td className="num">
+                            {f.types.map((x) => (
+                              <div key={x.type}>
+                                {x.type} {x.records.toLocaleString("en-US")}
+                              </div>
+                            ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                <p className="note">{total.toLocaleString("en-US")} records, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.</p>
+                <p className="note">
+                  {total.toLocaleString("en-US")} records {off.size ? "from the feeds that are on" : "from every feed"}, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.
+                </p>
               </>
             )}
           </section>
