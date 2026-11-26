@@ -51,7 +51,7 @@ Data moves top to bottom, in five layers:
 - **Access control.** Each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system.
 - **Traceability.** Every record carries its source system, model and version, a confidence and links to evidence, so every agent answer can cite where it came from.
 
-Today the spec, schemas, examples, validator, store simulator, the demo replay with its record inspector, and a browsable spec are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
+Today the spec, schemas, examples, validator, store simulator, the demo replay with its record inspector and task board, the first version of the Store Operations Assistant (four agents with read-only tools, in the demo's **Ask the store** tab), and a browsable spec are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
 
 ## Record types
 
@@ -87,7 +87,7 @@ Needs Node 22.18 or later.
 ```sh
 npm install
 npm run dev             # the site at http://localhost:5173: the RFC at /rfc/, the demo store at /demo/, the spec at /spec/
-npm test                # simulator tests
+npm test                # simulator, adapter, assistant and site tests
 npm run golden:check    # the golden day still matches its manifest
 ```
 

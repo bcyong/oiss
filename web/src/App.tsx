@@ -9,6 +9,7 @@ import { VENDORS } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus, TaskData, TaskState } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
+import { AssistantPanel, type ChatEntry } from "./AssistantPanel.tsx";
 
 const SPEEDS = [
   { label: "Real time", value: 1 },
@@ -23,7 +24,7 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "story" | "now" | "tasks" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
+export type Tab = "story" | "assistant" | "now" | "tasks" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
 
 /** A task still waiting on the store team. */
 const OPEN_STATES: TaskState[] = ["open", "assigned", "in_progress"];
@@ -109,6 +110,9 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [tab, setTab] = useState<Tab>(start?.tab ?? "story");
   const [streamType, setStreamType] = useState<string>("");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("open");
+  /** The conversation with the Store Operations Assistant, kept while the visitor switches tabs. A new day starts a new one. */
+  const [chat, setChat] = useState<ChatEntry[]>([]);
+  useEffect(() => setChat([]), [base]);
   /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
   const [live, setLive] = useState(false);
 
@@ -699,6 +703,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               <button type="button" role="tab" aria-selected={tab === "story"} onClick={() => setTab("story")}>
                 Story
               </button>
+              <button type="button" role="tab" aria-selected={tab === "assistant"} onClick={() => setTab("assistant")}>
+                Ask the store
+              </button>
               <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
                 At {clock(t)}
               </button>
@@ -747,6 +754,8 @@ export function App({ start }: { start?: AppStart } = {}) {
                 )}
               </>
             )}
+
+            {tab === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} />}
 
             {tab === "now" && (
               <>

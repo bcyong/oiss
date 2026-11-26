@@ -10,7 +10,8 @@
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
     "test": "node --test test/*.test.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "eval:assistant": "node eval/run.ts"
   },
   "dependencies": {
     "@oiss/adapters": "0.1.0",
