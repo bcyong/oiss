@@ -1685,7 +1685,6 @@ ol.chat .answer {
   border: 2px solid var(--accent);
   border-radius: 14px;
   box-shadow: 0 0 0 9999px rgba(12, 14, 11, 0.5);
-  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
 }
 .tour-card {
   position: fixed;
@@ -1751,10 +1750,5 @@ ol.chat .answer {
   }
   .tour-buttons {
     flex-wrap: wrap;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tour-ring {
-    transition: none;
   }
 }

@@ -78,7 +78,7 @@ export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose
   return (
     <div className="tour">
       <div className="tour-block" onClick={(e) => e.stopPropagation()} />
-      {ring ? <div className="tour-ring" style={ring} /> : <div className="tour-dim" />}
+      {ring ? <div key={`ring-${i}`} className="tour-ring" style={ring} /> : <div key="dim" className="tour-dim" />}
       <div ref={card} className="tour-card" style={cardStyle} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text" tabIndex={-1}>
         <p className="tour-count">
           {i + 1} of {steps.length}
