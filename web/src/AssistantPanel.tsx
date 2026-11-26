@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { clock, secondsOf, type IndexedDay } from "./day.ts";
 import { AGENTS, SAMPLE_QUESTIONS } from "./assistant/agents.ts";
-import { ask, AssistantError, httpStep, modelName, type Answer, type Step } from "./assistant/run.ts";
+import { ask, AssistantError, httpStep, modelName, type Answer, type LoadPeers, type Step } from "./assistant/run.ts";
+import { loadDistrict } from "./district.ts";
 import type { Proposal } from "./assistant/tools.ts";
 import type { Approval } from "./approve.ts";
 
@@ -137,8 +138,14 @@ function modelsLine(a: Answer): string {
   return parts.join(" · ");
 }
 
-export function AssistantPanel({ day, t, onInspect, entries, setEntries, onApprove, step = httpStep() }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; onApprove?: (p: Proposal) => Promise<Approval>; step?: Step }) {
+export function AssistantPanel({ day, t, onInspect, entries, setEntries, onApprove, step = httpStep(), loadPeers }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; onApprove?: (p: Proposal) => Promise<Approval>; step?: Step; loadPeers?: LoadPeers }) {
   const [draft, setDraft] = useState("");
+  const date = day.files.date;
+  const peers: LoadPeers = loadPeers ?? (() => loadDistrict(date));
+  // Start simulating the district's other stores while the visitor reads or types, so a comparison doesn't wait.
+  useEffect(() => {
+    if (!loadPeers) loadDistrict(date).catch(() => undefined);
+  }, [date, loadPeers]);
   // Bring each new question to the top of the panel, so its answer appears where the eye already is.
   const latest = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -165,7 +172,7 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
     setEntries((es) => [...es, { id, question: q, t, state: "asking", progress: "Starting" }]);
     const update = (e: ChatEntry) => setEntries((es) => es.map((x) => (x.id === id ? e : x)));
     try {
-      const answer = await ask(day, t, q, step, (progress) => update({ id, question: q, t, state: "asking", progress }));
+      const answer = await ask(day, t, q, step, (progress) => update({ id, question: q, t, state: "asking", progress }), peers);
       update({ id, question: q, t, state: "answered", answer });
     } catch (err) {
       const code = err instanceof AssistantError ? err.code : "upstream";
@@ -180,6 +187,7 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
         <p>
           A small, fast NVIDIA Nemotron model hands each question to one agent, which reads the day's OISS records as they stood at the time shown and cites the records it used. A larger Nemotron writes the answer, and a content safety model screens the question and the answer.
         </p>
+        <p>The store insights agent also compares this store with three other stores in its district, simulated on this page from the same floor plan.</p>
         <p>Agents can propose shelf tasks. The store's rules check each one, and nothing is raised until you approve it. The assistant never acts toward a shopper.</p>
         <p>Each question is answered on its own. Pause playback to ask about one moment.</p>
       </details>

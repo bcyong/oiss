@@ -59,7 +59,7 @@ export function runDay(config: DayConfig): SimulatedDay {
   const ground = settleDay(config);
   const observed = observeDay(ground);
   const lp = lossPreventionDay(ground);
-  const adapted = adaptLpAlerts(lp.alerts, demo001Config());
+  const adapted = adaptLpAlerts(lp.alerts, demo001Config(ground.layout.store));
   if (adapted.rejected.length) throw new Error(`the loss prevention adapter rejected ${adapted.rejected.length} alerts: ${adapted.rejected[0]!.reason}`);
   const { shelfScanMissions: _missions, trafficRows: _rows, eslEvents: _labels, ...observedRecords } = observed;
   const records = {

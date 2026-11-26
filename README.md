@@ -43,7 +43,7 @@ Data moves top to bottom, in five layers:
   - **Price and label agent:** fixes wrong shelf prices through the electronic shelf label or a task.
   - **Front-end agent:** opens a lane when a queue grows, and feeds queue trends to labor scheduling.
   - **Loss prevention agent:** ties a front-end exception to an anonymous shopper path, a missing item and the evidence, for a person to review.
-  - **Store insights agent:** measures display lift, compares stores and flags where two vendors disagree about the same shelf.
+  - **Store insights agent:** flags where two vendors disagree about the same shelf, compares the store with the other stores in its district, and measures display lift.
 - **Seven record types.** A small shared core, versioned as v0.1 and listed below.
 - **Adapters and validation.** One adapter per vendor export, a schema validator, and a mapping from ShelfObservation to a GS1 EPCIS 2.0 ObjectEvent.
 - **Storage and query.** DuckDB for current state, Parquet for history, and an evidence store that enforces retention.
@@ -51,7 +51,7 @@ Data moves top to bottom, in five layers:
 - **Access control.** Each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system.
 - **Traceability.** Every record carries its source system, model and version, a confidence and links to evidence, so every agent answer can cite where it came from.
 
-Today the spec, schemas, examples, validator, store simulator, the demo replay with its record inspector and task board, the first version of the Store Operations Assistant (four agents with read-only tools, in the demo's **Ask the store** tab), and a browsable spec are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
+Today the spec, schemas, examples, validator, store simulator, the demo replay with its record inspector and task board, the first version of the Store Operations Assistant (five agents with read-only tools, in the demo's **Ask the store** tab), and a browsable spec are built; the rest arrives milestone by milestone, as the table under [What's here](#whats-here) shows.
 
 ## Record types
 

@@ -12,7 +12,8 @@
  * request isn't marked failed.
  */
 import { appendFileSync } from "node:fs";
-import { runDay } from "@oiss/sim";
+import { DISTRICT_PEERS, runDay } from "@oiss/sim";
+import { simulatePeerStore } from "../src/peers.ts";
 import { SAMPLE_QUESTIONS } from "../src/assistant/agents.ts";
 import { handleAssistant, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
 import { ask, AssistantError, httpStep, type Step } from "../src/assistant/run.ts";
@@ -31,6 +32,9 @@ const sim = runDay({ seed: 20261117, date: "2026-11-17" });
 const files: DayFiles = { store: sim.records.storeLayout.oissstore, date: "2026-11-17", seed: 20261117, origin: "browser", records: sim.records as unknown as DayFiles["records"], itemMaster: sim.itemMaster, vendorFeeds: { mockLpAlerts: sim.vendorExports.mockLpAlerts } };
 const day = indexDay(files);
 const TIMES = [9, 13, 18].map((h) => h * 3600);
+// The district's other stores, for questions that compare stores, simulated once as the page does in its workers.
+const peers = DISTRICT_PEERS.map((p) => simulatePeerStore(p.id, "2026-11-17"));
+const loadPeers = async () => peers;
 
 interface Row {
   time: string;
@@ -63,10 +67,10 @@ for (const t of TIMES) {
     };
     try {
       // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
-      const a = await ask(day, t, question, step).catch((err: unknown) => {
+      const a = await ask(day, t, question, step, undefined, loadPeers).catch((err: unknown) => {
         if (err instanceof AssistantError && err.code === "timeout") {
           console.log(`        timed out once; asking again`);
-          return ask(day, t, question, step);
+          return ask(day, t, question, step, undefined, loadPeers);
         }
         throw err;
       });

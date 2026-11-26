@@ -1,7 +1,7 @@
 import { clock, type IndexedDay } from "../day.ts";
-import { AGENTS, LIMITS, parseRoute, TOOLS, type AgentId } from "./agents.ts";
+import { AGENTS, LIMITS, parseRoute, startTools, TOOLS, type AgentId } from "./agents.ts";
 import type { ChatMessage, SafetyCheck, StepReply, StepRequest, ToolCall } from "./proxy.ts";
-import { idsIn, runTool, type Proposal, type ToolArgs } from "./tools.ts";
+import { idsIn, runTool, type PeerStore, type Proposal, type ToolArgs, type ToolContext } from "./tools.ts";
 
 /**
  * One question to the Store Operations Assistant, run in the page: the router picks an agent, the page
@@ -166,7 +166,10 @@ export function citations(text: string): string[] {
   return [...out];
 }
 
-export async function ask(day: IndexedDay, t: number, question: string, step: Step, onProgress?: (note: string) => void): Promise<Answer> {
+/** Gets the other stores of the district, simulating them first if they aren't ready. */
+export type LoadPeers = () => Promise<PeerStore[]>;
+
+export async function ask(day: IndexedDay, t: number, question: string, step: Step, onProgress?: (note: string) => void, loadPeers?: LoadPeers): Promise<Answer> {
   const q = question.trim().slice(0, LIMITS.maxQuestionChars);
   let calls = 0;
   let agent: AgentId;
@@ -192,8 +195,13 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   const tools: ToolUse[] = [];
   const proposals: Proposal[] = [];
   const turnedDown: string[] = [];
-  const run = (name: string, args: ToolArgs) => {
-    const result = runTool(day, t, agent, name, args);
+  const ctx: ToolContext = {};
+  const run = async (name: string, args: ToolArgs) => {
+    if (name === "compare_stores" && !ctx.peers && loadPeers) {
+      onProgress?.("Gathering the other stores' records");
+      ctx.peers = await loadPeers().catch(() => undefined);
+    }
+    const result = runTool(day, t, agent, name, args, ctx);
     idsIn(result, seen);
     const p = (result as { decision?: string; proposal?: Proposal }).proposal;
     if (name === "propose_task" && p && !proposals.some((x) => x.kind === p.kind && x.facing === p.facing) && proposals.length < 3) proposals.push(p);
@@ -205,9 +213,10 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   };
 
   // The page runs the agent's starting tools itself, so the first model call already has the records.
-  const start = AGENTS[agent].start;
+  const start = startTools(agent, q);
   const startCalls: ToolCall[] = start.map((s, i) => ({ id: `start-${i + 1}`, type: "function", function: { name: s.name, arguments: JSON.stringify(s.args) } }));
-  const messages: ChatMessage[] = [{ role: "user", content: q }, { role: "assistant", content: null, tool_calls: startCalls }, ...startCalls.map((c, i) => ({ role: "tool" as const, tool_call_id: c.id, content: run(start[i]!.name, start[i]!.args) }))];
+  const messages: ChatMessage[] = [{ role: "user", content: q }, { role: "assistant", content: null, tool_calls: startCalls }];
+  for (const [i, c] of startCalls.entries()) messages.push({ role: "tool", tool_call_id: c.id, content: await run(start[i]!.name, start[i]!.args) });
 
   const store = day.layout.store.name;
   const now = `${clock(t)} on ${day.files.date}`;
@@ -227,7 +236,7 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     messages.push({ role: "assistant", content: message.content ?? null, tool_calls: wanted });
     for (const c of wanted) {
       onProgress?.(`Reading ${c.function.name.replaceAll("_", " ")}`);
-      messages.push({ role: "tool", tool_call_id: c.id, content: run(c.function.name, parseArgs(c.function.arguments)) });
+      messages.push({ role: "tool", tool_call_id: c.id, content: await run(c.function.name, parseArgs(c.function.arguments)) });
     }
   }
   // Models often write "I'd propose…" without calling the tool, so an agent that can propose but didn't
@@ -238,7 +247,7 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     const nudge: ChatMessage[] = [...messages, { role: "assistant", content: text }, { role: "user", content: PROPOSE_NUDGE }];
     try {
       const { message } = await step({ step: "agent", agent, store, now, messages: nudge, final: false });
-      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) run(c.function.name, parseArgs(c.function.arguments));
+      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) await run(c.function.name, parseArgs(c.function.arguments));
     } catch {
       // The answer is already in hand; a failed follow-up only means no proposals.
     }

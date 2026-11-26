@@ -62,11 +62,14 @@ export function eslLabelFor(facing: string): string {
   return `ESL-${(h >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
 }
 
-export function demo001EslConfig(layout: LayoutData): EslAdapterConfig {
+/** The demo's own store. Every store of the district keeps the same codes, since all are built to one prototype. */
+const DEMO_001 = { id: "demo-001", storeNumber: "0001" };
+
+export function demo001EslConfig(layout: LayoutData, store: { id: string; storeNumber: string } = DEMO_001): EslAdapterConfig {
   return {
-    store: "demo-001",
+    store: store.id,
     timezone: "America/Los_Angeles",
-    storeRef: "0001",
+    storeRef: store.storeNumber,
     labels: Object.fromEntries(layout.facings.map((f) => [eslLabelFor(f.id), f.id])),
     layout,
     confidence: { PRICE_CONFIRMED: 0.99, UPDATE_FAILED: 0.9 },

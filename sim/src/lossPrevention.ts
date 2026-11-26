@@ -89,7 +89,6 @@ function pickItems(ground: Ground, txn: Transaction, type: ExceptionType, rng: R
 
 // ---- the mock vendor's alert feed ----------------------------------------------
 
-export const MOCK_LP_SITE = "DG0001";
 
 const CODE: Record<ExceptionType, MockLpAlert["alert_code"]> = { non_scan: "NSCN", bottom_of_basket: "BOTB", ticket_switching: "TKSW", sweethearting: "SWHT" };
 
@@ -129,7 +128,7 @@ export function lossPreventionDay(ground: Ground): LossPreventionDay {
   const alert = (lane: string, t: number, type: ExceptionType, score: number, items: { gtin: string; qty: number }[], truth: boolean, rng: Rng) => {
     const eventMs = clock.epochMs(t);
     raw.push({
-      site: MOCK_LP_SITE,
+      site: `DG${ground.layout.store.storeNumber}`,
       register: registerOf(lane),
       event_ts: Math.round(eventMs),
       alert_ts: Math.round(eventMs + rng.uniform(4, 40) * 1000),

@@ -46,8 +46,11 @@ export const DEMO_001_TRAFFIC_ZONES: Record<string, string> = {
   SCO: "self-checkout",
 };
 
-export function demo001TrafficConfig(): TrafficAdapterConfig {
-  return { store: "demo-001", timezone: "America/Los_Angeles", site: "0001", zones: DEMO_001_TRAFFIC_ZONES };
+/** The demo's own store. Every store of the district keeps the same codes, since all are built to one prototype. */
+const DEMO_001 = { id: "demo-001", storeNumber: "0001" };
+
+export function demo001TrafficConfig(store: { id: string; storeNumber: string } = DEMO_001): TrafficAdapterConfig {
+  return { store: store.id, timezone: "America/Los_Angeles", site: store.storeNumber, zones: DEMO_001_TRAFFIC_ZONES };
 }
 
 /** CSV column -> OISS ZoneMetric metric, in the order OISS writes them. */
