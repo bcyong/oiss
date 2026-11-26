@@ -322,6 +322,8 @@ td:first-child {
 }
 .scroll-hint {
   display: none;
+  position: sticky;
+  left: 0;
   margin-top: 8px;
   color: var(--muted);
   font-size: 13px;
