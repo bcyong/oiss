@@ -245,6 +245,7 @@ td:first-child {
 
 .diagram {
   margin: 0;
+  overflow-x: auto;
   background: #111;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -311,6 +312,37 @@ td:first-child {
 .arrowhead {
   fill: #8a8a8a;
 }
+.d-planned rect,
+.d-legend rect {
+  fill: none;
+  stroke: #8a8a8a;
+  stroke-dasharray: 5 4;
+}
+.arch .d-planned text {
+  fill: var(--muted);
+}
+.scroll-hint {
+  display: none;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.planned {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 7px;
+  border: 1px dashed #8a8a8a;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 1px;
+}
+.legend {
+  color: var(--muted);
+  font-size: 14px;
+}
 
 .toc {
   position: relative;
@@ -376,8 +408,13 @@ td:first-child {
     padding: 20px 16px 28px;
   }
   .hero-art {
-    width: 100%;
-    opacity: 0.18;
+    display: none;
+  }
+  .diagram svg {
+    min-width: 640px;
+  }
+  .scroll-hint {
+    display: block;
   }
   .card-wrap {
     padding: 0 0 32px;
