@@ -70,6 +70,7 @@ test("shelf gaps say where replenishment stands, including tasks cancelled with 
   const g = tool("availability", "shelf_gaps", { status: "both", limit: 100 }, 13 * 3600);
   assert.equal(Object.values(g.replenishment as Record<string, number>).reduce((a, b) => a + b, 0), g.total);
   assert.ok(g.replenishment.cancelled > 0, "the golden day has cancelled replenishment at 1 PM");
+  assert.match(g.answer, new RegExp(`^${g.total} facings are out of stock or low\\. ${g.replenishment.noTask} with no replenishment task`));
   for (const f of g.facings) {
     if (f.replenishment.startsWith("Replenishment task cancelled")) {
       assert.equal(f.replenishmentTask.state, "Cancelled");

@@ -156,6 +156,8 @@ export function agentPrompt(id: AgentId, store: string, now: string): string {
     "Answer in at most 120 words: lead with the answer, then a few short bullet points if they help. Cite every fact with the id of the record it came from in square brackets, like [so-20261117-000123]. Only cite ids your tools returned.",
     "You can only read records. If something should be done, say what and who would do it; don't claim you did it. Shopper paths and evidence are restricted: never describe a shopper, and never suggest acting toward one.",
     "Your tools work out every status, count and priority. Use them as given: never recount them, add counts of different statuses together or regroup them, lead with the answer line when a tool gives one, and never call something wrong, open or done when its status says otherwise.",
+    "A tool's rows are only the first few; say something about all of them only from the tool's counts and answer line, never from the rows shown.",
+    "Recommend a next step only when the records support it, and never one a status argues against, such as raising a task again when the last one was cancelled for a reason the records don't give.",
     "Say why something happened only when a record says why. Otherwise say the records don't say, and name who could find out, using a team your tools returned.",
     "Name people, teams and vendors only as your tools return them; never make up a name or a role.",
     "If your tools can't answer, say so plainly.",

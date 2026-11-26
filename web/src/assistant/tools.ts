@@ -56,6 +56,8 @@ function taskLine(day: IndexedDay, view: TaskView, t: number) {
 /** "assigned to Grocery team", or the state on its own. */
 const stateWithTeam = (state: TaskData["state"], team?: string) => (state === "assigned" && team ? `assigned to ${team}` : TASK_STATE[state].toLowerCase());
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 /** A task in a row about something else: just enough to cite it and say where it stands. */
 const taskRef = (t?: ReturnType<typeof taskLine>) => t && { id: t.id, state: t.state, assignedTo: t.assignedTo, changed: t.changed };
 
@@ -196,7 +198,16 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
       replenishmentTask: taskRef(rep.task),
     };
   });
+  const what = want === "both" ? "out of stock or low" : STATUS_LABEL[want as "out_of_stock"].toLowerCase();
+  const answer = [
+    `${plural(rows.length, "facing is", "facings are")} ${what}${dept ? ` in ${dept.replaceAll("_", " ")}` : ""}.`,
+    counts.noTask && `${counts.noTask} with no replenishment task since it was last in stock.`,
+    counts.taskOpen && `${counts.taskOpen} with a replenishment task open.`,
+    counts.doneNotConfirmed && `${counts.doneNotConfirmed} with replenishment marked done but not confirmed by a shelf read.`,
+    counts.cancelled && `${counts.cancelled} whose replenishment task was cancelled; the records don't say why, so ask the team that had it before raising another.`,
+  ].filter(Boolean).join(" ");
   return {
+    answer,
     asked: { status: want, department: dept || undefined },
     total: rows.length,
     replenishment: counts,
@@ -338,7 +349,6 @@ function shelfTagIssues(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
   const order: Record<TagBucket, number> = { wrongOnShelf: 0, flaggedAgainAfterFix: 1, fixedWaitingForRead: 2 };
   rows.sort((a, b) => order[a.bucket] - order[b.bucket]);
   const confirmedToday = tasksAt(day, t).filter(({ latest }) => latest.data.kind === "fix_shelf_tag" && latest.data.state === "verified").length;
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const parts = [`${plural(counts.wrongOnShelf, "shelf tag is", "shelf tags are")} wrong on the shelf now.`];
   if (counts.flaggedAgainAfterFix) parts.push(`${plural(counts.flaggedAgainAfterFix, "tag was", "tags were")} flagged again after a fix.`);
   if (counts.fixedWaitingForRead) parts.push(`${plural(counts.fixedWaitingForRead, "fix is", "fixes are")} marked done and waiting for the robot's next read to confirm.`);
@@ -374,11 +384,15 @@ function frontEndStatus(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
       return { ...taskLine(day, view, t)!, status };
     });
   const m = latest?.data.metrics;
+  const meets = (m?.avgWaitSeconds ?? 0) >= OPEN_LANE_WAIT_SECONDS && (m?.openLanes ?? staffed) < staffed;
   return {
+    answer: latest
+      ? `${m?.openLanes} of ${staffed} staffed lanes open, ${m?.queueLength} in line, ${m?.avgWaitSeconds} s average wait (${intervalOf(day, latest)}). ${meets ? "That meets the store's rule for opening another staffed lane." : m?.openLanes === staffed ? "Every staffed lane is open." : "That is under the store's rule for opening another staffed lane."}`
+      : "No front-end reading yet today.",
     hours,
     staffedLanesInStore: staffed,
     selfCheckoutStations: selfCheckoutCount(day),
-    now: latest && { record: latest.id, interval: intervalOf(day, latest), inLine: m?.queueLength, avgWaitSeconds: m?.avgWaitSeconds, openLanes: m?.openLanes, of: staffed, meetsOpenLaneRule: (m?.avgWaitSeconds ?? 0) >= OPEN_LANE_WAIT_SECONDS && (m?.openLanes ?? staffed) < staffed },
+    now: latest && { record: latest.id, interval: intervalOf(day, latest), inLine: m?.queueLength, avgWaitSeconds: m?.avgWaitSeconds, openLanes: m?.openLanes, of: staffed, meetsOpenLaneRule: meets },
     openLaneRule: `The store's task system raises "Open another staffed lane" when the average wait at the staffed lanes reaches ${OPEN_LANE_WAIT_SECONDS / 60} minutes and at least one staffed lane is closed.`,
     staffedLanes: series("front-end"),
     selfCheckout: series("self-checkout"),
@@ -424,6 +438,7 @@ function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResu
   // Those still waiting for a person come first.
   list.sort((a, b) => (a.review.bucket === "notReviewed" ? 0 : 1) - (b.review.bucket === "notReviewed" ? 0 : 1));
   return {
+    answer: `${plural(list.length, "checkout exception", "checkout exceptions")} so far: ${reviews.notReviewed} not reviewed yet, ${reviews.reviewed} reviewed${reviews.reviewCancelled ? `, ${reviews.reviewCancelled} with the review cancelled` : ""}.`,
     total: list.length,
     reviews,
     incidents: list.slice(0, n).map(({ r, review }) => ({
