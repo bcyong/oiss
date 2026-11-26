@@ -13,7 +13,8 @@ function inline(text: string, day: IndexedDay, t: number, onInspect: (id: string
   let n = 0;
   for (const m of text.matchAll(re)) {
     if (m.index! > last) out.push(text.slice(last, m.index));
-    if (m[1] !== undefined) out.push(<b key={`${key}-${n++}`}>{m[1]}</b>);
+    // Bold text can hold citations too.
+    if (m[1] !== undefined) out.push(<b key={`${key}-${n++}`}>{inline(m[1], day, t, onInspect, `${key}-${n}`)}</b>);
     else {
       const ids = m[2]!.split(/[,;\s]+/).filter(Boolean);
       const records = ids.map((id) => day.byId.get(id));
