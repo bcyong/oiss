@@ -61,6 +61,7 @@ test("shelf tags fixed after the read that flagged them aren't counted as wrong 
       assert.ok(secondsOf(day, task!.time) >= secondsOf(day, day.byId.get(row.robotTagRead.record)!.time), "the fix came after the read that flagged it");
     } else assert.match(row.status, /^Wrong on the shelf/);
   }
+  assert.equal(tags.answer, "2 shelf tags are wrong on the shelf now. 4 fixes are marked done and waiting for the robot's next read to confirm.");
   // By 1 PM every fix has been confirmed by a later read.
   assert.equal(tool("price_and_label", "shelf_tag_issues", {}, 13 * 3600).counts.wrongOnShelf, 0);
 });

@@ -338,7 +338,12 @@ function shelfTagIssues(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
   const order: Record<TagBucket, number> = { wrongOnShelf: 0, flaggedAgainAfterFix: 1, fixedWaitingForRead: 2 };
   rows.sort((a, b) => order[a.bucket] - order[b.bucket]);
   const confirmedToday = tasksAt(day, t).filter(({ latest }) => latest.data.kind === "fix_shelf_tag" && latest.data.state === "verified").length;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const parts = [`${plural(counts.wrongOnShelf, "shelf tag is", "shelf tags are")} wrong on the shelf now.`];
+  if (counts.flaggedAgainAfterFix) parts.push(`${plural(counts.flaggedAgainAfterFix, "tag was", "tags were")} flagged again after a fix.`);
+  if (counts.fixedWaitingForRead) parts.push(`${plural(counts.fixedWaitingForRead, "fix is", "fixes are")} marked done and waiting for the robot's next read to confirm.`);
   return {
+    answer: parts.join(" "),
     counts: { ...counts, fixesConfirmedToday: confirmedToday },
     tags: rows.slice(0, n).map((r) => r.row),
     note: "wrongOnShelf: the latest read shows a price other than the register price and no fix has been marked done since. fixedWaitingForRead: an associate marked the fix done after the read that flagged it, and no read has confirmed it yet. fixesConfirmedToday: fixes a later robot read confirmed. The records don't say why a tag was wrong.",
