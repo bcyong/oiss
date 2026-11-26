@@ -1041,3 +1041,59 @@ table.feeds td.num div {
 table.feeds tr.off td {
   color: var(--muted);
 }
+
+/* The day's story. */
+ol.beats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+ol.beats button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+ol.beats li.current button {
+  border-color: var(--accent);
+}
+ol.beats .step {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--panel);
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+ol.beats .beat-title {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+ol.beats .beat-title .time {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 4px;
+}
+ol.beats .beat-what,
+ol.beats .beat-why {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+}
+ol.beats .beat-why {
+  color: var(--muted);
+}

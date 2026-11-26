@@ -8,6 +8,7 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 
 ## The demo store
 
+- **Story**, the tab the demo opens on: four moments a store team would act on, found in the day's records the way any OISS consumer could: the lunch rush at the front end, a promoted item running out, two systems disagreeing on a shelf price, and a checkout incident to review. Each says what happened and why it matters, and tapping it jumps the floor plan and inspector to that moment. A day simulated in the browser gets its own moments, and a moment drops out when its feed is switched off.
 - A floor plan of store `demo-001`: every planogram facing colored by its latest ShelfObservation, zones shaded by occupancy from ZoneMetric, shopper dots moving along anonymous ShopperPaths, line length at each checkout, loss prevention incidents at each checkout lane and self-checkout station, the shelf-scanning robot and its route during a scan run, and cameras with their fields of view (shown by default; turn them off with the camera button at the top left of the floor plan).
 - **Zoom** with the + and − buttons, ctrl or ⌘ and the scroll wheel, a trackpad pinch or a two-finger pinch on a phone. Drag to pan when zoomed in. The corners button goes back to the whole store.
 - Facings whose latest ShelfObservation is flagged (a misplaced item or a shelf tag that disagrees with the price file) are outlined, and the inspector says what was found.

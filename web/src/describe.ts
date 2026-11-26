@@ -1,4 +1,4 @@
-import { clockOf, type IndexedDay } from "./day.ts";
+import { clockOf, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, type IndexedDay } from "./day.ts";
 import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
 
 export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
@@ -135,3 +135,11 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
 }
 
 export const timeOf = (day: IndexedDay, r: AnyRecord) => clockOf(day, r.time);
+
+/** Where a shelf observation came from, in a few words. */
+export function observer(r: { source: string; data: { location: { camera?: string } } }): string {
+  if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
+  if (r.source.endsWith(ROBOT_SOURCE_SUFFIX)) return "the robot";
+  if (r.source.endsWith(LABEL_SOURCE_SUFFIX)) return "the shelf labels";
+  return r.source;
+}

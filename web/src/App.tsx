@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
-import { checkoutName, duration, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { checkoutName, duration, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
+import { storyBeats, type Beat } from "./story.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
@@ -21,7 +22,7 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "now" | "faults" | "disagreements" | "stream" | "sources";
+export type Tab = "story" | "now" | "faults" | "disagreements" | "stream" | "sources";
 
 /** The faults a visitor can inject, in a store team's words. */
 const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
@@ -29,14 +30,6 @@ const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
   { kind: "price_mismatch", button: "Mistag the price", what: "The shelf tag stops matching the price file." },
   { kind: "phantom_inventory", button: "Empty it without a sale", what: "The units go missing, but the system still counts them: phantom inventory." },
 ];
-
-/** Where a shelf observation came from, in a few words. */
-function observer(r: { source: string; data: { location: { camera?: string } } }): string {
-  if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
-  if (r.source.endsWith(ROBOT_SOURCE_SUFFIX)) return "the robot";
-  if (r.source.endsWith(LABEL_SOURCE_SUFFIX)) return "the shelf labels";
-  return r.source;
-}
 
 /** What two sources said about a facing, in a store team's words. */
 function disagreementText(day: IndexedDay, d: Disagreement): string {
@@ -98,7 +91,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
-  const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
+  const [tab, setTab] = useState<Tab>(start?.tab ?? "story");
   const [streamType, setStreamType] = useState<string>("");
   /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
   const [live, setLive] = useState(false);
@@ -226,6 +219,9 @@ export function App({ start }: { start?: AppStart } = {}) {
     return m;
   }, [day]);
 
+  // The day's story, found in its records.
+  const beats = useMemo(() => (day ? storyBeats(day) : []), [day]);
+
   if (error) return <main className="message">{error}</main>;
   if (!day) return <main className="message">Loading the store day…</main>;
 
@@ -251,6 +247,13 @@ export function App({ start }: { start?: AppStart } = {}) {
   const forReview = incidentsUpTo(day.incidents, t).filter((r) => r.data.status === "open" || r.data.status === "under_review").length;
   const nextRun = day.robot.runs.find((r) => r.start > t);
   const disputes = groupDisagreements(disagreementsUpTo(day, t));
+  const showBeat = (b: Beat) => {
+    setPlaying(false);
+    setLive(false);
+    setT(b.t);
+    setSelection(b.selection);
+    setPinned(b.record.id);
+  };
 
   // Each source system is one feed the visitor can switch off. The store layout is the frame every
   // record refers to, so it stays on.
@@ -628,6 +631,9 @@ export function App({ start }: { start?: AppStart } = {}) {
 
           <section className="card">
             <div className="tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={tab === "story"} onClick={() => setTab("story")}>
+                Story
+              </button>
               <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
                 At {clock(t)}
               </button>
@@ -644,6 +650,32 @@ export function App({ start }: { start?: AppStart } = {}) {
                 Sources
               </button>
             </div>
+
+            {tab === "story" && (
+              <>
+                <p className="note top">Four moments from this store day that a store team would act on, each found in the day's OISS records. Tap one to jump there.</p>
+                {beats.length ? (
+                  <ol className="beats">
+                    {beats.map((b, i) => (
+                      <li key={b.id} className={shown?.id === b.record.id ? "current" : undefined}>
+                        <button type="button" onClick={() => showBeat(b)}>
+                          <span className="step">{i + 1}</span>
+                          <span>
+                            <span className="beat-title">
+                              {b.title} <span className="time">{clock(b.t)}</span>
+                            </span>
+                            <span className="beat-what">{b.what}</span>
+                            <span className="beat-why">{b.why}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="note">None of the story's moments are in the feeds that are on.</p>
+                )}
+              </>
+            )}
 
             {tab === "now" && (
               <>
