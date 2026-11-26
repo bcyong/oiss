@@ -100,7 +100,7 @@ export function unknownRoles(answer: string, toolText: string, question = ""): s
   const known = `${valuesOf(toolText)} ${question.toLowerCase()}`;
   const out: string[] = [];
   // The store manager is who approves a proposed task on the page, so the agents are told of one.
-  for (const m of answer.replace(/\bstore manager(?:'s)?\b/gi, " ").matchAll(ROLE)) {
+  for (const m of answer.replace(/\bstore[- ]manager(?:'s)?\b/gi, " ").matchAll(ROLE)) {
     const word = (m[1] ?? m[2]!).toLowerCase();
     const stem = word.replace(/s$/, "");
     if (new RegExp(`\\b${stem}s?\\b`).test(known)) continue;
@@ -130,7 +130,8 @@ const PROPOSED_IT = /\b(?:I(?:'ve| have)? proposed|proposed (?:for|tasks?|replen
 
 /** Words saying the assistant proposed a task, when the answer came with no proposal. */
 export function claimedProposal(answer: string, proposals: number): string | undefined {
-  return proposals ? undefined : answer.match(PROPOSED_IT)?.[0];
+  // "Not proposed: …" is the page saying the store's rules turned the proposal down.
+  return proposals || /\bNot proposed:/.test(answer) ? undefined : answer.match(PROPOSED_IT)?.[0];
 }
 
 /** Every finding for one answer. */

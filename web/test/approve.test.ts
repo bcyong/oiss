@@ -121,3 +121,15 @@ test("an agent that recommends shelf work in words but proposes none gets one tu
   assert.deepEqual(b.proposals, []);
   assert.equal(tagSent.filter((r) => r.step === "agent").length, 1);
 });
+
+test("a follow-up proposal the store's rules turn down is said plainly after the answer", async () => {
+  const step = async (req: StepRequest): Promise<StepReply> => {
+    if (req.step === "route") return { message: { content: '{"agent":"availability"}' } };
+    if (req.step === "agent" && req.messages.at(-1)?.content === PROPOSE_NUDGE)
+      return { message: { content: null, tool_calls: [{ id: "n1", type: "function", function: { name: "propose_task", arguments: JSON.stringify({ kind: "replenish", facing: "Z99-X-S0-F00" }) } }] } };
+    return { message: { content: "I proposed a replenish task." } };
+  };
+  const a = await ask(day, T, "Which low-stock items should we fill before they run out?", step);
+  assert.deepEqual(a.proposals, []);
+  assert.match(a.text, /^I proposed a replenish task\.\n\nNot proposed: /);
+});

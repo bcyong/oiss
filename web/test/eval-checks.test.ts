@@ -67,6 +67,7 @@ test("an answer that says it proposed a task, with none proposed, is caught", ()
   assert.equal(claimedProposal("Proposed replenishment tasks for the Grocery team:", 0), "Proposed replenishment");
   assert.equal(claimedProposal("I proposed one replenishment task.", 1), undefined);
   assert.equal(claimedProposal("Nothing needs a task right now.", 0), undefined);
+  assert.equal(claimedProposal("Proposed for Grocery team.\n\nNot proposed: The facing needs a store order.", 0), undefined);
 });
 
 test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave aren't new numbers", () => {
@@ -78,5 +79,6 @@ test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave
 
 test("the store manager who approves a proposal isn't a new role", () => {
   assert.deepEqual(unknownRoles("I proposed it; it waits for the store manager's approval.", "{}"), []);
+  assert.deepEqual(unknownRoles("Proposed tasks (awaiting store-manager approval):", "{}"), []);
   assert.deepEqual(unknownRoles("Ask the department manager.", "{}"), ["manager"]);
 });

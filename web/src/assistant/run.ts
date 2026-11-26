@@ -196,7 +196,13 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     const nudge: ChatMessage[] = [...messages, { role: "assistant", content: text }, { role: "user", content: PROPOSE_NUDGE }];
     try {
       const { message } = await step({ step: "agent", agent, store, now, messages: nudge, final: false });
-      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) run(c.function.name, parseArgs(c.function.arguments));
+      const turnedDown = new Set<string>();
+      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) {
+        const r = JSON.parse(run(c.function.name, parseArgs(c.function.arguments))) as { decision?: string; answer?: string };
+        if (r.decision === "rejected" && r.answer) turnedDown.add(r.answer);
+      }
+      // The answer was written before the store's rules ruled, so a proposal they turned down is said plainly.
+      if (turnedDown.size) text = `${text}\n\n${[...turnedDown].join(" ")}`;
     } catch {
       // The answer is already in hand; a failed follow-up only means no proposals.
     }
