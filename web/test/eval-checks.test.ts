@@ -15,11 +15,19 @@ test("numbers, times and amounts must come from the tool results", () => {
   assert.deepEqual(unsupportedNumbers("The tag reads $8.99.", tools), ["$8.99"]);
   // List markers and record ids aren't facts; a wait in minutes from seconds is.
   assert.deepEqual(unsupportedNumbers("1. 5 of 8 lanes are open, with a 3 minute wait [zm-20261117-000747].", tools), []);
+  // The same wait in other units: seconds from a rule given in minutes, and minutes and seconds spelled out.
+  const lane = JSON.stringify({ now: { avgWaitSeconds: 199 }, rule: "Open another lane when the wait reaches 3 minutes." });
+  assert.deepEqual(unsupportedNumbers("The wait is 199 s (3 min 19 s), past the 3 minutes (180 s) rule.", lane), []);
+  assert.deepEqual(unsupportedNumbers("The wait is 3 min 40 s.", lane), ["40"]);
 });
 
 test("an answer may not give a cause the records don't", () => {
   assert.deepEqual(statedCauses("The tag is wrong, likely because the price file changed overnight.", tools), ["likely", "because"]);
   assert.deepEqual(statedCauses("The records don't say why. Replenish by likely lost sales.", tools), []);
+  // A cause word is fine when what follows it is the cause a record gave.
+  const cancelled = JSON.stringify({ outcome: "No backroom stock. The facing needs a store order." });
+  assert.deepEqual(statedCauses("Its task was cancelled due to no backroom stock.", cancelled), []);
+  assert.deepEqual(statedCauses("Its task was cancelled due to a late delivery.", cancelled), ["due to"]);
 });
 
 test("team names must come from the tool results", () => {

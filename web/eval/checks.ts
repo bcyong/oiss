@@ -34,6 +34,8 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
   const seconds = [...known].filter((n) => /^\d+$/.test(n)).map(Number);
   const text = answer
     .replace(RECORD_ID, " ")
+    // "3 min 19 s" spells out 199 seconds, which the tools may well have given.
+    .replace(/\b(\d+) ?min(?:utes?)? (\d+) ?s(?:ec(?:onds?)?)?\b/gi, (whole, m: string, sec: string) => (known.has(String(Number(m) * 60 + Number(sec))) ? " " : whole))
     .replace(/^\s*\d+[.)]\s+/gm, " ")
     .replaceAll(",", "");
   const out: string[] = [];
@@ -43,6 +45,8 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
     if (known.has(n) || known.has(bare) || known.has(String(Number(bare)))) continue;
     // "about 3 minutes" from avgWaitSeconds 180, or "1 minute" from 56 seconds.
     if (/^\d+(\.\d+)?$/.test(bare) && seconds.some((s) => Math.abs(s / 60 - Number(bare)) < 0.75)) continue;
+    // "180 s" from a rule the tools gave as 3 minutes.
+    if (/^\d+$/.test(bare) && Number(bare) % 60 === 0 && known.has(String(Number(bare) / 60))) continue;
     out.push(n);
   }
   return [...new Set(out)];
@@ -56,7 +60,13 @@ const NOT_A_CAUSE = /likely lost sales|most likely to lose sales/gi;
 export function statedCauses(answer: string, toolText: string): string[] {
   const tools = toolText.toLowerCase();
   const out: string[] = [];
-  for (const m of answer.replace(NOT_A_CAUSE, " ").matchAll(CAUSE)) if (!tools.includes(m[0].toLowerCase())) out.push(m[0].toLowerCase());
+  for (const m of answer.replace(NOT_A_CAUSE, " ").matchAll(CAUSE)) {
+    if (tools.includes(m[0].toLowerCase())) continue;
+    // "cancelled due to no backroom stock" gives the cause a record gave, which is fine.
+    const after = answer.slice(m.index! + m[0].length).toLowerCase().match(/^\s+([a-z'-]+(?: [a-z'-]+){0,2})/);
+    if (after && after[1]!.split(" ").length >= 2 && tools.includes(after[1]!)) continue;
+    out.push(m[0].toLowerCase());
+  }
   return [...new Set(out)];
 }
 
