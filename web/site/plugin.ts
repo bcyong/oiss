@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Plugin } from "vite";
 import { siteFooter, siteHeader } from "./layout.ts";
+import { externalLinksInNewTab } from "./links.ts";
 import { escapeHtml, renderMarkdown, tocHtml } from "./markdown.ts";
 
 /**
@@ -9,7 +10,7 @@ import { escapeHtml, renderMarkdown, tocHtml } from "./markdown.ts";
  * <!--site-header--> (or <!--site-header:#root--> to name the skip link's target), <!--site-footer-->,
  * and on the RFC page <!--rfc-title-->, <!--rfc-byline-->, <!--rfc-body--> and <!--rfc-toc-->, rendered
  * from docs/rfc/OISS-RFC.md. An SVG the RFC shows from its own folder is inlined, so it scales and
- * follows the page's colors.
+ * follows the page's colors. Every link that leaves the site then opens in a new tab.
  */
 export function sitePages(repoRoot: string): Plugin {
   const rfcDir = resolve(repoRoot, "docs/rfc");
@@ -46,7 +47,7 @@ export function sitePages(repoRoot: string): Plugin {
             .replace("<!--rfc-body-->", doc.html)
             .replace("<!--rfc-toc-->", tocHtml(doc.toc, 1));
         }
-        return out;
+        return externalLinksInNewTab(out);
       },
     },
   };

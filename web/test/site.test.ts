@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { pageOf, siteFooter, siteHeader } from "../site/layout.ts";
+import { externalLinksInNewTab } from "../site/links.ts";
+import { sitePages } from "../site/plugin.ts";
 import { inline, renderMarkdown, slug, tocHtml } from "../site/markdown.ts";
 
 const repo = resolve(import.meta.dirname, "../..");
@@ -43,7 +45,8 @@ test("every page carries the shared header", () => {
 test("inline Markdown escapes HTML and formats bold, italics, code and links", () => {
   assert.equal(inline("**Bold** and *it* <b>"), "<strong>Bold</strong> and <em>it</em> &lt;b&gt;");
   assert.equal(inline("Run `a < b`"), "Run <code>a &lt; b</code>");
-  assert.equal(inline("[GS1](https://www.gs1.org/epcis)"), '<a href="https://www.gs1.org/epcis">GS1</a>');
+  assert.equal(inline("[GS1](https://www.gs1.org/epcis)"), '<a href="https://www.gs1.org/epcis" target="_blank" rel="noopener noreferrer">GS1</a>');
+  assert.equal(inline("[RFC](/rfc/)"), '<a href="/rfc/">RFC</a>');
   assert.doesNotMatch(inline("[bad](javascript:alert(1))"), /href/);
   assert.equal(slug("1. The problem"), "1-the-problem");
 });
@@ -76,4 +79,37 @@ test("the RFC in the repo renders whole, with its diagram and a way to comment o
   // Every Markdown link became a link, and no Markdown syntax is left over.
   assert.equal((doc.html.match(/<a href=/g) ?? []).length, (source.match(/\]\(https?:/g) ?? []).length);
   assert.doesNotMatch(doc.html.replace(/<[^>]+>/g, ""), /\*\*|\]\(|^\|/m);
+});
+
+test("a link that leaves the site gets a new tab, and links on the site stay in the tab", () => {
+  assert.equal(
+    externalLinksInNewTab('<a class="btn" href="https://github.com/bcyong/oiss">Repo</a>'),
+    '<a class="btn" href="https://github.com/bcyong/oiss" target="_blank" rel="noopener noreferrer">Repo</a>',
+  );
+  assert.equal(externalLinksInNewTab('<a href="/demo/">Demo</a> <a href="#x">X</a> <a href="mailto:a@b.c">M</a>'), '<a href="/demo/">Demo</a> <a href="#x">X</a> <a href="mailto:a@b.c">M</a>');
+  assert.equal(externalLinksInNewTab('<a href="https://x.org" target="_self">X</a>'), '<a href="https://x.org" target="_self">X</a>');
+  assert.equal(externalLinksInNewTab('<a href="https://x.org" rel="nofollow">X</a>'), '<a href="https://x.org" target="_blank" rel="noopener noreferrer">X</a>');
+});
+
+const anchors = (html: string) => [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
+
+test("every page as built opens each external link in a new tab", () => {
+  const plugin = sitePages(repo);
+  const hook = plugin.transformIndexHtml as { handler: (html: string, ctx: { path: string }) => string };
+  for (const page of ["index.html", "rfc/index.html", "demo/index.html", "spec/index.html", "github/index.html"]) {
+    const html = hook.handler(readFileSync(resolve(repo, "web", page), "utf8"), { path: `/${page}` });
+    const external = anchors(html).filter((a) => /href="https?:/.test(a));
+    if (page === "index.html" || page === "github/index.html" || page === "rfc/index.html") assert.ok(external.length > 0, page);
+    for (const a of external) assert.match(a, /target="_blank" rel="noopener noreferrer"/, `${page}: ${a}`);
+    for (const a of anchors(html).filter((x) => /href="[/#]/.test(x))) assert.doesNotMatch(a, /target=/, `${page}: ${a}`);
+  }
+});
+
+test("every external link the demo and schema browser draw opens in a new tab", () => {
+  const dir = resolve(import.meta.dirname, "../src");
+  for (const file of readdirSync(dir, { recursive: true }) as string[]) {
+    if (!file.endsWith(".tsx")) continue;
+    const src = readFileSync(resolve(dir, file), "utf8");
+    for (const [tag] of src.matchAll(/<a\b[^>]*href=\{?["'`]https?:[^>]*>/g)) assert.match(tag, /target="_blank" rel="noopener noreferrer"/, `${file}: ${tag}`);
+  }
 });

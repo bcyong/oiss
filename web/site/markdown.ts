@@ -4,6 +4,8 @@
  * bulleted or numbered lists. Text is escaped, so no HTML in the source reaches the page.
  */
 
+import { isExternalHref, NEW_TAB_ATTRS } from "./links.ts";
+
 export interface TocEntry {
   id: string;
   text: string;
@@ -54,7 +56,7 @@ export function inline(text: string): string {
     else {
       const href = m[3]!;
       const label = emphasis(escapeHtml(m[2]!));
-      parts.push(SAFE_URL.test(href) ? `<a href="${escapeHtml(href)}">${label}</a>` : label);
+      parts.push(SAFE_URL.test(href) ? `<a href="${escapeHtml(href)}"${isExternalHref(href) ? ` ${NEW_TAB_ATTRS}` : ""}>${label}</a>` : label);
     }
     last = m.index! + m[0].length;
   }

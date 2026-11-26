@@ -224,7 +224,7 @@ function RecordPage({ slug }: { slug: (typeof RECORD_TYPES)[number]["slug"] }) {
         <dd>{privacy.map(humanize).join(" or ")}</dd>
         <dt>Schema</dt>
         <dd>
-          <a href={`https://github.com/bcyong/oiss/blob/main/schemas/v0.1/${slug}.schema.json`}>{slug}.schema.json</a>
+          <a href={`https://github.com/bcyong/oiss/blob/main/schemas/v0.1/${slug}.schema.json`} target="_blank" rel="noopener noreferrer">{slug}.schema.json</a>
         </dd>
       </dl>
       <p>{s.description}</p>
