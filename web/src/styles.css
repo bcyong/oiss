@@ -1408,8 +1408,27 @@ ol.chat .answer {
 /* Fixed width, so the chart doesn't move when the speed picker becomes the Live controls. */
 .timebar .playback {
   margin: 0;
-  gap: 8px;
-  width: 232px;
+  gap: 10px;
+  width: 268px;
+}
+/* The main control on the page, so it reads as one: wide, tall and in the accent color. */
+.timebar .play {
+  width: 64px;
+  height: 44px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+}
+.timebar .play:hover {
+  filter: brightness(1.08);
+}
+.timebar .play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .timebar .timeline {
   margin: 0;
