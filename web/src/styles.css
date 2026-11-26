@@ -597,8 +597,8 @@ th {
 .dl-row {
   display: contents;
 }
-button.link {
-  display: inline;
+button.link,
+a.link {
   border: none;
   background: none;
   padding: 0;

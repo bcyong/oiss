@@ -395,9 +395,17 @@ export function App({ start }: { start?: AppStart } = {}) {
               <dt>Sources disagree</dt>
               {disputes.map((g) => (
                 <dd key={g.latest.kind}>
-                  <button type="button" className="link" onClick={() => inspect(g.latest.robot.id)}>
+                  {/* A link, not a button, so the text after it stays on the same line when it wraps. */}
+                  <a
+                    href={`#${g.latest.robot.id}`}
+                    className="link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      inspect(g.latest.robot.id);
+                    }}
+                  >
                     {disagreementText(day, g.latest)}
-                  </button>
+                  </a>
                   , since {clock(g.first)}
                 </dd>
               ))}
