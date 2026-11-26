@@ -360,9 +360,6 @@ export function SpecBrowser({ initialPage }: { initialPage?: string } = {}) {
   const record = RECORD_TYPES.find((r) => r.slug === page);
   return (
     <div className="app spec">
-      <nav className="crumbs" aria-label="Breadcrumb">
-        <a href="/">OISS</a> <span aria-hidden="true">/</span> Spec browser <span aria-hidden="true">·</span> <a href="/demo/">Demo store</a>
-      </nav>
       <div className="spec-layout">
         <nav className="spec-nav" aria-label="Spec pages">
           <p className="eyebrow">OISS v0.1</p>

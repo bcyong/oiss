@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
+    "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {

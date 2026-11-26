@@ -1,0 +1,85 @@
+/* The header every page of the site shares (web/site/layout.ts). It keeps its own colors, so it looks
+   the same on the dark landing and RFC pages and on the demo and spec browser in light or dark. */
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus {
+  left: 16px;
+  top: 8px;
+  z-index: 20;
+  background: #1a1a1a;
+  color: #eeeeee;
+  padding: 8px 12px;
+}
+
+.topbar {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  margin: 0;
+  background: #000;
+  border-bottom: 1px solid #333333;
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 48px;
+}
+.topbar .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #eeeeee;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.topbar .brand svg {
+  width: 22px;
+  height: 22px;
+  fill: #76b900;
+}
+.topbar .brand svg .cut {
+  fill: #000;
+}
+.topbar nav {
+  display: flex;
+  gap: 24px;
+}
+.topbar nav a,
+.topbar .topbar-gh {
+  color: #a7a7a7;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 13px 0 11px;
+  border-bottom: 2px solid transparent;
+}
+.topbar nav a:hover,
+.topbar .topbar-gh:hover {
+  color: #eeeeee;
+}
+.topbar nav a[aria-current="page"],
+.topbar .topbar-gh[aria-current="page"] {
+  color: #eeeeee;
+  border-bottom-color: #76b900;
+}
+.topbar .topbar-gh {
+  margin-left: auto;
+  font-weight: 600;
+  color: #eeeeee;
+}
+@media (max-width: 700px) {
+  .topbar-inner {
+    gap: 20px;
+  }
+  .topbar nav {
+    gap: 18px;
+  }
+}
