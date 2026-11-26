@@ -630,6 +630,7 @@ a.link {
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 12px;
@@ -1107,4 +1108,26 @@ ol.beats .beat-why {
   font-size: 12px;
   margin-top: 2px;
   line-height: 1.4;
+}
+
+/* Who sends each feed. */
+.vendors section + section {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.vendors h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.vendors h3 .vendor {
+  font-weight: 400;
+}
+.vendors p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.vendors .feeds-of {
+  color: var(--muted);
+  font-size: 13px;
 }

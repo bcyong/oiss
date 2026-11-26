@@ -1,50 +1,67 @@
 /**
- * What each source in the demo stands for. The mock vendors are modeled on kinds of products that
- * retailers buy today, described by what they do, never by a real company's name.
+ * Who stands behind each source in the demo. The mock vendors are modeled on kinds of companies that
+ * sell to retailers today, described by what they do, never by a real company's name.
  */
-export interface SourceInfo {
-  /** The kind of product it stands for. */
+export interface Vendor {
+  /** As records name it in provenance.vendor, or the retailer for its own systems. */
+  name: string;
+  /** What kind of company or system it is, in a few words. */
   kind: string;
-  /** What it is, in a store team's words. */
-  about: string;
-  /** What it sends in the demo. */
-  sends: string;
+  /** A general description, one paragraph each. */
+  about: string[];
+  /** The feeds it sends in the demo, by provenance.system. */
+  systems: string[];
 }
 
-export const SOURCE_INFO: Record<string, SourceInfo> = {
-  "Demo Grocery space planning": {
-    kind: "Retailer's space planning system",
-    about: "The planogram and floor-plan software category managers already use to decide what goes on each shelf.",
-    sends: "One StoreLayout before opening: zones, fixtures, shelves, every facing with its GTIN, and camera positions. Every other record refers to it.",
+export const VENDORS: Vendor[] = [
+  {
+    name: "Mock vendor A",
+    kind: "Shelf-scanning robots",
+    about: [
+      "Mock vendor A makes autonomous shelf-scanning robots for grocery and mass-merchandise stores. It uses a fleet of mobile robots, each carrying high-resolution cameras and depth sensors on a mast, that drive the aisles on a schedule and photograph every shelf from floor to top.",
+      "Computer vision on those images finds out-of-stocks, low stock, misplaced items and shelf tags whose price doesn't match the price file. The retailer usually sees the results in the vendor's own dashboard and associate app.",
+    ],
+    systems: ["Mock shelf-scanning robot"],
   },
-  "Mock shelf-scanning robot": {
-    kind: "Autonomous shelf-scanning robot",
-    about: "Modeled on the robots some US grocers run down every aisle several times a day, photographing each shelf to find out-of-stocks, misplaced items and wrong price tags.",
-    sends: "A ShelfObservation for every facing it can reach, on seven runs a day from 8 AM, with shelf images as Evidence.",
-  },
-  "Store shelf cameras (in-house)": {
-    kind: "Fixed shelf cameras, run by the retailer",
-    about: "Cameras mounted across from high-value shelves, of the kind a chain builds on an edge AI platform such as NVIDIA Metropolis or buys from a shelf-camera vendor.",
-    sends: "A look at aisle 3 and the dairy wall every 5 minutes, sending a ShelfObservation when a change holds for two looks. They can't read shelf tags.",
-  },
-  "Mock electronic shelf labels": {
-    kind: "Electronic shelf labels",
-    about: "Modeled on the radio-updated digital price labels now standard across much of European grocery and spreading in the US. The label system pushes overnight price changes and knows whether each label took its new price.",
-    sends: "A ShelfObservation price check when a label confirms its new price or fails to, with the price it shows and no on-shelf status.",
-  },
-  "Mock people-counting system": {
-    kind: "People counting and queue measurement",
-    about: "Modeled on overhead 3D sensors at the doors and over the checkout lines, the kind stores use to staff lanes and measure conversion.",
-    sends: "A ZoneMetric for every sales-floor zone every 15 minutes: traffic, occupancy and, at the front end, line length, wait and lanes open. The vendor's own export is a CSV.",
-  },
-  "Mock multi-camera tracker": {
-    kind: "Anonymous shopper tracking",
-    about: "The same vendor's ceiling cameras that follow shoppers across the store without identifying anyone, the technology behind cashierless checkout and store layout studies.",
-    sends: "ShopperPaths of anonymous positions over time, with ids that change every 15 minutes, never a face or an identity.",
-  },
-  "Mock loss prevention": {
+  {
+    name: "Mock vendor B",
     kind: "Checkout loss prevention",
-    about: "Modeled on computer vision over staffed lanes and self-checkout that spots missed scans and other exceptions as they happen, so a person can review a short clip.",
-    sends: "An Incident for each exception, with its clip as Evidence carrying a retention date and access roles.",
+    about: [
+      "Mock vendor B sells computer vision loss prevention for the front end. It uses overhead cameras at staffed lanes and self-checkout, with models that compare what crosses the scanner to what the register records.",
+      "When an item leaves the lane without a scan, or a cheaper item is scanned in its place, it raises an alert with a short clip for a person to review. It never identifies the shopper.",
+    ],
+    systems: ["Mock loss prevention"],
   },
-};
+  {
+    name: "Mock vendor C",
+    kind: "People counting and store analytics",
+    about: [
+      "Mock vendor C sells people counting and in-store analytics. It uses ceiling-mounted 3D stereo sensors at the doors and over the front end to count shoppers in and out, measure occupancy, and time lines at each checkout, so stores can staff lanes and measure conversion.",
+      "The same sensors follow anonymous shoppers across the floor for layout and display studies, the technology behind cashierless checkout. The vendor delivers its counts as a CSV every 15 minutes.",
+    ],
+    systems: ["Mock people-counting system", "Mock multi-camera tracker"],
+  },
+  {
+    name: "Mock vendor D",
+    kind: "Electronic shelf labels",
+    about: [
+      "Mock vendor D makes electronic shelf labels: battery-powered digital price labels on every facing, updated by radio from ceiling base stations. They are standard across much of European grocery and spreading in the US.",
+      "Price changes from the retailer's price file go out overnight, and each label confirms when it shows its new price, so the system knows which labels failed. A label shows a price; it can't see what's on the shelf.",
+    ],
+    systems: ["Mock electronic shelf labels"],
+  },
+  {
+    name: "Demo Grocery",
+    kind: "The retailer's own systems",
+    about: [
+      "Demo Grocery runs two sources itself. Its space planning system is the planogram and floor-plan software category managers already use to decide what goes on each shelf, and it publishes the StoreLayout every other record refers to.",
+      "It also runs its own fixed shelf cameras over aisle 3 and the dairy wall, built on an edge AI platform such as NVIDIA Metropolis. They report a change on a shelf when it holds for two looks, but can't read shelf tags.",
+    ],
+    systems: ["Demo Grocery space planning", "Store shelf cameras (in-house)"],
+  },
+];
+
+/** The vendor behind a source system, if the demo knows it. */
+export function vendorOf(system: string): Vendor | undefined {
+  return VENDORS.find((v) => v.systems.includes(system));
+}

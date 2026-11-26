@@ -5,7 +5,7 @@ import { checkoutName, duration, observer, elapsed, flagDetail, flagName, humani
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { storyBeats, type Beat } from "./story.ts";
-import { SOURCE_INFO } from "./vendors.ts";
+import { VENDORS } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
@@ -23,7 +23,7 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "story" | "now" | "faults" | "disagreements" | "stream" | "sources";
+export type Tab = "story" | "now" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
 
 /** The faults a visitor can inject, in a store team's words. */
 const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
@@ -658,6 +658,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               <button type="button" role="tab" aria-selected={tab === "sources"} onClick={() => setTab("sources")}>
                 Sources
               </button>
+              <button type="button" role="tab" aria-selected={tab === "vendors"} onClick={() => setTab("vendors")}>
+                Vendors
+              </button>
             </div>
 
             {tab === "story" && (
@@ -860,9 +863,28 @@ export function App({ start }: { start?: AppStart } = {}) {
               </>
             )}
 
+            {tab === "vendors" && (
+              <>
+                <p className="note top">The vendors are mock, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
+                <div className="vendors">
+                  {VENDORS.map((v) => (
+                    <section key={v.name}>
+                      <h3>
+                        {v.name} <span className="vendor">{v.kind}</span>
+                      </h3>
+                      {v.about.map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                      <p className="feeds-of">Feeds in this demo: {v.systems.join(", ")}</p>
+                    </section>
+                  ))}
+                </div>
+              </>
+            )}
+
             {tab === "sources" && (
               <>
-                <p className="note top">Each feed stands for a kind of system retailers buy today. The vendors are mock, labeled A to D, and their formats are invented. Switch a feed off to see what the store would know without it. Counts are for the whole day.</p>
+                <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day. Vendors describes who sends each feed.</p>
                 <table className="feeds">
                   <thead>
                     <tr>
@@ -882,11 +904,6 @@ export function App({ start }: { start?: AppStart } = {}) {
                               <span>
                                 {f.system}
                                 {f.vendor ? <span className="vendor">{f.vendor}</span> : null}
-                                {SOURCE_INFO[f.system] ? (
-                                  <span className="about">
-                                    <b>{SOURCE_INFO[f.system]!.kind}.</b> {SOURCE_INFO[f.system]!.about} {SOURCE_INFO[f.system]!.sends}
-                                  </span>
-                                ) : null}
                                 {fixed ? <span className="vendor">Always on: every record refers to it</span> : null}
                               </span>
                             </label>
