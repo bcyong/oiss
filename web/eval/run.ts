@@ -6,7 +6,8 @@
  *   EVAL_URL=https://<deploy preview>/api/assistant npm run eval:assistant -w web
  *
  * The second form asks a deployed site's assistant instead, with the key that site already has.
- * About 30 model calls. Prints a table, adds it to the GitHub job summary when there is one, and exits
+ * A question the safety check turns down counts as a failure, since every sample question is an
+ * ordinary store question. About 30 model calls, and a safety check on each question and answer. Prints a table, adds it to the GitHub job summary when there is one, and exits
  * non-zero when an answer fails a check. Without a key it says so and exits zero, so a fork's pull
  * request isn't marked failed.
  */
@@ -38,6 +39,10 @@ interface Row {
   findings: Finding[];
   error?: string;
   text?: string;
+  /** The safety check's verdicts, so a run shows whether the safety model answered at all. */
+  safety?: string;
+  proposals?: number;
+  turnedDown?: number;
 }
 
 const rows: Row[] = [];
@@ -51,19 +56,28 @@ for (const t of TIMES) {
       if (req.step === "agent") toolText = req.messages.filter((m) => m.role === "tool").map((m) => m.content).join("\n");
       if (url) return httpStep(url)(req);
       // Each question looks like its own visitor, so the server's per-visitor limit doesn't trip.
-      const res = await handleAssistant(new Request("https://eval.invalid/api/assistant", { method: "POST", headers: { "content-type": "application/json", "x-nf-client-connection-ip": `eval-${n}` }, body: JSON.stringify(req) }), { key, model: process.env.NVIDIA_MODEL });
+      const res = await handleAssistant(new Request("https://eval.invalid/api/assistant", { method: "POST", headers: { "content-type": "application/json", "x-nf-client-connection-ip": `eval-${n}` }, body: JSON.stringify(req) }), { key, model: process.env.NVIDIA_MODEL, routerModel: process.env.NVIDIA_ROUTER_MODEL, safetyModel: process.env.NVIDIA_SAFETY_MODEL });
       const body = (await res.json()) as StepReply & { code?: string; error?: string };
       if (!res.ok) throw new AssistantError(body.code ?? "upstream", body.error ?? `HTTP ${res.status}`);
       return body;
     };
     try {
-      const a = await ask(day, t, question, step);
-      rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text });
+      // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
+      const a = await ask(day, t, question, step).catch((err: unknown) => {
+        if (err instanceof AssistantError && err.code === "timeout") {
+          console.log(`        timed out once; asking again`);
+          return ask(day, t, question, step);
+        }
+        throw err;
+      });
+      const verdict = (c?: { verdict: string; model?: string }) => (c ? `${c.verdict}${c.model ? ` (${c.model})` : ""}` : "off");
+      rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length, turnedDown: a.turnedDown.length });
     } catch (err) {
       rows.push({ time: clock(t), question, findings: [], error: err instanceof Error ? err.message : String(err) });
     }
     const r = rows.at(-1)!;
     console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}`);
+    if (r.safety) console.log(`        safety: ${r.safety}; ${r.proposals} task(s) proposed, ${r.turnedDown ?? 0} turned down by the store's rules`);
     for (const f of r.findings) console.log(`        ${f.check}: ${f.detail}`);
     if (r.error) console.log(`        ${r.error}`);
     // A failed answer's own words, so the log shows what the check caught.
@@ -76,9 +90,9 @@ const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", "<br>");
 const summary = [
   `## Assistant answer check: ${rows.length - failed.length} of ${rows.length} passed`,
   "",
-  "| Time | Question | Agent | Result |",
-  "| --- | --- | --- | --- |",
-  ...rows.map((r) => `| ${r.time} | ${cell(r.question)} | ${r.agent ?? ""} | ${r.error ? `Error: ${cell(r.error)}` : r.findings.length ? cell(r.findings.map((f) => `${f.check}: ${f.detail}`).join("\n")) : "Pass"} |`),
+  "| Time | Question | Agent | Safety | Proposed | Result |",
+  "| --- | --- | --- | --- | --- | --- |",
+  ...rows.map((r) => `| ${r.time} | ${cell(r.question)} | ${r.agent ?? ""} | ${r.safety ?? ""} | ${r.proposals ?? ""} | ${r.error ? `Error: ${cell(r.error)}` : r.findings.length ? cell(r.findings.map((f) => `${f.check}: ${f.detail}`).join("\n")) : "Pass"} |`),
   "",
   ...failed.filter((r) => r.text).flatMap((r) => [`<details><summary>${r.time}: ${cell(r.question)}</summary>`, "", r.text!, "", "</details>", ""]),
 ].join("\n");

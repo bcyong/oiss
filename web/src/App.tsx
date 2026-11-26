@@ -12,6 +12,8 @@ import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus, TaskData
 import { Timeline } from "./Timeline.tsx";
 import { Tour, tourSeen } from "./Tour.tsx";
 import { AssistantPanel, type ChatEntry } from "./AssistantPanel.tsx";
+import { approveTask, type Approval } from "./approve.ts";
+import type { Proposal } from "./assistant/tools.ts";
 
 const SPEEDS = [
   { label: "Real time", value: 1 },
@@ -158,9 +160,14 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [nowClock, setNowClock] = useState<number | null>(null);
   const [streamType, setStreamType] = useState<string>("");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("open");
-  /** The conversation with the Store Operations Assistant, kept while the visitor switches tabs. A new day starts a new one. */
+  /**
+   * The conversation with the Store Operations Assistant, kept while the visitor switches tabs. A new day starts
+   * a new one; replaying the same day with an injected fault or an approved task keeps it, since every record
+   * sent before then stays the same.
+   */
   const [chat, setChat] = useState<ChatEntry[]>([]);
-  useEffect(() => setChat([]), [base]);
+  const dayKey = base ? `${base.files.seed}:${base.files.date}` : "";
+  useEffect(() => setChat([]), [dayKey]);
   /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
   const [live, setLive] = useState(false);
 
@@ -509,7 +516,7 @@ export function App({ start }: { start?: AppStart } = {}) {
     setPlaying(false);
     setBusy(true);
     setReplaying(true);
-    simulateInBrowser(day.files.seed, day.files.date, injections)
+    simulateInBrowser(day.files.seed, day.files.date, injections, day.files.requested)
       .then((files) => {
         setDay(indexDay({ ...files, origin: day.files.origin }));
         setSelection({ kind: "facing", index });
@@ -522,6 +529,21 @@ export function App({ start }: { start?: AppStart } = {}) {
         setReplaying(false);
       });
   };
+  // Approving a task the assistant proposed replays the day with it from now on, the way injecting a fault does.
+  const approve = async (p: Proposal): Promise<Approval> => {
+    const wasPlaying = playing;
+    setPlaying(false);
+    setBusy(true);
+    try {
+      const { files, result } = await approveTask(day, t, p, simulateInBrowser);
+      if (files) setDay(indexDay(files));
+      return result;
+    } finally {
+      setBusy(false);
+      setPlaying(wasPlaying);
+    }
+  };
+
   const faultText = (f: (typeof injected)[number]) => {
     const own = itemNameAt(day, f.facing);
     if (f.kind === "misplaced_item") return `${(f.gtin && day.items.get(f.gtin)?.name) || "Another item"} left on the ${own} facing`;
@@ -1019,7 +1041,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                     {!pinnedRecord && following && <Inspector key={following.id} day={day} record={following} onInspect={inspect} following t={t} />}
                   </>
                 )}
-                {panel === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} />}
+                {panel === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} onApprove={approve} />}
                 {panel === "story" && (
                   <>
                 <p className="note top">{storyNote(storyBeatsSoFar.length, live)}</p>

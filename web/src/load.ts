@@ -1,7 +1,7 @@
 import type { MockEslEvent } from "@oiss/adapters/mock-esl";
 import type { MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
 import type { MockShelfScanMission } from "@oiss/adapters/mock-shelf-scan";
-import type { Injection, ShelfFault } from "@oiss/sim";
+import type { Injection, RequestedTask, ShelfFault } from "@oiss/sim";
 import type { DayRecords, ItemMaster } from "./oiss.ts";
 
 export interface DayFiles {
@@ -23,6 +23,8 @@ export interface DayFiles {
    * happened on the shelf, kept so the demo can show whether any record has caught each one yet.
    */
   injected?: ShelfFault[];
+  /** Shelf tasks the visitor approved, which the simulator raised in the store's task system and played out. */
+  requested?: RequestedTask[];
 }
 
 export interface VendorFeeds {
@@ -77,18 +79,18 @@ export async function loadGoldenDay(): Promise<DayFiles> {
 }
 
 /** Runs the store simulator in a web worker, so a new day never blocks the page. */
-export function simulateInBrowser(seed: number, date: string, injections: Injection[] = []): Promise<DayFiles> {
+export function simulateInBrowser(seed: number, date: string, injections: Injection[] = [], requestedTasks: RequestedTask[] = []): Promise<DayFiles> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<{ records: DayRecords; itemMaster: ItemMaster; vendorFeeds: DayFiles["vendorFeeds"]; injected: ShelfFault[]; ms: number } | { error: string }>) => {
       worker.terminate();
       if ("error" in e.data) return reject(new Error(e.data.error));
-      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, vendorFeeds: e.data.vendorFeeds, simulatedInMs: e.data.ms, injected: e.data.injected });
+      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, vendorFeeds: e.data.vendorFeeds, simulatedInMs: e.data.ms, injected: e.data.injected, ...(requestedTasks.length ? { requested: requestedTasks } : {}) });
     };
     worker.onerror = (e) => {
       worker.terminate();
       reject(new Error(e.message || "The simulator stopped"));
     };
-    worker.postMessage({ seed, date, injections });
+    worker.postMessage({ seed, date, injections, requestedTasks });
   });
 }

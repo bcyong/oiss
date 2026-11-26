@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkAnswer, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
+import { checkAnswer, claimedActions, claimedProposal, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
 
 const tools = JSON.stringify({
   counts: { wrongOnShelf: 2, fixedWaitingForRead: 4 },
@@ -27,6 +27,7 @@ test("an answer may not give a cause the records don't", () => {
   // A cause word is fine when what follows it is the cause a record gave.
   const cancelled = JSON.stringify({ outcome: "No backroom stock. The facing needs a store order." });
   assert.deepEqual(statedCauses("Its task was cancelled due to no backroom stock.", cancelled), []);
+  assert.deepEqual(statedCauses("All other facings have cancelled tasks due to \"No backroom stock\" and need store orders.", cancelled), []);
   assert.deepEqual(statedCauses("Its task was cancelled due to a late delivery.", cancelled), ["due to"]);
 });
 
@@ -49,10 +50,41 @@ test("only record ids go in citation brackets", () => {
   assert.deepEqual(nonRecordCitations("Three exceptions [checkout_incidents]; see [the guide](https://example.com)."), ["[checkout_incidents]"]);
 });
 
+test("an answer may propose a task but never say it raised one", () => {
+  assert.deepEqual(claimedActions("I proposed two replenishment tasks; approve them below."), []);
+  assert.deepEqual(claimedActions("I've created a replenishment task, and the task has been assigned to Dairy."), ["I've created", "task has been assigned"]);
+  assert.deepEqual(claimedActions("Two tasks have been raised for the Grocery team."), ["tasks have been raised"]);
+});
+
 test("every finding for an answer, including citations the tools didn't return", () => {
   const f = checkAnswer({ text: "6 tags are wrong because of a bad price file [shelf_tag_issues]. Ask the merchandising team or your supervisor.", unverified: ["so-20261117-999999"] }, tools);
   assert.deepEqual(
     f.map((x) => x.check),
     ["citation", "number", "cause", "name", "role", "citation"],
   );
+});
+
+test("an answer that says it proposed a task, with none proposed, is caught", () => {
+  assert.equal(claimedProposal("Proposed replenishment tasks for the Grocery team:", 0), "Proposed replenishment");
+  assert.equal(claimedProposal("I proposed one replenishment task.", 1), undefined);
+  assert.equal(claimedProposal("Nothing needs a task right now.", 0), undefined);
+});
+
+test("a wait written as minutes and seconds matches the seconds the tools gave", () => {
+  const tools = JSON.stringify({ avgWaitSeconds: 199 });
+  assert.deepEqual(unsupportedNumbers("Average wait is 199 seconds (3:19).", tools), []);
+  assert.deepEqual(unsupportedNumbers("Average wait is 4:05.", tools), ["4:05"]);
+});
+
+test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave aren't new numbers", () => {
+  assert.deepEqual(unsupportedNumbers("The latest 15-minute interval shows 12 in line.", '{"inLine":12}'), []);
+  assert.deepEqual(unsupportedNumbers("All other 16 out-of-stock facings need store orders.", '{"outOfStock":17}'), []);
+  assert.deepEqual(unsupportedNumbers("16 facings are out.", '{"outOfStock":17}'), ["16"]);
+  assert.deepEqual(unknownTeams("each assigned team places a store order", ""), []);
+});
+
+test("the store manager who approves a proposal isn't a new role", () => {
+  assert.deepEqual(unknownRoles("I proposed it; it waits for the store manager's approval.", "{}"), []);
+  assert.deepEqual(unknownRoles("Proposed tasks (awaiting store-manager approval):", "{}"), []);
+  assert.deepEqual(unknownRoles("Ask the department manager.", "{}"), ["manager"]);
 });

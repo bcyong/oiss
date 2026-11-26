@@ -276,6 +276,12 @@ td:first-child {
   fill: var(--muted);
   font-size: 12px;
 }
+.arch .d-end {
+  text-anchor: end;
+}
+.arch .d-start {
+  text-anchor: start;
+}
 .arch .d-side {
   text-anchor: middle;
 }

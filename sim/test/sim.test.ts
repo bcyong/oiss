@@ -314,3 +314,32 @@ test("a cancelled task says why, and an exception review says what the reviewer 
   // A day this long has both real exceptions and false alerts among those reviewed.
   assert.ok(outcomes.has("false_alarm") && (outcomes.has("confirmed_loss") || outcomes.has("customer_paid")), [...outcomes].join(", "));
 });
+
+test("a requested task is raised when asked, worked and verified like any other, and changes nothing sent before it", () => {
+  const golden = runDay({ seed: 20261117, date: "2026-11-17" });
+  const T = 13 * 3600;
+  // A low-stock facing that isn't on promotion, so the store's task system raises no task for it itself.
+  const facing = "A03-R-S4-F07";
+  const cutoff = golden.ground.clock.iso(T);
+  const read = golden.records.shelfObservations.filter((r) => r.time <= cutoff && (r.data as { location: { facing: string } }).location.facing === facing).at(-1)!;
+  assert.equal((read.data as { status: string }).status, "low_stock");
+  const createdBy = "agent:store-operations-assistant";
+  const changed = runDay({ seed: 20261117, date: "2026-11-17", requestedTasks: [{ kind: "replenish", facing, t: T, basedOn: [read.id], createdBy }] });
+  for (const kind of ["shelfObservations", "zoneMetrics", "shopperPaths", "evidence", "incidents", "tasks"] as const) {
+    const before = (rs: { time: string }[]) => JSON.stringify(rs.filter((r) => r.time < cutoff));
+    assert.equal(before(changed.records[kind]), before(golden.records[kind]), `${kind} sent before ${cutoff} are unchanged`);
+  }
+  const versions = changed.records.tasks.filter((r) => (r.data as { createdBy: string }).createdBy === createdBy);
+  assert.ok(versions.length > 0, "the requested task is in the day");
+  assert.equal(versions[0]!.time, cutoff, "it's raised at the time asked");
+  const first = versions[0]!.data as { state: string; kind: string; basedOn: string[]; location: { facing: string } };
+  assert.deepEqual([first.state, first.kind, first.location.facing, first.basedOn], ["open", "replenish", facing, [read.id]]);
+  assert.equal(new Set(versions.map((r) => r.subject)).size, 1);
+  assert.equal((versions.at(-1)!.data as { state: string }).state, "verified");
+  // One the backroom has no stock for is cancelled with the reason, as the store's own tasks are.
+  const empty = "A01-L-S0-F06";
+  const emptyRead = golden.records.shelfObservations.filter((r) => r.time <= cutoff && (r.data as { location: { facing: string } }).location.facing === empty).at(-1)!;
+  const noStock = runDay({ seed: 20261117, date: "2026-11-17", requestedTasks: [{ kind: "replenish", facing: empty, t: T, basedOn: [emptyRead.id], createdBy }] });
+  const last = noStock.records.tasks.filter((r) => (r.data as { createdBy: string }).createdBy === createdBy).at(-1)!.data as { state: string; resolution?: { outcome: string } };
+  assert.deepEqual([last.state, last.resolution?.outcome], ["cancelled", "no_backroom_stock"]);
+});

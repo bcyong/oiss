@@ -7,7 +7,8 @@ import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
 /**
  * The assistant's tools. Each one reads the day's OISS records as they stood at time t, the demo's
  * playback time, and returns a small JSON object in retail terms with the id of every record it drew on,
- * so the answer can cite them. None of them changes anything.
+ * so the answer can cite them. None of them changes anything: propose_task only checks a task and
+ * hands it to the page, which shows it to the store manager to approve.
  *
  * Anything a manager acts on, such as a count, a status or a priority, is worked out here in code, and
  * the model only puts it into words. So where a status depends on comparing two records' times (a fix
@@ -519,6 +520,77 @@ function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResu
   };
 }
 
+/** Who raises a task the Store Operations Assistant proposed and the store manager approved. */
+export const ASSISTANT_CREATOR = "agent:store-operations-assistant";
+
+export type ProposalKind = "replenish" | "go_back" | "fix_shelf_tag";
+
+/** The kinds of task each agent may propose. Loss prevention and the front end propose none. */
+export const PROPOSAL_KINDS: Partial<Record<AgentId, ProposalKind[]>> = { availability: ["replenish", "go_back"], price_and_label: ["fix_shelf_tag"] };
+
+export interface Proposal {
+  kind: ProposalKind;
+  facing: string;
+  title: string;
+  /** Team id, such as team:dairy, and its name. */
+  assignedTo: string;
+  team: string;
+  /** The record that shows the facing needs the work. */
+  basedOn: string;
+  reason?: string;
+}
+
+export type Decision = { decision: "proposed"; proposal: Proposal } | { decision: "rejected"; reason: string; openTask?: string };
+
+/**
+ * Decides, in code and from the records alone, whether a task may go to the store manager: the facing
+ * exists, the latest records show the work is needed, and no task for it is open or was just cancelled for
+ * want of backroom stock. The model only asks; this decides. The page runs it again at approval, so a
+ * task is never raised on records that have changed since it was proposed.
+ */
+export function decideTask(day: IndexedDay, t: number, kind: string, facing: string, allowed: readonly string[] = ["replenish", "go_back", "fix_shelf_tag"]): Decision {
+  if (!allowed.includes(kind)) return { decision: "rejected", reason: `This agent can propose only ${allowed.map((k) => TASK_KIND[k as ProposalKind].toLowerCase()).join(" or ")} tasks.` };
+  if (t < day.open || t >= day.close) return { decision: "rejected", reason: "The store is closed, so no shelf task can be raised now." };
+  const v = day.facings.find((f) => f.facing.id === facing);
+  if (!v) return { decision: "rejected", reason: `There is no facing ${facing || "with that id"}. Use a facing id from a tool result.` };
+  const name = day.items.get(v.facing.gtin)?.name ?? facing;
+  const open = (day.tasksByFacing.get(facing) ?? []).map((view) => ({ view, r: taskAt(view, t) })).find(({ r }) => r && r.data.kind === kind && OPEN_STATES.has(r.data.state));
+  if (open) return { decision: "rejected", reason: `A ${TASK_KIND[kind as ProposalKind].toLowerCase()} task for ${name} is already ${TASK_STATE[open.r!.data.state].toLowerCase()}.`, openTask: open.r!.id };
+  const obs = latestObservation(v, t);
+  const latest = lastFrom(v, t, () => true);
+  let basedOn: string | undefined;
+  let title: string;
+  if (kind === "replenish") {
+    title = `Replenish ${name}`;
+    const status = obs?.data.status;
+    if (status !== "out_of_stock" && status !== "low_stock") return { decision: "rejected", reason: `The latest shelf read shows ${name} ${STATUS_LABEL[status ?? "none"].toLowerCase()}, so it needs no replenishment.` };
+    const cancelled = latestTask(day, facing, "replenish", -Infinity, t);
+    const last = cancelled && taskAt(cancelled, t);
+    if (last?.data.state === "cancelled" && last.data.resolution?.outcome === "no_backroom_stock") return { decision: "rejected", reason: `The last replenishment task for ${name} was cancelled for no backroom stock. It needs a store order, not another task.` };
+    basedOn = obs!.id;
+  } else if (kind === "go_back") {
+    title = `Clear a go-back from the ${name} facing`;
+    if (!latest?.r.data.flags?.includes("misplaced_item")) return { decision: "rejected", reason: `The latest read of the ${name} facing shows no misplaced item.` };
+    basedOn = latest.r.id;
+  } else {
+    title = `Fix the shelf tag for ${name}`;
+    const tag = tagStatus(day, v, t);
+    if (!tag || tag.bucket === "fixedWaitingForRead") return { decision: "rejected", reason: tag ? `The fix for ${name}'s shelf tag is marked done and waits for the robot's next read.` : `The latest reads show no price problem on ${name}'s shelf tag.` };
+    const robot = tag.row.robotTagRead as { record: string; flagged: boolean } | undefined;
+    const label = tag.row.shelfLabel as { record: string } | undefined;
+    basedOn = (robot?.flagged ? robot.record : label?.record) ?? latest!.r.id;
+  }
+  const team = routeTask(kind as ProposalKind, day.items.get(v.facing.gtin)?.department);
+  return { decision: "proposed", proposal: { kind: kind as ProposalKind, facing, title, assignedTo: team, team: assigneeName(team), basedOn } };
+}
+
+function proposeTask(day: IndexedDay, t: number, agent: AgentId, args: ToolArgs): ToolResult {
+  const d = decideTask(day, t, str(args.kind), str(args.facing), PROPOSAL_KINDS[agent] ?? []);
+  if (d.decision === "rejected") return { ...d, answer: `Not proposed: ${d.reason}` };
+  const reason = str(args.reason).slice(0, 200) || undefined;
+  return { decision: "proposed", proposal: { ...d.proposal, reason }, answer: `Proposed "${d.proposal.title}" for ${d.proposal.team}. It waits for the store manager to approve it on this page; nothing is raised until then.` };
+}
+
 function getRecord(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
   const id = str(args.id);
   const r = day.byId.get(id) as AnyRecord | undefined;
@@ -540,12 +612,14 @@ const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs) => Tool
   zone_traffic: zoneTraffic,
   checkout_incidents: checkoutIncidents,
   get_record: getRecord,
+  propose_task: () => ({}),
 };
 
 /** Runs one tool for an agent. A tool the agent wasn't given, or bad arguments, come back as an error the model can read. */
 export function runTool(day: IndexedDay, t: number, agent: AgentId, name: string, args: ToolArgs): ToolResult {
   if (!(AGENTS[agent].tools as string[]).includes(name)) return { error: `The ${AGENTS[agent].name} has no tool named ${name}.` };
   try {
+    if (name === "propose_task") return proposeTask(day, t, agent, args ?? {});
     return RUN[name as ToolName](day, t, args ?? {});
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
