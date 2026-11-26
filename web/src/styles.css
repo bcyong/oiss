@@ -1234,12 +1234,13 @@ ol.chat .answer {
 /* The question box stays at the bottom of the panel while the conversation scrolls above it. */
 .assistant form.ask {
   position: sticky;
-  bottom: 0;
+  /* Down over the drawer's bottom padding, so no answer text shows below the box. */
+  bottom: -16px;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
-  padding: 10px 0 2px;
+  margin: 12px 0 -16px;
+  padding: 10px 0 16px;
   background: var(--panel);
   border-top: 1px solid var(--line);
 }
