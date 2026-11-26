@@ -384,10 +384,12 @@ function frontEndStatus(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
       return { ...taskLine(day, view, t)!, status };
     });
   const m = latest?.data.metrics;
+  const openTask = tasksAt(day, t).find(({ latest }) => latest.data.kind === "open_lane" && OPEN_STATES.has(latest.data.state));
+  const openLaneNow = openTask && stateWithTeam(openTask.latest.data.state, assigneeName(openTask.latest.data.assignedTo));
   const meets = (m?.avgWaitSeconds ?? 0) >= OPEN_LANE_WAIT_SECONDS && (m?.openLanes ?? staffed) < staffed;
   return {
     answer: latest
-      ? `${m?.openLanes} of ${staffed} staffed lanes open, ${m?.queueLength} in line, ${m?.avgWaitSeconds} s average wait (${intervalOf(day, latest)}). ${meets ? "That meets the store's rule for opening another staffed lane." : m?.openLanes === staffed ? "Every staffed lane is open." : "That is under the store's rule for opening another staffed lane."}`
+      ? `${m?.openLanes} of ${staffed} staffed lanes open, ${m?.queueLength} in line, ${m?.avgWaitSeconds} s average wait (${intervalOf(day, latest)}). ${meets ? `That meets the store's rule for opening another staffed lane. ${openLaneNow ? `An open-lane task is ${openLaneNow.toLowerCase()}.` : "No open-lane task is open yet."}` : m?.openLanes === staffed ? "Every staffed lane is open." : "That is under the store's rule for opening another staffed lane."}`
       : "No front-end reading yet today.",
     hours,
     staffedLanesInStore: staffed,
