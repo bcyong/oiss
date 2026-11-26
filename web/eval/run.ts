@@ -62,7 +62,14 @@ for (const t of TIMES) {
       return body;
     };
     try {
-      const a = await ask(day, t, question, step);
+      // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
+      const a = await ask(day, t, question, step).catch((err: unknown) => {
+        if (err instanceof AssistantError && err.code === "timeout") {
+          console.log(`        timed out once; asking again`);
+          return ask(day, t, question, step);
+        }
+        throw err;
+      });
       const verdict = (c?: { verdict: string; model?: string }) => (c ? `${c.verdict}${c.model ? ` (${c.model})` : ""}` : "off");
       rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length, turnedDown: a.turnedDown.length });
     } catch (err) {

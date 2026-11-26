@@ -36,6 +36,8 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
     .replace(RECORD_ID, " ")
     // "3 min 19 s" spells out 199 seconds, which the tools may well have given.
     .replace(/\b(\d+) ?min(?:utes?)? (\d+) ?s(?:ec(?:onds?)?)?\b/gi, (whole, m: string, sec: string) => (known.has(String(Number(m) * 60 + Number(sec))) ? " " : whole))
+    // "3:19" is 199 seconds written as minutes and seconds.
+    .replace(/\b(\d{1,2}):([0-5]\d)(?!\s*[AP]M)\b/gi, (whole, m: string, sec: string) => (seconds.includes(Number(m) * 60 + Number(sec)) ? " " : whole))
     .replace(/^\s*\d+[.)]\s+/gm, " ")
     // A ZoneMetric covers 15 minutes by definition, so "the 15-minute interval" needs no tool to say 15.
     .replace(/\b15[- ]min(?:ute)?s?\b/gi, " ")

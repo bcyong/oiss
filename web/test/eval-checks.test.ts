@@ -70,6 +70,12 @@ test("an answer that says it proposed a task, with none proposed, is caught", ()
   assert.equal(claimedProposal("Nothing needs a task right now.", 0), undefined);
 });
 
+test("a wait written as minutes and seconds matches the seconds the tools gave", () => {
+  const tools = JSON.stringify({ avgWaitSeconds: 199 });
+  assert.deepEqual(unsupportedNumbers("Average wait is 199 seconds (3:19).", tools), []);
+  assert.deepEqual(unsupportedNumbers("Average wait is 4:05.", tools), ["4:05"]);
+});
+
 test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave aren't new numbers", () => {
   assert.deepEqual(unsupportedNumbers("The latest 15-minute interval shows 12 in line.", '{"inLine":12}'), []);
   assert.deepEqual(unsupportedNumbers("All other 16 out-of-stock facings need store orders.", '{"outOfStock":17}'), []);
