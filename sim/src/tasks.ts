@@ -9,14 +9,19 @@
  * - review_exception: a checkout Incident from loss prevention, for a person to review.
  * - open_lane: front-end waits of three minutes or more with staffed lanes still closed.
  *
- * What the associates do comes from the ground truth: a facing is restocked in a recovery round,
- * a go-back is cleared, a tag is fixed, a lane opens. That marks the task done. A task that needs
- * verification closes only when a later record shows the fix, and names that record.
+ * Associates work the shelf tasks assigned to them: some minutes after assignment they fill the
+ * facing from the backroom, clear the go-back or fix the shelf tag (workOrders below), and runDay
+ * feeds that work back into the simulated day, so the next shelf scan sees the fix. A recovery
+ * round that reaches the facing first does the job instead. Whatever did the work in the ground
+ * truth marks the task done; a fill the backroom had no stock for cancels it, since only a store
+ * order can fix that. The front-end lead opens lanes on their own judgment, and a task closes when
+ * one opens. A task that needs verification closes only when a later record shows the fix, and
+ * names that record.
  *
  * Each status change is a new Task record with the same subject (spec/record-types.md).
  */
 import type { Department } from "./layout.ts";
-import type { Ground } from "./model.ts";
+import type { Ground, WorkOrder } from "./model.ts";
 import { idMaker, type OissRecord, type Provenance, record } from "./records.ts";
 import { Rng } from "./rng.ts";
 
@@ -33,6 +38,8 @@ const OPEN_LANE_TIMEOUT = 30 * 60;
 /** Seconds from the record to the task, and from the task to its assignment. */
 const RAISE_DELAY = 30;
 const ASSIGN_DELAY = 60;
+/** Minutes from assignment until the associate has done the work, by kind of shelf task. */
+const WORK_MINUTES: Record<WorkOrder["kind"], [number, number]> = { replenish: [10, 35], go_back: [5, 20], fix_shelf_tag: [15, 45] };
 
 const TEAM: Partial<Record<Department, string>> = {
   produce: "team:produce",
@@ -51,6 +58,9 @@ interface Step {
 
 interface Plan {
   kind: TaskKind;
+  /** Shelf tasks: the facing, and when the associate will have done the work if nothing does it first. */
+  facing?: string;
+  workAt?: number;
   title: string;
   location: Record<string, string>;
   assignedTo: string;
@@ -82,9 +92,24 @@ function laneName(id: string): string {
   return m[1] === "lane" ? `Lane ${m[2]}` : `self-checkout ${m[2]}`;
 }
 
-export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetrics: OissRecord[], incidents: OissRecord[]): OissRecord[] {
+/**
+ * The shelf work associates do for the day's tasks: for each replenish, go-back and shelf-tag task,
+ * the time its associate does the work, unless a recovery round did it first. runDay runs the day
+ * again with these until they stop changing.
+ */
+export function workOrders(g: Ground, shelfObservations: OissRecord[]): WorkOrder[] {
+  const out: WorkOrder[] = [];
+  for (const p of shelfPlans(g, shelfObservations)) {
+    if (p.workAt === undefined || p.workAt >= g.close) continue;
+    const finished = p.steps.find((s) => s.state === "done" || s.state === "cancelled");
+    if (finished && finished.t < p.workAt) continue;
+    out.push({ kind: p.kind as WorkOrder["kind"], facing: p.facing!, t: p.workAt });
+  }
+  return out.sort((a, b) => a.t - b.t || (a.facing < b.facing ? -1 : a.facing > b.facing ? 1 : a.kind < b.kind ? -1 : 1));
+}
+
+function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
   const { clock, catalog, layout } = g;
-  const store = layout.store.id;
   const last = 86_399;
   const sec = (iso: string) => (Date.parse(iso) - clock.epochMs(0)) / 1000;
   const fixtureDept = new Map(layout.fixtures.map((f) => [f.id, f.department]));
@@ -140,7 +165,9 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
           }
         }
         busyUntil[kind] = end;
-        plans.push({ kind, title, location: facingLocation(r.data.location), assignedTo: kind === "fix_shelf_tag" ? "team:price-integrity" : teamFor(facing), basedOn: [r.id], verify: true, steps });
+        const [lo, hi] = WORK_MINUTES[kind];
+        const workAt = Math.round(created + ASSIGN_DELAY + 60 * new Rng(g.config.seed).fork(`task-work:${kind}:${facing}:${created}`).uniform(lo, hi));
+        plans.push({ kind, facing, workAt, title, location: facingLocation(r.data.location), assignedTo: kind === "fix_shelf_tag" ? "team:price-integrity" : teamFor(facing), basedOn: [r.id], verify: true, steps });
       };
       const next = (after: number, ok: (o: Obs) => boolean) => {
         const hit = list.find((o) => o.t > after && ok(o.r));
@@ -165,6 +192,16 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
       }
     }
   }
+
+  return plans;
+}
+
+export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetrics: OissRecord[], incidents: OissRecord[]): OissRecord[] {
+  const { clock, layout } = g;
+  const store = layout.store.id;
+  const last = 86_399;
+  const sec = (iso: string) => (Date.parse(iso) - clock.epochMs(0)) / 1000;
+  const plans = shelfPlans(g, shelfObservations);
 
   // ---- checkout exceptions, for a person to review ----
   for (const r of incidents as OissRecord<{ location: Record<string, string>; incidentType: string }>[]) {

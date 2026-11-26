@@ -56,7 +56,7 @@ export const VENDORS: Vendor[] = [
     about: [
       "Demo Grocery runs three sources itself. Its space planning system is the planogram and floor-plan software category managers already use to decide what goes on each shelf, and it publishes the StoreLayout every other record refers to.",
       "It also runs its own fixed shelf cameras over aisle 3 and the dairy wall, built on an edge AI platform such as NVIDIA Metropolis. They report a change on a shelf when it holds for two looks, but can't read shelf tags.",
-      "Its task management system is the work list store teams already carry on handhelds. It raises a Task when OISS records call for work, such as an out-of-stock read or a long wait at the staffed lanes, assigns it to a department team, and closes it when a later record from any vendor shows the fix.",
+      "Its task management system is the work list store teams already carry on handhelds. It raises a Task when OISS records call for work, such as an out-of-stock read or a long wait at the staffed lanes, assigns it to a department team whose associates do the work, and closes it when a later record from any vendor shows the fix.",
     ],
     systems: ["Demo Grocery space planning", "Store shelf cameras (in-house)", "Demo Grocery task management"],
   },

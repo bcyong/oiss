@@ -806,7 +806,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             {tab === "tasks" && (
               <>
                 <p className="note top">
-                  The store's task management system raises a Task when the records call for work, assigns it to a team and closes it when a later record shows the fix, such as the next shelf scan. Every status change is its own OISS record, so any vendor or agent can follow the work. Open tasks are circled on the floor plan.
+                  The store's task management system raises a Task when the records call for work and assigns it to a team, whose associate fills the shelf, clears the go-back or fixes the tag. It closes the task when a later record shows the fix, such as the next shelf scan. Every status change is its own OISS record, so any vendor or agent can follow the work. Open tasks are circled on the floor plan.
                 </p>
                 <div className="task-summary">
                   <span>

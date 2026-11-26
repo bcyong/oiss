@@ -3,7 +3,10 @@ import { test } from "node:test";
 import { checkDigit, syntheticGtin } from "../src/catalog.ts";
 import { route, routeLength, buildLayout } from "../src/layout.ts";
 import { Rng } from "../src/rng.ts";
+import { simulateDay } from "../src/model.ts";
+import { observeDay } from "../src/observe.ts";
 import { runDay } from "../src/run.ts";
+import { workOrders } from "../src/tasks.ts";
 import { storeClock } from "../src/time.ts";
 
 const day = runDay({ seed: 7, date: "2026-11-17" });
@@ -164,7 +167,7 @@ test("an injected fault changes nothing sent before it, and the robot finds it o
   ];
   const changed = runDay({ seed: 7, date: "2026-11-17", injections });
   const cutoff = day.ground.clock.iso(T);
-  for (const kind of ["shelfObservations", "zoneMetrics", "shopperPaths", "evidence", "incidents"] as const) {
+  for (const kind of ["shelfObservations", "zoneMetrics", "shopperPaths", "evidence", "incidents", "tasks"] as const) {
     const before = (rs: { time: string }[]) => JSON.stringify(rs.filter((r) => r.time <= cutoff));
     assert.equal(before(changed.records[kind]), before(day.records[kind]), `${kind} sent by ${cutoff} are unchanged`);
   }
@@ -185,9 +188,24 @@ test("shelf labels report the price mismatches they cause, and only those", () =
   const flaggedFacings = new Set(checks.filter((r) => (r.data as { flags?: string[] }).flags?.includes("price_mismatch")).map((r) => r.subject));
   const mismatches = day.ground.faults.filter((f) => f.kind === "price_mismatch");
   for (const f of mismatches) assert.equal(flaggedFacings.has(f.facing), f.cause === "label_not_updated", `${f.id} ${f.cause}`);
-  // The robot reads the tag itself, so it finds every one whatever its cause.
-  const robotFlagged = new Set(day.records.shelfObservations.filter((r) => r.source.endsWith(":robot-1") && (r.data as { flags?: string[] }).flags?.includes("price_mismatch")).map((r) => r.subject));
-  for (const f of mismatches) assert.ok(robotFlagged.has(f.facing), f.id);
+  // The robot reads the tag itself, so it flags every wrong tag still up when it passes, whatever its cause.
+  const sec = (iso: string) => (Date.parse(iso) - day.ground.clock.epochMs(0)) / 1000;
+  let robotSaw = 0;
+  for (const f of mismatches) {
+    const passes = day.records.shelfObservations.filter((r) => r.source.endsWith(":robot-1") && r.subject === f.facing && (r.data as { status: string }).status !== "unknown");
+    for (const r of passes) {
+      const t = sec(r.time);
+      const up = t >= f.start && (f.end === null || t < f.end);
+      assert.equal((r.data as { flags?: string[] }).flags?.includes("price_mismatch") ?? false, up, `${f.id} at ${r.time}`);
+      if (up) robotSaw++;
+    }
+  }
+  assert.ok(robotSaw > 0);
+  // A label fixed for a store task confirms its price afterwards.
+  for (const f of mismatches.filter((f) => f.cause === "label_not_updated" && f.end !== null && f.end < day.ground.close)) {
+    const confirmed = checks.find((r) => r.subject === f.facing && sec(r.time) > f.end! && !(r.data as { flags?: string[] }).flags?.includes("price_mismatch"));
+    assert.ok(confirmed, `${f.id}: the label confirms after the fix`);
+  }
 });
 
 test("each vendor's own export is what its adapter read", () => {
@@ -226,4 +244,48 @@ test("store tasks move forward through their states and a verified task names th
       }
     }
   }
+});
+
+test("associates work the shelf tasks assigned to them, and that work is what closes each task", () => {
+  const { ground } = day;
+  const sec = (iso: string) => (Date.parse(iso) - ground.clock.epochMs(0)) / 1000;
+  // The day has settled: its own tasks ask for exactly the work it ran with.
+  assert.deepEqual(workOrders(ground, observeDay(ground, { shelvesOnly: true }).shelfObservations), ground.config.workOrders);
+  assert.ok(ground.config.workOrders.length > 0);
+
+  type T = { kind: string; state: string; location: { facing?: string } };
+  const latest = new Map<string, (typeof day.records.tasks)[number]>();
+  const assignedAt = new Map<string, number>();
+  for (const r of day.records.tasks) {
+    latest.set(r.subject, r);
+    if ((r.data as T).state === "assigned") assignedAt.set(r.subject, sec(r.time));
+  }
+  const shelfKinds = { replenish: "replenish", go_back: "misplaced_item", fix_shelf_tag: "price_mismatch" } as const;
+  const tasksAt = (kind: string, facing: string) => [...latest.values()].filter((r) => (r.data as T).kind === kind && (r.data as T).location.facing === facing);
+
+  // Every piece of work done for a task follows that task's assignment on the same facing.
+  for (const o of ground.config.workOrders) {
+    assert.ok(tasksAt(o.kind, o.facing).some((r) => (assignedAt.get(r.subject) ?? Infinity) < o.t), `${o.kind} at ${o.facing} follows its task`);
+  }
+  // Every shelf task marked done or cancelled matches work in the store at that time.
+  for (const r of day.records.tasks) {
+    const d = r.data as T;
+    if (!(d.kind in shelfKinds) || (d.state !== "done" && d.state !== "cancelled")) continue;
+    const t = sec(r.time);
+    const facing = d.location.facing!;
+    const work =
+      d.kind === "replenish"
+        ? ground.recoveryWork.some((w) => w.facing === facing && Math.abs(w.t - t) < 1.5)
+        : ground.faults.some((f) => f.kind === shelfKinds[d.kind as keyof typeof shelfKinds] && f.facing === facing && f.end !== null && Math.abs(f.end - t) < 1.5);
+    assert.ok(work, `${r.id} matches work done at ${facing}`);
+  }
+  // No wrong shelf tag lasts the day once a task has asked for it to be fixed.
+  for (const p of [...latest.values()].filter((r) => (r.data as T).kind === "fix_shelf_tag")) {
+    assert.ok(["done", "verified"].includes((p.data as T).state), `${p.subject} is fixed`);
+  }
+  assert.ok(ground.stats.shelfTagsFixedForTasks > 0 && ground.stats.taskFillUnits > 0);
+
+  // The work pays off: fewer missed sales than the same day with nobody working the tasks.
+  const idle = simulateDay({ seed: 7, date: "2026-11-17" });
+  assert.ok(ground.stats.missedDollars < idle.stats.missedDollars, `${ground.stats.missedDollars} < ${idle.stats.missedDollars}`);
 });

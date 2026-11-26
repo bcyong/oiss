@@ -3,8 +3,8 @@
  *
  * Every facing has an electronic shelf label. At 6 AM the label system sends the overnight price
  * changes to the labels that need them, and each label confirms its new price or fails to. A label
- * that fails keeps showing its old price, and the system retries it every hour until the store
- * closes. A price mismatch whose cause is label_not_updated is one of those failures, so the label
+ * that fails keeps showing its old price, and the system retries it every hour until an associate
+ * fixes the label for a store task, when it confirms the price, or until the store closes. A price mismatch whose cause is label_not_updated is one of those failures, so the label
  * system reports it within 15 minutes. A paper sale sign left up over a correct label is a price
  * mismatch the label system never sees: the promotion ended overnight, the label took the regular
  * price back and confirmed it, and the sign still shows the sale price. Only something that looks at
@@ -54,11 +54,16 @@ export function eslEvents(g: Ground): MockEslEvent[] {
   for (const f of failures) {
     const r = rng.fork(`fault-${f.id}`);
     let attempt = 1;
-    report(f.facing, f.start + CONFIRM_TIMEOUT + r.uniform(0, 60), "UPDATE_FAILED", f.tagPrice!, attempt);
-    for (let h = Math.floor((f.start + CONFIRM_TIMEOUT) / 3600) + 1; hours(h) < g.close; h++) {
-      if (f.end !== null && hours(h) >= f.end) break;
-      report(f.facing, hours(h) + r.uniform(5, 300), "UPDATE_FAILED", f.tagPrice!, ++attempt);
+    const failedAt = f.start + CONFIRM_TIMEOUT + r.uniform(0, 60);
+    if (f.end === null || f.end > failedAt) {
+      report(f.facing, failedAt, "UPDATE_FAILED", f.tagPrice!, attempt);
+      for (let h = Math.floor((f.start + CONFIRM_TIMEOUT) / 3600) + 1; hours(h) < g.close; h++) {
+        if (f.end !== null && hours(h) >= f.end) break;
+        report(f.facing, hours(h) + r.uniform(5, 300), "UPDATE_FAILED", f.tagPrice!, ++attempt);
+      }
     }
+    // An associate who fixes the label (re-pairs or replaces it) sends the price again, and the label confirms it.
+    if (f.end !== null && f.end < g.close) report(f.facing, f.end + r.uniform(20, 120), "PRICE_CONFIRMED", price(catalog.byFacing.get(f.facing)!.gtin), ++attempt);
   }
 
   out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.label_id < b.label_id ? -1 : 1));

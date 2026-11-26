@@ -4,10 +4,11 @@
  * each source reports about it.
  *
  * - Misplaced item: an item left on another item's facing, usually by a shopper who changed their
- *   mind (a "go-back"). An associate clears go-backs during a recovery round, most of the time.
+ *   mind (a "go-back"). An associate clears go-backs during a recovery round, most of the time, or
+ *   sooner when a store task asks for it.
  * - Price mismatch: the shelf tag doesn't match the price in the price file, because an electronic
  *   shelf label didn't take a price change or a paper sale sign was left up over the label. It stays
- *   wrong until someone fixes the tag.
+ *   wrong until an associate fixes the tag for a store task.
  * - Phantom inventory: the units on a facing disappear without a sale (theft or damage that was
  *   never written off), so the store's system still counts them on hand. No replenishment order
  *   goes in and the backroom has none, so the facing stays out of stock while the system says it
@@ -41,6 +42,8 @@ export interface ShelfFault {
   start: number;
   /** When it was put right, or null if it lasts the rest of the day. */
   end: number | null;
+  /** Who put it right: an associate on a recovery round, or one working a store task. */
+  endedBy?: "recovery_round" | "task";
   /** Misplaced item: the GTIN of the item left on the facing. */
   gtin?: string;
   /** Price mismatch: the price on the shelf tag. The price file keeps the item's own price. */
@@ -99,7 +102,7 @@ function details(kind: FaultKind, facing: string, start: number, ctx: Context, r
         break;
       }
     }
-    return { kind, facing, start, end, gtin: stray.gtin };
+    return { kind, facing, start, end, ...(end !== null ? { endedBy: "recovery_round" as const } : {}), gtin: stray.gtin };
   }
   if (kind === "price_mismatch") {
     const tagPrice = wrongPrice(own, rng);
