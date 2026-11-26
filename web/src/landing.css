@@ -78,14 +78,6 @@ code {
   margin: 0 auto;
   padding: 28px 72px 36px;
 }
-.owner {
-  margin: 0 0 4px;
-  font-size: 18px;
-}
-.owner a {
-  color: var(--muted);
-  text-decoration: none;
-}
 .title-row {
   display: flex;
   flex-wrap: wrap;
