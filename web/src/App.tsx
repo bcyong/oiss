@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, faultSeen, flagsAt, incidentsUpTo, indexDay, latestObservation, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type IndexedDay } from "./day.ts";
-import { checkoutName, duration, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { checkoutName, duration, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
@@ -67,6 +67,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [day, setDay] = useState<IndexedDay | null>(start?.day ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [replaying, setReplaying] = useState(false);
   const [t, setT] = useState(start?.t ?? 9 * 3600);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(300);
@@ -272,6 +273,7 @@ export function App({ start }: { start?: AppStart } = {}) {
     const wasPlaying = playing;
     setPlaying(false);
     setBusy(true);
+    setReplaying(true);
     simulateInBrowser(day.files.seed, day.files.date, injections)
       .then((files) => {
         setDay(indexDay({ ...files, origin: day.files.origin }));
@@ -280,7 +282,10 @@ export function App({ start }: { start?: AppStart } = {}) {
         setPlaying(wasPlaying);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setBusy(false));
+      .finally(() => {
+        setBusy(false);
+        setReplaying(false);
+      });
   };
   const faultText = (f: (typeof injected)[number]) => {
     const own = itemNameAt(day, f.facing);
@@ -644,7 +649,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                     </button>
                   ))}
                 </div>
-                {busy && <p className="note">Replaying the day with your fault…</p>}
+                {replaying && <p className="note">Replaying the day with your fault…</p>}
                 {injected.length > 0 && (
                   <>
                     <h3>Your faults</h3>
@@ -653,7 +658,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                         const seen = faultSeen(day, f, t);
                         const status =
                           seen.kind === "caught"
-                            ? `Caught by ${observer(seen.record)} at ${clock(seen.at)}, ${duration(seen.at - f.start)} later`
+                            ? `Caught by ${observer(seen.record)} at ${clock(seen.at)}, ${elapsed(seen.at - f.start)} later`
                             : seen.kind === "cleared"
                               ? `An associate put it back at ${clock(seen.at)}, before any scan saw it`
                               : seen.kind === "ahead"

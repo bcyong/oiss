@@ -46,6 +46,12 @@ export const typeName = (type: string) => type.replace(/^oiss\./, "");
 
 export const pct = (v: number) => `${Math.round(v * 100)}%`;
 export const money = (m?: { amount: number; currency: string }) => (m ? m.amount.toLocaleString("en-US", { style: "currency", currency: m.currency }) : "");
+// How long something took, rounded for a person: "45 s", "73 min", "2 h 5 min".
+export const elapsed = (s: number) => {
+  if (s < 60) return `${Math.round(s)} s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`;
+};
 export const duration = (s?: number) => (s === undefined ? "–" : s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, "0")} s`);
 export const humanize = (v: string) => v.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 
