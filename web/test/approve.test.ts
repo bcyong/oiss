@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { approveTask, type Simulate } from "../src/approve.ts";
-import { ask } from "../src/assistant/run.ts";
+import { ask, PROPOSE_NUDGE } from "../src/assistant/run.ts";
 import { ASSISTANT_CREATOR, decideTask, runTool } from "../src/assistant/tools.ts";
 import type { StepReply, StepRequest } from "../src/assistant/proxy.ts";
 import { indexDay, tasksAt } from "../src/day.ts";
@@ -95,4 +95,29 @@ test("an answer gathers the tasks the agent proposed, checked by the store's rul
   assert.equal(a.safety.question?.verdict, "safe");
   assert.equal(a.safety.answer?.verdict, "safe");
   assert.equal(files.records.tasks.length, tasksBefore, "proposing raises nothing");
+});
+
+test("an agent that recommends shelf work in words but proposes none gets one turn to propose it, and its answer stays as written", async () => {
+  const sent: StepRequest[] = [];
+  const step = async (req: StepRequest): Promise<StepReply> => {
+    sent.push(req);
+    if (req.step === "route") return { message: { content: '{"agent":"availability"}' } };
+    if (req.step === "agent" && req.messages.at(-1)?.content === PROPOSE_NUDGE)
+      return { message: { content: null, tool_calls: [{ id: "n1", type: "function", function: { name: "propose_task", arguments: JSON.stringify({ kind: "replenish", facing: FACING, reason: "Low stock" }) } }] } };
+    return { message: { content: "Fill the Aisle 3 facing first." } };
+  };
+  const a = await ask(day, T, "Which low-stock items should we fill before they run out?", step);
+  assert.equal(a.text, "Fill the Aisle 3 facing first.");
+  assert.deepEqual(a.proposals.map((p) => p.facing), [FACING]);
+  assert.equal(sent.filter((r) => r.step === "agent").length, 2);
+
+  // An agent that can't propose isn't asked to.
+  const tagSent: StepRequest[] = [];
+  const tagStep = async (req: StepRequest): Promise<StepReply> => {
+    tagSent.push(req);
+    return req.step === "route" ? { message: { content: '{"agent":"front_end"}' } } : { message: { content: "One more lane would help." } };
+  };
+  const b = await ask(day, T, "Do we need another lane open at the front end?", tagStep);
+  assert.deepEqual(b.proposals, []);
+  assert.equal(tagSent.filter((r) => r.step === "agent").length, 1);
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkAnswer, claimedActions, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
+import { checkAnswer, claimedActions, claimedProposal, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
 
 const tools = JSON.stringify({
   counts: { wrongOnShelf: 2, fixedWaitingForRead: 4 },
@@ -61,4 +61,17 @@ test("every finding for an answer, including citations the tools didn't return",
     f.map((x) => x.check),
     ["citation", "number", "cause", "name", "role", "citation"],
   );
+});
+
+test("an answer that says it proposed a task, with none proposed, is caught", () => {
+  assert.equal(claimedProposal("Proposed replenishment tasks for the Grocery team:", 0), "Proposed replenishment");
+  assert.equal(claimedProposal("I proposed one replenishment task.", 1), undefined);
+  assert.equal(claimedProposal("Nothing needs a task right now.", 0), undefined);
+});
+
+test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave aren't new numbers", () => {
+  assert.deepEqual(unsupportedNumbers("The latest 15-minute interval shows 12 in line.", '{"inLine":12}'), []);
+  assert.deepEqual(unsupportedNumbers("All other 16 out-of-stock facings need store orders.", '{"outOfStock":17}'), []);
+  assert.deepEqual(unsupportedNumbers("16 facings are out.", '{"outOfStock":17}'), ["16"]);
+  assert.deepEqual(unknownTeams("each assigned team places a store order", ""), []);
 });

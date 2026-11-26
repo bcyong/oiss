@@ -78,6 +78,10 @@ export const httpStep =
   };
 
 const MAX_TOOL_CHARS = 9000;
+
+/** The follow-up turn for an agent that recommended shelf work in words but proposed none. */
+export const PROPOSE_NUDGE =
+  "If your answer recommends shelf work that no open task covers, call propose_task for each, at most three, the most important first. If it recommends none, reply none.";
 const MAX_CALLS_PER_TURN = 4;
 
 /** A tool result as the model reads it, cut short when it is long. */
@@ -181,6 +185,19 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     for (const c of wanted) {
       onProgress?.(`Reading ${c.function.name.replaceAll("_", " ")}`);
       messages.push({ role: "tool", tool_call_id: c.id, content: run(c.function.name, parseArgs(c.function.arguments)) });
+    }
+  }
+  // Models often write "I'd propose…" without calling the tool, so an agent that can propose but didn't
+  // gets one more turn that may only propose. Its words are dropped; the answer stays as written.
+  if (text && AGENTS[agent].tools.includes("propose_task") && !tools.some((u) => u.name === "propose_task") && calls < LIMITS.maxModelCalls) {
+    calls++;
+    onProgress?.("Checking for shelf work to propose");
+    const nudge: ChatMessage[] = [...messages, { role: "assistant", content: text }, { role: "user", content: PROPOSE_NUDGE }];
+    try {
+      const { message } = await step({ step: "agent", agent, store, now, messages: nudge, final: false });
+      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) run(c.function.name, parseArgs(c.function.arguments));
+    } catch {
+      // The answer is already in hand; a failed follow-up only means no proposals.
     }
   }
   if (!text) text = "I couldn't put an answer together from the records. Try asking a narrower question.";
