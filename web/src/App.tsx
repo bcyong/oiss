@@ -332,7 +332,7 @@ export function App({ start }: { start?: AppStart } = {}) {
               <dt>Shelf label</dt>
               <dd>
                 Shows {money(label.data.tagPrice)}
-                {label.data.flags?.includes("price_mismatch") ? ", which didn't take its new price" : ", confirmed"}, at {clockOf(day, label.time)}
+                {label.data.flags?.includes("price_mismatch") ? " and hasn't taken its new price" : ", confirmed"}, at {clockOf(day, label.time)}
               </dd>
             </>
           )}
@@ -468,7 +468,7 @@ export function App({ start }: { start?: AppStart } = {}) {
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
             A synthetic grocery day{live ? " running live" : ""}, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, {live ? "simulated" : "replayed"} only from{" "}
-            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor and a mock loss prevention vendor. Tap anything on the floor plan to inspect the records behind it.
+            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor, a mock loss prevention vendor and mock electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
@@ -499,7 +499,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             ))}
             <span>
               <i className="swatch flag-swatch" />
-              Flagged by a shelf scan
+              Flagged by a shelf scan or shelf label
             </span>
             <span>
               <i className="swatch dot" />
