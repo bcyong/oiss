@@ -1405,9 +1405,11 @@ ol.chat .answer {
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+/* Fixed width, so the chart doesn't move when the speed picker becomes the Live controls. */
 .timebar .playback {
   margin: 0;
   gap: 8px;
+  width: 232px;
 }
 .timebar .timeline {
   margin: 0;
@@ -1540,6 +1542,7 @@ ol.chat .answer {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  align-content: start;
 }
 
 .drawer {
@@ -1584,7 +1587,8 @@ ol.chat .answer {
   padding: 0;
   background: transparent;
 }
-.drawer .selection + .inspector {
+.drawer .selection + .inspector,
+.drawer .inspector + .selection {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
@@ -1599,14 +1603,14 @@ ol.chat .answer {
   .app {
     height: auto;
     min-height: 0;
-    padding: 12px 12px 150px;
+    padding: 12px 12px 190px;
   }
   .stage {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
   }
-  .stage .map {
-    height: min(62vh, 520px);
+  .stage .plan {
+    height: auto;
   }
   .side {
     grid-column: 1;
@@ -1630,8 +1634,18 @@ ol.chat .answer {
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
   }
+  .timebar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .timebar .playback {
+    width: auto;
+  }
   .timebar .tl-head {
     display: none;
+  }
+  .tl-hours {
+    font-size: 10px;
   }
   .timebar .timeline svg {
     height: 30px;

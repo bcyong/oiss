@@ -129,7 +129,9 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [back, setBack] = useState<Panel | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const [keyOpen, setKeyOpen] = useState(() => typeof window === "undefined" || !window.matchMedia?.("(max-width: 960px)").matches);
+  /** The map's key starts closed so it doesn't cover the store. */
+  const [keyOpen, setKeyOpen] = useState(false);
+  const drawerBody = useRef<HTMLDivElement>(null);
   /** The store's clock now, for Live: the slider stops here. */
   const [nowClock, setNowClock] = useState<number | null>(null);
   const [streamType, setStreamType] = useState<string>("");
@@ -160,6 +162,11 @@ export function App({ start }: { start?: AppStart } = {}) {
       document.removeEventListener("keydown", esc);
     };
   }, [moreOpen]);
+
+  // A new view or record in the drawer starts at its top.
+  useEffect(() => {
+    drawerBody.current?.scrollTo?.({ top: 0 });
+  }, [panel, pinned]);
 
   // Live: keep the store's clock, so the slider can't run past now.
   useEffect(() => {
@@ -913,9 +920,10 @@ export function App({ start }: { start?: AppStart } = {}) {
                   ×
                 </button>
               </div>
-              <div className="drawer-body">
+              <div className="drawer-body" ref={drawerBody}>
                 {panel === "detail" && (
                   <>
+                    {pinnedRecord && <Inspector key={pinnedRecord.id} day={day} record={pinnedRecord} onInspect={inspect} following={false} onClose={selectionCard ? () => setPinned(null) : undefined} t={t} />}
                     {selectionCard && (
                       <div className="selection">
                         {selectionCard}
@@ -956,7 +964,7 @@ export function App({ start }: { start?: AppStart } = {}) {
               )}
                       </div>
                     )}
-                    {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord && selectionCard ? () => setPinned(null) : undefined} t={t} />}
+                    {!pinnedRecord && following && <Inspector key={following.id} day={day} record={following} onInspect={inspect} following t={t} />}
                   </>
                 )}
                 {panel === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} />}
