@@ -66,9 +66,7 @@ export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose
 
   useLayoutEffect(() => {
     const c = card.current;
-    if (!c) return;
-    setCardSize({ w: c.offsetWidth, h: c.offsetHeight });
-    c.focus({ preventScroll: true });
+    if (c) setCardSize({ w: c.offsetWidth, h: c.offsetHeight });
   }, [i]);
 
   const close = (story = false) => {
@@ -91,6 +89,11 @@ export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose
   const pad = 6;
   const ring: CSSProperties | undefined = box ? { top: box.top - pad, left: box.left - pad, width: box.width + 2 * pad, height: box.height + 2 * pad } : undefined;
   const waiting = !box && !gaveUp;
+
+  // Focus the card once it shows, so keys and screen readers land on it. A hidden card can't take focus.
+  useEffect(() => {
+    if (!waiting) card.current?.focus({ preventScroll: true });
+  }, [i, waiting]);
   const cardStyle: CSSProperties = box
     ? place(box, cardSize, view.w, view.h)
     : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", visibility: waiting ? "hidden" : undefined };
