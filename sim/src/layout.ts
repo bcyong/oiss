@@ -11,6 +11,7 @@
  *   south wall:  meat and seafood                                               backroom behind
  */
 import { type Point, type Polygon, rect } from "./geometry.ts";
+import { MAIN_STREET, type StoreProfile } from "./stores.ts";
 
 export type ZoneKind =
   | "aisle" | "endcap" | "front_end" | "self_checkout" | "entrance" | "exit" | "produce" | "deli"
@@ -133,7 +134,8 @@ const AISLE_NAMES = ["breakfast and coffee", "snacks and candy", "beverages", "c
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-export function buildLayout(): StoreLayoutModel {
+/** The prototype floor plan, for one store of the district. */
+export function buildLayout(store: StoreProfile = MAIN_STREET): StoreLayoutModel {
   const zones: Zone[] = [];
   const fixtures: Fixture[] = [];
   const cameras: Camera[] = [];
@@ -247,7 +249,7 @@ export function buildLayout(): StoreLayoutModel {
   const walk = buildWalkGraph();
 
   return {
-    store: { id: "demo-001", storeNumber: "0001", banner: "Demo Grocery", name: "Demo Grocery, Main Street", timezone: "America/Los_Angeles", width: W, depth: D },
+    store: { id: store.id, storeNumber: store.storeNumber, banner: "Demo Grocery", name: store.name, timezone: "America/Los_Angeles", width: W, depth: D },
     planogramVersion: "2026-11-A",
     zones,
     fixtures,

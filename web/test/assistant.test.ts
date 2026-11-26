@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runDay } from "@oiss/sim";
-import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, TOOLS } from "../src/assistant/agents.ts";
+import { DISTRICT_PEERS, runDay } from "@oiss/sim";
+import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, startTools, TOOLS } from "../src/assistant/agents.ts";
 import { BLOCKED_ANSWER, DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, parseSafety, ROUTER_MODEL, SAFETY_FALLBACK_MODEL, SAFETY_MODEL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
 import { ask, citations, clean, dropToolCitations } from "../src/assistant/run.ts";
-import { idsIn, runTool } from "../src/assistant/tools.ts";
-import { incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
+import { idsIn, runTool, storeCard, type PeerStore } from "../src/assistant/tools.ts";
+import { disagreementsUpTo, groupDisagreements, incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
 import type { DayFiles } from "../src/load.ts";
+import { simulatePeerStore } from "../src/peers.ts";
 
 // The golden day, built the way the page's worker builds a day.
 const sim = runDay({ seed: 20261117, date: "2026-11-17" });
@@ -21,7 +22,7 @@ test("every agent's tools and starting tools are defined", () => {
     const a = AGENTS[id];
     assert.ok(a.tools.length > 0);
     for (const name of a.tools) assert.ok(TOOLS[name], `${id} has ${name}`);
-    for (const s of a.start) assert.ok(a.tools.includes(s.name), `${id} starts with its own ${s.name}`);
+    for (const s of [...a.start, ...(a.startWhen ?? []).flatMap((w) => w.start)]) assert.ok(a.tools.includes(s.name), `${id} starts with its own ${s.name}`);
     assert.match(agentPrompt(id, "Demo Market", "6:00 PM on 2026-11-17"), /6:00 PM/);
   }
   assert.match(routerPrompt(), /loss_prevention/);
@@ -157,6 +158,80 @@ test("the router's reply picks the agent, and keywords pick one when it can't be
   assert.equal(parseRoute("", "How long is the wait at checkout?"), "front_end");
   assert.equal(parseRoute("", "Any ticket switching today?"), "loss_prevention");
   assert.equal(parseRoute("nonsense", "What's empty in dairy?"), "availability");
+  assert.equal(parseRoute('{"agent":"store_insights"}', "anything"), "store_insights");
+  assert.equal(parseRoute("", "Where do our vendors disagree about a shelf?"), "store_insights");
+  assert.equal(parseRoute("", "How do we compare with the rest of the district?"), "store_insights");
+  // Disagreements moved from the price and label agent to store insights.
+  assert.doesNotMatch(AGENTS.price_and_label.handles, /disagree/);
+  assert.match(routerPrompt(), /store_insights: .*disagree/);
+});
+
+test("the store insights agent starts from the comparison for a question about other stores", () => {
+  assert.deepEqual(startTools("store_insights", "How does this store compare with the district?").map((s) => s.name), ["compare_stores"]);
+  assert.deepEqual(startTools("store_insights", "Where do our vendors disagree about a shelf?").map((s) => s.name), ["vendor_disagreements"]);
+  assert.deepEqual(startTools("availability", "Compare dairy and produce"), AGENTS.availability.start);
+});
+
+test("vendor disagreements match the day's own disagreements and cite both sides", () => {
+  const t = 23 * 3600;
+  const r = tool("store_insights", "vendor_disagreements", { limit: 25 }, t);
+  const groups = groupDisagreements(disagreementsUpTo(day, t));
+  assert.ok(groups.length > 0, "the golden day has disagreements");
+  assert.equal(r.counts.standing + r.counts.settled, groups.length);
+  assert.equal(Object.values(r.counts.byKind as Record<string, number>).reduce((a, b) => a + b, 0), groups.length);
+  const ids = idsIn(r);
+  for (const d of r.disagreements) {
+    assert.ok(ids.has(d.robot.id) && ids.has(d.other.id));
+    assert.ok(day.byId.has(d.robot.id) && day.byId.has(d.other.id));
+    if (d.about === "shelf tag price") assert.ok(["the robot's read", "the electronic shelf labels", "neither"].includes(d.matchesRegisterPrice));
+  }
+  // Still disagreeing comes before settled.
+  const standing = r.disagreements.map((d: { standing?: boolean; status: string }) => d.status.startsWith("Still"));
+  assert.deepEqual(standing, [...standing].sort((a, b) => Number(b) - Number(a)));
+  const prices = tool("store_insights", "vendor_disagreements", { kind: "price" }, t);
+  for (const d of prices.disagreements) assert.equal(d.about, "shelf tag price");
+  assert.match(tool("price_and_label", "vendor_disagreements").error, /no tool/);
+});
+
+test("compare stores ranks this store against the district's other stores at the same time", async () => {
+  const peers: PeerStore[] = DISTRICT_PEERS.slice(0, 2).map((p) => simulatePeerStore(p.id, "2026-11-17"));
+  for (const [i, p] of peers.entries()) {
+    assert.equal(p.id, DISTRICT_PEERS[i]!.id);
+    assert.equal(p.cards[0]!.storeNumber, DISTRICT_PEERS[i]!.storeNumber);
+  }
+  const other = runDay({ seed: 1, date: "2026-11-17", store: DISTRICT_PEERS[0] });
+  assert.ok([...other.records.shelfObservations, ...other.records.zoneMetrics, ...other.records.incidents].every((r) => r.source.startsWith(`urn:oiss:${DISTRICT_PEERS[0]!.id}:`)), "another store's records carry its own store id");
+  assert.match(tool("store_insights", "compare_stores").error, /aren't available/);
+  const r = runTool(day, T, "store_insights", "compare_stores", {}, { peers }) as Record<string, any>;
+  assert.equal(r.stores.length, 3);
+  assert.equal(r.stores[0].thisStore, true);
+  assert.equal(r.stores[0].name, "Demo Grocery, Main Street");
+  assert.deepEqual(r.stores.slice(1).map((c: { name: string }) => c.name), peers.map((p) => p.name));
+  for (const c of r.stores.slice(1)) assert.equal(c.records, undefined, "another store's records stay at that store");
+  for (const id of idsIn(r)) assert.ok(day.byId.has(id), `${id} is one of this store's records`);
+  assert.match(r.ranks["on-shelf availability"].thisStore, /^(\d of 3|tied with every store)/);
+  const own = storeCard(day, T);
+  assert.equal(own.outOfStock, statusesAt(day, T).filter((x) => x === "out_of_stock").length);
+  // The stores differ in how they run, so they don't all come out the same.
+  assert.ok(new Set(r.stores.map((c: { shoppersThroughCheckout: number }) => c.shoppersThroughCheckout)).size > 1);
+});
+
+test("a comparison question waits for the other stores before the agent reads them", async () => {
+  const sent: StepRequest[] = [];
+  const step = async (req: StepRequest): Promise<StepReply> => {
+    sent.push(req);
+    if (req.step === "route") return { message: { content: '{"agent":"store_insights"}' } };
+    return { message: { content: "Main Street ranks well." } };
+  };
+  let loads = 0;
+  const peers = async () => {
+    loads++;
+    return [] as PeerStore[];
+  };
+  const a = await ask(day, T, "How do we compare with the district?", step, undefined, peers);
+  assert.equal(a.agent, "store_insights");
+  assert.deepEqual(a.tools.map((u) => u.name), ["compare_stores"]);
+  assert.equal(loads, 1);
 });
 
 test("answers keep only cited ids and drop shown reasoning", () => {

@@ -280,9 +280,9 @@ export function observeDay(g: Ground, opts: { shelvesOnly?: boolean } = {}): Obs
       }
       captures.push({ capture_id: captureId, ts: vendorTime(t), section: sectionOf.get(pos.fixture)!, position: pos.sequence, shelves });
     });
-    missions.push({ mission_id: missionId, site: "DG0001", robot: "MVA-R1", started_at: vendorTime(start), ended_at: captures[captures.length - 1]!.ts, captures, mock: true });
+    missions.push({ mission_id: missionId, site: `DG${layout.store.storeNumber}`, robot: "MVA-R1", started_at: vendorTime(start), ended_at: captures[captures.length - 1]!.ts, captures, mock: true });
   }
-  const scans = adaptShelfScans(missions, demo001ShelfScanConfig(storeLayout.data as unknown as LayoutData));
+  const scans = adaptShelfScans(missions, demo001ShelfScanConfig(storeLayout.data as unknown as LayoutData, layout.store));
   if (scans.rejected.length) throw new Error(`the shelf-scan adapter rejected ${scans.rejected.length} reads: ${scans.rejected[0]!.reason}`);
   shelfObservations.push(...(scans.observations as unknown as OissRecord[]));
   evidence.push(...(scans.evidence as unknown as OissRecord[]));
@@ -333,7 +333,7 @@ export function observeDay(g: Ground, opts: { shelvesOnly?: boolean } = {}): Obs
   }
   // ---- ShelfObservation: electronic shelf label price checks, through the mock-esl adapter ----
   const labelEvents = eslEvents(g);
-  const labels = adaptEslEvents(labelEvents, demo001EslConfig(storeLayout.data as unknown as LayoutData));
+  const labels = adaptEslEvents(labelEvents, demo001EslConfig(storeLayout.data as unknown as LayoutData, layout.store));
   if (labels.rejected.length) throw new Error(`the shelf label adapter rejected ${labels.rejected.length} reports: ${labels.rejected[0]!.reason}`);
   shelfObservations.push(...(labels.observations as unknown as OissRecord[]));
 
@@ -431,7 +431,7 @@ export function observeDay(g: Ground, opts: { shelvesOnly?: boolean } = {}): Obs
     });
   }
   // Vendor C sends a CSV; the mock-traffic-csv adapter turns it into ZoneMetric records.
-  const traffic = adaptTraffic(trafficRows, demo001TrafficConfig());
+  const traffic = adaptTraffic(trafficRows, demo001TrafficConfig(layout.store));
   if (traffic.rejected.length) throw new Error(`the traffic adapter rejected ${traffic.rejected.length} rows: ${traffic.rejected[0]!.reason}`);
   const zoneMetrics = traffic.metrics as unknown as OissRecord[];
   zoneMetrics.sort(byTime);

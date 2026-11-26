@@ -5,9 +5,9 @@
  * from these definitions, so the key can only be used for this assistant.
  */
 
-export type AgentId = "availability" | "price_and_label" | "front_end" | "loss_prevention";
+export type AgentId = "availability" | "price_and_label" | "front_end" | "loss_prevention" | "store_insights";
 
-export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record" | "propose_task";
+export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record" | "vendor_disagreements" | "compare_stores" | "propose_task";
 
 export interface ToolSpec {
   name: ToolName;
@@ -25,6 +25,10 @@ export interface AgentSpec {
   tools: ToolName[];
   /** Tools the page runs before the first model call, so every answer starts from the records. */
   start: { name: ToolName; args: Record<string, unknown> }[];
+  /** Starting tools for questions that match a pattern, in place of start. */
+  startWhen?: { pattern: RegExp; start: { name: ToolName; args: Record<string, unknown> }[] }[];
+  /** Instructions only this agent needs. */
+  rules?: string;
 }
 
 const limit = { type: "integer", minimum: 1, maximum: 25, description: "Most rows to return. Default 10." };
@@ -106,6 +110,22 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
       additionalProperties: false,
     },
   },
+  vendor_disagreements: {
+    name: "vendor_disagreements",
+    description:
+      "Facings where two vendors' systems watching the same shelf disagree: the shelf-scanning robot against the shelf cameras about availability or a misplaced item, or against the electronic shelf labels about the tag price. Those still disagreeing first, then those the robot's next pass settled. Each row has the item, location, what each source said and when, the record ids, since when, on how many robot passes, for a tag price whose read matches the register price, and the team the store routes that shelf work to. Counts by kind and by pair of sources cover every disagreement, not only the rows shown.",
+    parameters: {
+      type: "object",
+      properties: { kind: { type: "string", enum: ["availability", "misplaced_item", "price"], description: "Only this kind. Default all." }, limit },
+      additionalProperties: false,
+    },
+  },
+  compare_stores: {
+    name: "compare_stores",
+    description:
+      "This store against the other stores in its district at the same time of day: on-shelf availability, out-of-stock and low-stock facings, open replenishment tasks, replenishments cancelled for no backroom stock, shelf tasks confirmed, shelf tags wrong on the shelf, shoppers through checkout so far, checkout waits and open lanes, checkout exceptions and how many aren't reviewed, and facings where two vendors still disagree. Ranks this store on each, with the best and worst store and the district average.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
   get_record: {
     name: "get_record",
     description: "One OISS record by id, as it arrived, for details the other tools leave out. Restricted records (shopper paths, evidence) show only their envelope.",
@@ -125,7 +145,7 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
   price_and_label: {
     id: "price_and_label",
     name: "Price and label agent",
-    handles: "Shelf tag prices, electronic shelf labels, sale signs left up, price mismatches and disagreements between the robot and the labels.",
+    handles: "Shelf tag prices, electronic shelf labels, sale signs left up and price mismatches.",
     role: "You find shelf tags that don't match the register price and say where each fix stands, telling tags still wrong on the shelf apart from fixes that wait for the robot's next read.",
     tools: ["shelf_tag_issues", "find_item", "store_tasks", "get_record", "propose_task"],
     start: [{ name: "shelf_tag_issues", args: { limit: 10 } }],
@@ -145,6 +165,17 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
     role: "You summarize checkout exceptions for a person to review. You never accuse a shopper or an associate, and nothing you say acts toward one.",
     tools: ["checkout_incidents", "store_tasks", "find_item", "get_record"],
     start: [{ name: "checkout_incidents", args: { limit: 10 } }],
+  },
+  store_insights: {
+    id: "store_insights",
+    name: "Store insights agent",
+    handles: "Where two vendors' systems disagree about the same shelf (the robot, the shelf cameras, the shelf labels), which source to trust, and how this store compares with the other stores in its district or the district average.",
+    role: "You look across sources and stores: you find where two vendors' systems disagree about the same shelf and say which facings someone should check, and you compare this store with the other stores in its district.",
+    tools: ["vendor_disagreements", "compare_stores", "find_item", "store_summary", "get_record"],
+    start: [{ name: "vendor_disagreements", args: { limit: 10 } }],
+    startWhen: [{ pattern: /\b(compare|comparison|district|other stores?|stores|rank\w*|average|peers?|benchmark|best|worst)\b/i, start: [{ name: "compare_stores", args: {} }] }],
+    rules:
+      "Other stores' figures come from their own records, which stay at those stores: cite this store's record ids, and for another store's figure name the store instead. Never say why one store differs from another unless a record says why; say what the figures point to and who could find out.",
   },
 };
 
@@ -178,6 +209,7 @@ export function agentPrompt(id: AgentId, store: string, now: string): string {
     "Say why something happened only when a record says why, such as a task's outcome. Otherwise say the records don't say, and name who could find out: the team in the row's assignedTo, or its routedTo when it has no task yet.",
     "Name people, teams, roles, systems and vendors only as your tools return them; never add one of your own, such as a lead, manager, supervisor or portal.",
     "If your tools can't answer, say so plainly.",
+    ...(a.rules ? [a.rules] : []),
   ].join("\n");
 }
 
@@ -188,9 +220,10 @@ export function toolsFor(id: AgentId): { type: "function"; function: ToolSpec }[
 
 /** Picks an agent from the router's reply, or by keyword when the reply can't be read. */
 export function parseRoute(reply: string, question: string): AgentId {
-  const m = /"agent"\s*:\s*"([a-z_]+)"/.exec(reply) ?? /\b(availability|price_and_label|front_end|loss_prevention)\b/.exec(reply);
+  const m = /"agent"\s*:\s*"([a-z_]+)"/.exec(reply) ?? /\b(availability|price_and_label|front_end|loss_prevention|store_insights)\b/.exec(reply);
   if (m && (AGENT_IDS as string[]).includes(m[1]!)) return m[1] as AgentId;
   const q = question.toLowerCase();
+  if (/(disagree|conflict|vendors\b|sources? (say|report)|other stores?|district|compare|benchmark|rank)/.test(q)) return "store_insights";
   if (/(price|tag|label|sign|\$)/.test(q)) return "price_and_label";
   if (/(line|queue|wait|lane|checkout|cashier|register|traffic|busy|rush)/.test(q) && !/(exception|scan|theft|shrink|incident|switch)/.test(q)) return "front_end";
   if (/(exception|non-scan|scan|theft|shrink|incident|switch|sweetheart|fraud|loss)/.test(q)) return "loss_prevention";
@@ -204,7 +237,15 @@ export const SAMPLE_QUESTIONS = [
   "Are any shelf tags showing the wrong price?",
   "Do we need another lane open at the front end?",
   "Which checkout exceptions need review?",
+  "Where do our vendors disagree about a shelf?",
+  "How does this store compare with the rest of the district?",
 ];
+
+/** The tools the page runs before an agent's first model call, for this question. */
+export function startTools(id: AgentId, question: string): AgentSpec["start"] {
+  const a = AGENTS[id];
+  return a.startWhen?.find((w) => w.pattern.test(question))?.start ?? a.start;
+}
 
 /** Limits the server function enforces on every request. */
 export const LIMITS = {

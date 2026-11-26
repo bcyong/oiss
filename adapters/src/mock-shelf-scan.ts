@@ -100,12 +100,15 @@ export const DEMO_001_SECTIONS: Record<string, string> = {
 };
 
 /** The mapping the retailer keeps for store demo-001, given its StoreLayout. */
-export function demo001ShelfScanConfig(layout: LayoutData): ShelfScanAdapterConfig {
+/** The demo's own store. Every store of the district keeps the same codes, since all are built to one prototype. */
+const DEMO_001 = { id: "demo-001", storeNumber: "0001" };
+
+export function demo001ShelfScanConfig(layout: LayoutData, store: { id: string; storeNumber: string } = DEMO_001): ShelfScanAdapterConfig {
   return {
-    store: "demo-001",
+    store: store.id,
     timezone: "America/Los_Angeles",
-    site: "DG0001",
-    robots: { "MVA-R1": "urn:oiss:demo-001:mock-vendor-a:robot-1" },
+    site: `DG${store.storeNumber}`,
+    robots: { "MVA-R1": `urn:oiss:${store.id}:mock-vendor-a:robot-1` },
     sections: DEMO_001_SECTIONS,
     layout,
     captureSeconds: 4,

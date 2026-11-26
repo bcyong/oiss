@@ -10,6 +10,7 @@ import { type Point, dist } from "./geometry.ts";
 import { ALLEY_NORTH_Y, type Department, type Lane, route, routeLength, type Slot, type StoreLayoutModel, buildLayout } from "./layout.ts";
 import { Rng } from "./rng.ts";
 import { hours, type StoreClock, storeClock } from "./time.ts";
+import { MAIN_STREET, type StoreProfile } from "./stores.ts";
 
 export interface DayConfig {
   seed: number;
@@ -31,6 +32,8 @@ export interface DayConfig {
    * proposed. The store's task system raises each at its time and associates work it like any other.
    */
   requestedTasks?: RequestedTask[];
+  /** Which store of the district to simulate. Default Main Street, the demo's own store. */
+  store?: StoreProfile;
 }
 
 /** A shelf task someone other than the task system asked for, at a set time and facing. */
@@ -171,12 +174,12 @@ const MIN_LANES: Record<number, number> = { 7: 2, 8: 2, 9: 3, 10: 3, 11: 4, 12: 
 const WALK_SPEED: [number, number] = [0.6, 1.0];
 const QUEUE_STEP = 0.8;
 
-const DEFAULT_ROUNDS = [hours(11), hours(15), hours(19)];
 
 export function simulateDay(input: DayConfig): Ground {
-  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], workOrders: [], requestedTasks: [], ...input };
+  const store = input.store ?? MAIN_STREET;
+  const config: Required<DayConfig> = { shoppers: store.shoppers, recoveryRounds: store.recoveryRounds, injections: [], workOrders: [], requestedTasks: [], ...input, store };
   const root = new Rng(config.seed);
-  const layout = buildLayout();
+  const layout = buildLayout(store);
   const clock = storeClock(config.date, layout.store.timezone);
   const catalog = buildCatalog(layout, root);
   const meanBasket = MISSIONS.reduce((s, m) => s + m.share * ((m.basket[0] + m.basket[1]) / 2), 0);
@@ -194,7 +197,7 @@ export function simulateDay(input: DayConfig): Ground {
   const shelfHistory = new Map<string, [number, number][]>();
   for (const pos of catalog.planogram) {
     const item = catalog.byGtin.get(pos.gtin)!;
-    const supplyIssue = invRng.chance(0.05);
+    const supplyIssue = invRng.chance(store.supplyIssueRate);
     const start = Math.round(pos.capacity * (supplyIssue ? invRng.uniform(0.15, 0.5) : invRng.uniform(0.8, 1.0)));
     units.set(pos.facing, start);
     backroom.set(pos.facing, supplyIssue ? 0 : item.casePack * invRng.int(1, 4));
@@ -514,7 +517,7 @@ export function simulateDay(input: DayConfig): Ground {
   };
   const leadCheck = () => {
     const hour = Math.floor(sched.now / 3600);
-    const min = MIN_LANES[hour] ?? 1;
+    const min = Math.max(1, Math.min(staffed.length, (MIN_LANES[hour] ?? 1) + store.laneOffset));
     const open = staffed.filter((l) => l.open && !l.closing);
     const waiting = open.reduce((n, l) => n + l.waiting.length, 0);
     if (open.length < min) {

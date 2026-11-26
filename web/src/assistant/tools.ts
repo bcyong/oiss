@@ -1,4 +1,4 @@
-import { incidentsUpTo, lastAtOrBefore, latestObservation, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, taskAt, tasksAt, zoneMetricAt, clock, secondsOf, type FacingView, type IndexedDay, type TaskView } from "../day.ts";
+import { disagreementsUpTo, groupDisagreements, incidentsUpTo, lastAtOrBefore, latestObservation, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, taskAt, tasksAt, zoneMetricAt, clock, secondsOf, type Disagreement, type FacingView, type IndexedDay, type TaskView } from "../day.ts";
 import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, observer, STATUS_LABEL, TASK_KIND, TASK_OUTCOME, TASK_STATE, zoneName } from "../describe.ts";
 import { OPEN_LANE_WAIT_SECONDS, routeTask } from "@oiss/sim";
 import type { AnyRecord, IncidentData, OissRecord, ShelfObservationData, TaskData } from "../oiss.ts";
@@ -602,7 +602,211 @@ function getRecord(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
   return { id: r.id, type: r.type, time: r.time, source: r.source, subject: r.subject, privacy: r.oissprivacy, provenance, data };
 }
 
-const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs) => ToolResult> = {
+// ---- store insights ---------------------------------------------------------------
+
+const DISAGREEMENT_KINDS = ["availability", "misplaced_item", "price"] as const;
+const DISAGREEMENT_LABEL: Record<Disagreement["kind"], string> = { availability: "availability", misplaced_item: "misplaced item", price: "shelf tag price" };
+
+/** What each of two sources said about a facing, in a store team's words. */
+function saidBy(d: Disagreement, r: OissRecord<ShelfObservationData>): string {
+  if (d.kind === "price") return r.data.tagPrice ? `tag reads ${money(r.data.tagPrice)}` : "no tag price";
+  if (d.kind === "misplaced_item") return r.data.flags?.includes("misplaced_item") ? "misplaced item on the facing" : "no misplaced item";
+  return r.data.status ? STATUS_LABEL[r.data.status].toLowerCase() : "no status";
+}
+
+/** Which kind of source the other side of a disagreement is, as a vendor category. */
+const sourceKind = (r: OissRecord<ShelfObservationData>) => (r.data.location.camera ? "shelf cameras" : r.source.endsWith(LABEL_SOURCE_SUFFIX) ? "electronic shelf labels" : observer(r));
+
+function vendorDisagreements(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
+  const n = int(args.limit, 10);
+  const kind = (DISAGREEMENT_KINDS as readonly string[]).includes(str(args.kind)) ? (str(args.kind) as Disagreement["kind"]) : undefined;
+  const groups = groupDisagreements(disagreementsUpTo(day, t)).filter((g) => !kind || g.latest.kind === kind);
+  const counts = { standing: 0, settled: 0 };
+  const byKind: Record<string, number> = {};
+  const byPair: Record<string, number> = {};
+  const rows = groups.map((g) => {
+    const d = g.latest;
+    const v = day.facings[d.facing]!;
+    // A disagreement stands until the robot passes the facing again and no longer disagrees about it.
+    const lastRobot = lastFrom(v, t, (r) => r.source.endsWith(ROBOT_SOURCE_SUFFIX));
+    const standing = !lastRobot || lastRobot.r.id === d.robot.id;
+    counts[standing ? "standing" : "settled"]++;
+    byKind[DISAGREEMENT_LABEL[d.kind]] = (byKind[DISAGREEMENT_LABEL[d.kind]] ?? 0) + 1;
+    const pair = `shelf-scanning robot vs ${sourceKind(d.other)}`;
+    byPair[pair] = (byPair[pair] ?? 0) + 1;
+    const item = itemOf(day, v);
+    const register = day.items.get(v.facing.gtin)?.price.amount;
+    const matches = (r: OissRecord<ShelfObservationData>) => r.data.tagPrice?.amount === register;
+    return {
+      standing,
+      row: {
+        about: DISAGREEMENT_LABEL[d.kind],
+        ...item,
+        ...where(day, v),
+        robot: { says: saidBy(d, d.robot), at: clock(secondsOf(day, d.robot.time)), id: d.robot.id },
+        other: { source: sourceKind(d.other), says: saidBy(d, d.other), at: clock(secondsOf(day, d.other.time)), id: d.other.id },
+        matchesRegisterPrice: d.kind === "price" ? (matches(d.robot) ? "the robot's read" : matches(d.other) ? `the ${sourceKind(d.other)}` : "neither") : undefined,
+        since: clock(g.first),
+        robotPasses: g.passes,
+        status: standing ? "Still disagreeing: the robot hasn't passed the facing again since." : `Settled: the robot's later pass at ${clock(lastRobot!.at)} no longer disagrees.`,
+        settledBy: standing ? undefined : lastRobot!.r.id,
+        routedTo: routedTo(d.kind === "price" ? "fix_shelf_tag" : d.kind === "misplaced_item" ? "go_back" : "replenish", item.department),
+      },
+    };
+  });
+  rows.sort((a, b) => Number(b.standing) - Number(a.standing));
+  const what = kind ? `${DISAGREEMENT_LABEL[kind]} disagreements` : "vendor disagreements";
+  return {
+    answer: groups.length ? `${plural(counts.standing, "facing still has", "facings still have")} ${kind ? `a ${DISAGREEMENT_LABEL[kind]} disagreement` : "a disagreement between two sources"}; ${counts.settled} more settled on the robot's next pass.` : `No ${what} so far today.`,
+    counts: { ...counts, byKind, bySources: byPair },
+    disagreements: rows.slice(0, n).map((r) => r.row),
+    note: "Each pass of the shelf-scanning robot is checked against the latest report from the shelf cameras and the electronic shelf labels for the same facing; every vendor reports the same facing ids, so the check is a simple comparison. The records don't say which source is right, except for a shelf tag price, where matchesRegisterPrice says whose read matches the item master. Someone should look at a facing that is still disagreeing; routedTo is the team the store routes that kind of shelf work to.",
+  };
+}
+
+/** One store's operating figures at time t, for comparing stores. */
+export interface StoreCard {
+  storeNumber: string;
+  name: string;
+  /** Share of facings read so far whose latest read isn't out of stock, in percent. */
+  onShelfAvailabilityPct: number;
+  outOfStock: number;
+  lowStock: number;
+  openReplenishmentTasks: number;
+  replenishmentsCancelledNoBackroomStock: number;
+  shelfTasksConfirmed: number;
+  shelfTagsWrongOnShelf: number;
+  /** Shoppers counted through the staffed lanes and self-checkout so far. */
+  shoppersThroughCheckout: number;
+  avgWaitSecondsSoFar: number;
+  longestIntervalWaitSeconds: number;
+  latestAvgWaitSeconds?: number;
+  staffedLanesOpen?: number;
+  staffedLanes: number;
+  checkoutExceptions: number;
+  checkoutExceptionsNotReviewed: number;
+  vendorDisagreementsStanding: number;
+  /** Record ids behind the figures, for the store whose records are on the page. */
+  records?: Record<string, string>;
+}
+
+export function storeCard(day: IndexedDay, t: number): StoreCard {
+  let outOfStock = 0;
+  let lowStock = 0;
+  let read = 0;
+  for (const v of day.facings) {
+    const st = latestObservation(v, t)?.data.status;
+    if (!st || st === "unknown") continue;
+    read++;
+    if (st === "out_of_stock") outOfStock++;
+    else if (st === "low_stock") lowStock++;
+  }
+  let openReplenishment = 0;
+  let cancelledNoStock = 0;
+  let confirmed = 0;
+  for (const { latest } of tasksAt(day, t)) {
+    const d = latest.data;
+    if (d.kind === "replenish" && OPEN_STATES.has(d.state)) openReplenishment++;
+    if (d.kind === "replenish" && d.state === "cancelled" && d.resolution?.outcome === "no_backroom_stock") cancelledNoStock++;
+    if ((d.kind === "replenish" || d.kind === "go_back" || d.kind === "fix_shelf_tag") && d.state === "verified") confirmed++;
+  }
+  let tagsWrong = 0;
+  for (const v of day.facings) if (tagStatus(day, v, t)?.bucket === "wrongOnShelf") tagsWrong++;
+  const series = (zone: string) => {
+    const s = day.zoneSeries.get(zone);
+    return s ? s.recs.slice(0, lastAtOrBefore(s.end, t) + 1) : [];
+  };
+  const front = series("front-end");
+  const sco = series("self-checkout");
+  const waits = front.map((r) => r.data.metrics.avgWaitSeconds ?? 0);
+  const incidents = incidentsUpTo(day.incidents, t);
+  const disagreements = groupDisagreements(disagreementsUpTo(day, t)).filter((g) => lastFrom(day.facings[g.latest.facing]!, t, (r) => r.source.endsWith(ROBOT_SOURCE_SUFFIX))?.r.id === g.latest.robot.id).length;
+  const latest = front.at(-1);
+  return {
+    storeNumber: day.layout.store.storeNumber,
+    name: day.layout.store.name,
+    onShelfAvailabilityPct: read ? Math.round((1000 * (read - outOfStock)) / read) / 10 : 100,
+    outOfStock,
+    lowStock,
+    openReplenishmentTasks: openReplenishment,
+    replenishmentsCancelledNoBackroomStock: cancelledNoStock,
+    shelfTasksConfirmed: confirmed,
+    shelfTagsWrongOnShelf: tagsWrong,
+    shoppersThroughCheckout: [...front, ...sco].reduce((n, r) => n + (r.data.metrics.traffic ?? 0), 0),
+    avgWaitSecondsSoFar: waits.length ? Math.round(waits.reduce((a, b) => a + b, 0) / waits.length) : 0,
+    longestIntervalWaitSeconds: waits.length ? Math.max(...waits) : 0,
+    latestAvgWaitSeconds: latest?.data.metrics.avgWaitSeconds,
+    staffedLanesOpen: latest?.data.metrics.openLanes,
+    staffedLanes: staffedLaneCount(day),
+    checkoutExceptions: incidents.length,
+    checkoutExceptionsNotReviewed: incidents.filter((r) => reviewOf(day, r, t).bucket === "notReviewed").length,
+    vendorDisagreementsStanding: disagreements,
+  };
+}
+
+/** Another store of the district: its figures every few minutes through its day, worked out where its records are. */
+export interface PeerStore {
+  id: string;
+  storeNumber: string;
+  name: string;
+  /** Times of the cards, in seconds since store midnight, ascending. */
+  times: number[];
+  cards: StoreCard[];
+}
+
+/** Whether a higher figure is better, for the figures stores are ranked on. */
+const RANKED: [keyof StoreCard, "higher" | "lower", string][] = [
+  ["onShelfAvailabilityPct", "higher", "on-shelf availability"],
+  ["outOfStock", "lower", "out-of-stock facings"],
+  ["shelfTagsWrongOnShelf", "lower", "shelf tags wrong on the shelf"],
+  ["avgWaitSecondsSoFar", "lower", "average checkout wait so far"],
+  ["checkoutExceptionsNotReviewed", "lower", "checkout exceptions not yet reviewed"],
+  ["vendorDisagreementsStanding", "lower", "facings where two vendors still disagree"],
+];
+
+function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefined): ToolResult {
+  if (!peers?.length) return { error: "The other stores' figures aren't available right now, so this store can't be compared with them." };
+  const own = storeCard(day, t);
+  const front = zoneMetricAt(day, "front-end", t);
+  const sco = zoneMetricAt(day, "self-checkout", t);
+  const records: Record<string, string> = {};
+  if (front) records.latestFrontEndMetric = front.id;
+  if (sco) records.latestSelfCheckoutMetric = sco.id;
+  const gaps = day.facings.map((v) => latestObservation(v, t)).filter((r) => r?.data.status === "out_of_stock");
+  if (gaps[0]) records.sampleOutOfStockRead = gaps[0].id;
+  const stores: (StoreCard & { thisStore?: true; asOf: string })[] = [{ ...own, thisStore: true, asOf: clock(t), records }];
+  for (const p of peers) {
+    const i = lastAtOrBefore(p.times, t);
+    if (i >= 0) stores.push({ ...p.cards[i]!, asOf: clock(p.times[i]!) });
+  }
+  const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number }> = {};
+  for (const [key, better, label] of RANKED) {
+    const value = (c: StoreCard) => c[key] as number;
+    const beats = (x: number, y: number) => (better === "higher" ? x > y : x < y);
+    const mine = value(stores[0]!);
+    const place = 1 + stores.filter((c) => beats(value(c), mine)).length;
+    const tied = stores.filter((c) => value(c) === mine).length > 1;
+    const values = stores.map(value);
+    const top = better === "higher" ? Math.max(...values) : Math.min(...values);
+    const bottom = better === "higher" ? Math.min(...values) : Math.max(...values);
+    const named = (v: number) => `${stores.filter((c) => value(c) === v).map((c) => c.name).join("; ")} (${v})`;
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10 };
+  }
+  return {
+    asOf: clock(t),
+    stores,
+    ranks,
+    note: `This store is ${own.name}; the others are the district's stores, built to the same prototype floor plan and planogram, so each figure compares like for like. Every figure comes from each store's own OISS records at the same time of day (each store's asOf). Only this store's records are on this page: cite its ids from records, and name the store for any other store's figure instead of citing an id. onShelfAvailabilityPct is the share of facings read so far whose latest read isn't out of stock. shoppersThroughCheckout counts shoppers through the staffed lanes and self-checkout so far. avgWaitSecondsSoFar averages the staffed lanes' 15-minute average waits since opening. The records don't say why one store differs from another; say so, and name what the figures point to.`,
+  };
+}
+
+/** What some tools need beyond the day: the other stores of the district, for compare_stores. */
+export interface ToolContext {
+  peers?: PeerStore[];
+}
+
+const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs, ctx: ToolContext) => ToolResult> = {
   store_summary: (day, t) => storeSummary(day, t),
   shelf_gaps: shelfGaps,
   find_item: findItem,
@@ -612,15 +816,17 @@ const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs) => Tool
   zone_traffic: zoneTraffic,
   checkout_incidents: checkoutIncidents,
   get_record: getRecord,
+  vendor_disagreements: vendorDisagreements,
+  compare_stores: (day, t, _args, ctx) => compareStores(day, t, ctx.peers),
   propose_task: () => ({}),
 };
 
 /** Runs one tool for an agent. A tool the agent wasn't given, or bad arguments, come back as an error the model can read. */
-export function runTool(day: IndexedDay, t: number, agent: AgentId, name: string, args: ToolArgs): ToolResult {
+export function runTool(day: IndexedDay, t: number, agent: AgentId, name: string, args: ToolArgs, ctx: ToolContext = {}): ToolResult {
   if (!(AGENTS[agent].tools as string[]).includes(name)) return { error: `The ${AGENTS[agent].name} has no tool named ${name}.` };
   try {
     if (name === "propose_task") return proposeTask(day, t, agent, args ?? {});
-    return RUN[name as ToolName](day, t, args ?? {});
+    return RUN[name as ToolName](day, t, args ?? {}, ctx);
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }

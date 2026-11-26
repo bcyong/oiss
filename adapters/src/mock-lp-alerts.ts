@@ -66,14 +66,17 @@ export { gs1CheckDigit, localIso, toGtin14 } from "./common.ts";
 export const ADAPTER = { name: "mock-lp-alerts", version: "0.1.0" };
 
 /** The mapping the retailer keeps for store demo-001. */
-export function demo001Config(): LpAdapterConfig {
+/** The demo's own store. Every store of the district keeps the same codes, since all are built to one prototype. */
+const DEMO_001 = { id: "demo-001", storeNumber: "0001" };
+
+export function demo001Config(store: { id: string; storeNumber: string } = DEMO_001): LpAdapterConfig {
   const registers: LpAdapterConfig["registers"] = {};
   for (let i = 1; i <= 8; i++) registers[`R${String(i).padStart(2, "0")}`] = { fixture: `lane-${String(i).padStart(2, "0")}`, zone: "front-end", name: `Lane ${i}` };
   for (let i = 1; i <= 6; i++) registers[`SCO${String(i).padStart(2, "0")}`] = { fixture: `sco-${String(i).padStart(2, "0")}`, zone: "self-checkout", name: `Self-checkout ${i}` };
   return {
-    store: "demo-001",
+    store: store.id,
     timezone: "America/Los_Angeles",
-    site: "DG0001",
+    site: `DG${store.storeNumber}`,
     registers,
     cameras: { "FE-CAM-1": "cam-fe-1", "FE-CAM-2": "cam-fe-2", "SCO-CAM": "cam-sco" },
     retentionDays: 90,
