@@ -15,7 +15,7 @@
     <main id="main-content">
       <section class="hero">
         <div class="hero-art" aria-hidden="true">
-          <svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice">
+          <svg viewBox="0 0 600 400" preserveAspectRatio="xMaxYMid meet">
             <rect width="600" height="400" class="art-floor" />
             <g class="art-fix">
               <rect x="130" y="90" width="6" height="166" /><rect x="172" y="90" width="6" height="166" /><rect x="214" y="90" width="6" height="166" /><rect x="256" y="90" width="6" height="166" /><rect x="298" y="90" width="6" height="166" /><rect x="340" y="90" width="6" height="166" /><rect x="382" y="90" width="6" height="166" /><rect x="424" y="90" width="6" height="166" />
@@ -40,7 +40,7 @@
           <p class="lede">An open interchange standard for store-intelligence data, so a retailer can combine several vendors' data with its own systems and use it to run its stores better.</p>
           <div class="hero-meta">
             <p class="stack">
-              <a href="https://github.com/cloudevents/spec">CloudEvents 1.0</a><span>•</span><span class="std">GS1 EPCIS 2.0</span><span>•</span><span class="std">ONVIF Profile M</span><span>•</span><span class="std">JSON Schema 2020-12</span><span>•</span><span class="std">Model Context Protocol</span>
+              <a href="https://github.com/cloudevents/spec">CloudEvents 1.0</a><span>•</span><a href="https://www.gs1.org/standards/epcis">GS1 EPCIS 2.0</a><span>•</span><a href="https://www.onvif.org/wp-content/uploads/2021/06/onvif-profile-m-specification-v1-0.pdf">ONVIF Profile M</a><span>•</span><a href="https://json-schema.org/draft/2020-12">JSON Schema 2020-12</a><span>•</span><a href="https://modelcontextprotocol.io/specification/2026-07-28">Model Context Protocol</a>
             </p>
             <ul class="pills" aria-label="Labels">
               <li>retail</li>
@@ -67,15 +67,15 @@
                 <li><strong>One View Across Vendors</strong>: on-shelf availability, traffic, front-end queues and loss-prevention exceptions line up on one store layout and one item master</li>
                 <li><strong>Use Cases No Single Vendor Covers</strong>: replenish the out-of-stocks with the most shopper traffic first, and close a task only when the next shelf scan shows it fixed</li>
                 <li><strong>No Lock-In</strong>: change or add vendors without rewiring every report, task tool or agent downstream</li>
-                <li><strong>Agent-Ready</strong>: a query API and an MCP server let any agent platform read the data and write tasks back</li>
+                <li><strong>Agent-Ready</strong>: <span class="planned">Planned</span> a query API and an MCP server let any agent platform read the data and write tasks back</li>
                 <li><strong>Built on What Retailers Use</strong>: GTINs from the item master, the retailer's own store numbers, and CloudEvents, GS1 and ONVIF underneath</li>
               </ul>
 
               <h2 id="architecture-diagram">Architecture Diagram</h2>
               <figure class="diagram">
-                <svg class="arch" viewBox="0 0 760 520" role="img" aria-labelledby="arch-title arch-desc">
+                <svg class="arch" viewBox="0 0 760 580" role="img" aria-labelledby="arch-title arch-desc">
                   <title id="arch-title">OISS architecture</title>
-                  <desc id="arch-desc">Store-intelligence sources feed adapters, which publish OISS records to a stream. Records land in an OISS store and an evidence store, which a query API and MCP server expose to the Store Operations Assistant and its five agents. Their actions reach the store, and tasks flow back as records.</desc>
+                  <desc id="arch-desc">Store-intelligence sources feed adapters, which publish OISS records to a stream. Records land in an OISS store and an evidence store. The Store Operations Assistant and its four agents read those records, a fifth agent is planned, and a query API and MCP server are planned to expose the same records to any agent platform. Tasks reach store associates and flow back as records.</desc>
                   <defs>
                     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead" /></marker>
                   </defs>
@@ -87,46 +87,50 @@
                   <g class="d-box"><rect x="200" y="128" width="360" height="48" rx="8" /><text x="380" y="148">Adapters and validator</text><text x="380" y="165" class="d-sub">Map each vendor export to the OISS schemas</text></g>
                   <g class="d-box d-accent"><rect x="140" y="202" width="480" height="48" rx="8" /><text x="380" y="222">OISS record stream</text><text x="380" y="239" class="d-sub">CloudEvents over MQTT or HTTP, GS1 identifiers, one store layout</text></g>
                   <g class="d-box"><rect x="140" y="276" width="230" height="48" rx="8" /><text x="255" y="296">OISS store</text><text x="255" y="313" class="d-sub">Current state and history</text></g>
-                  <g class="d-box"><rect x="390" y="276" width="230" height="48" rx="8" /><text x="505" y="296">Evidence store</text><text x="505" y="313" class="d-sub">Clips and images, retention</text></g>
-                  <g class="d-box"><rect x="200" y="350" width="360" height="40" rx="8" /><text x="380" y="375">Query API and MCP server</text></g>
-                  <g class="d-group"><rect x="60" y="414" width="640" height="56" rx="10" /><text x="76" y="432" class="d-cap">Store Operations Assistant</text></g>
-                  <g class="d-chip"><rect x="76" y="440" width="110" height="22" rx="11" /><text x="131" y="455">Availability</text></g>
-                  <g class="d-chip"><rect x="198" y="440" width="110" height="22" rx="11" /><text x="253" y="455">Price and label</text></g>
-                  <g class="d-chip"><rect x="320" y="440" width="110" height="22" rx="11" /><text x="375" y="455">Front end</text></g>
-                  <g class="d-chip"><rect x="442" y="440" width="120" height="22" rx="11" /><text x="502" y="455">Loss prevention</text></g>
-                  <g class="d-chip"><rect x="574" y="440" width="110" height="22" rx="11" /><text x="629" y="455">Store insights</text></g>
-                  <g class="d-box"><rect x="160" y="484" width="440" height="30" rx="8" /><text x="380" y="504" class="d-sub-strong">Tasks to associates, shelf tag fixes, lane openings, alerts</text></g>
+                  <g class="d-box"><rect x="390" y="276" width="230" height="48" rx="8" /><text x="505" y="296">Evidence store</text><text x="505" y="313" class="d-sub">Clips and images (retention planned)</text></g>
+                  <g class="d-box d-planned"><rect x="200" y="350" width="360" height="48" rx="8" /><text x="380" y="370">Query API and MCP server</text><text x="380" y="387" class="d-sub">Planned. The demo's agents read the store directly</text></g>
+                  <g class="d-group"><rect x="60" y="424" width="640" height="58" rx="10" /><text x="76" y="442" class="d-cap">Store Operations Assistant</text></g>
+                  <g class="d-chip"><rect x="76" y="452" width="110" height="22" rx="11" /><text x="131" y="467">Availability</text></g>
+                  <g class="d-chip"><rect x="198" y="452" width="110" height="22" rx="11" /><text x="253" y="467">Price and label</text></g>
+                  <g class="d-chip"><rect x="320" y="452" width="110" height="22" rx="11" /><text x="375" y="467">Front end</text></g>
+                  <g class="d-chip"><rect x="442" y="452" width="120" height="22" rx="11" /><text x="502" y="467">Loss prevention</text></g>
+                  <g class="d-chip d-planned"><rect x="574" y="452" width="110" height="22" rx="11" /><text x="629" y="467">Store insights</text></g>
+                  <g class="d-box"><rect x="160" y="506" width="440" height="30" rx="8" /><text x="380" y="526" class="d-sub-strong">Tasks to associates, shelf tag fixes, lane openings, alerts</text></g>
                   <g class="d-lines">
                     <path d="M380 102 V126" marker-end="url(#arrow)" />
                     <path d="M380 176 V200" marker-end="url(#arrow)" />
                     <path d="M255 250 V274" marker-end="url(#arrow)" />
                     <path d="M505 250 V274" marker-end="url(#arrow)" />
-                    <path d="M380 324 V348" marker-end="url(#arrow)" />
-                    <path d="M380 390 V412" marker-end="url(#arrow)" />
-                    <path d="M380 470 V482" marker-end="url(#arrow)" />
-                    <path class="d-dash" d="M600 499 H726 V226 H622" marker-end="url(#arrow)" />
+                    <path d="M255 324 V336 H505 M505 324 V336" />
+                    <path d="M380 336 V348" marker-end="url(#arrow)" />
+                    <path d="M380 398 V422" marker-end="url(#arrow)" />
+                    <path d="M380 482 V504" marker-end="url(#arrow)" />
+                    <path class="d-dash" d="M600 521 H726 V226 H622" marker-end="url(#arrow)" />
                   </g>
-                  <text x="732" y="370" class="d-sub d-side" transform="rotate(90 732 370)">Task records, verified by the next shelf check</text>
+                  <text x="732" y="375" class="d-sub d-side" transform="rotate(90 732 375)">Task records, verified by the next shelf check</text>
+                  <g class="d-legend"><rect x="26" y="556" width="26" height="14" rx="4" /><text x="60" y="567" class="d-cap">Dashed box: planned, not in the demo yet</text></g>
                 </svg>
+                <figcaption class="scroll-hint">Swipe sideways to see the whole diagram.</figcaption>
               </figure>
 
               <h2 id="key-features">Key Features</h2>
+              <p class="legend"><span class="planned">Planned</span> marks what the blueprint describes but the demo doesn't do yet.</p>
               <ul>
-                <li><strong>Store Operations Assistant:</strong> a reference orchestrator that routes each question to a specialized agent reading OISS through MCP</li>
-                <li><strong>Multi-Agent System</strong> - Five specialized agents:
+                <li><strong>Store Operations Assistant:</strong> a reference orchestrator that routes each question to a specialized agent, which reads OISS records through its tools and cites every record it uses. <span class="planned">Planned</span> The same tools served over MCP.</li>
+                <li><strong>Multi-Agent System:</strong> four specialized agents in the demo, and a fifth planned:
                   <ul>
-                    <li><strong>Availability Agent</strong> - Prioritizes replenishment by lost sales and closes a task only when the next shelf check shows it fixed</li>
-                    <li><strong>Price and Label Agent</strong> - Fixes wrong shelf prices through the electronic shelf label or a task</li>
-                    <li><strong>Front-End Agent</strong> - Opens a lane when a queue grows and feeds queue trends to labor scheduling</li>
-                    <li><strong>Loss Prevention Agent</strong> - Ties a front-end exception to an anonymous shopper path, a missing item and the evidence, for a person to review</li>
-                    <li><strong>Store Insights Agent</strong> - Measures display lift, compares stores and flags where two vendors disagree about the same shelf</li>
+                    <li><strong>Availability Agent:</strong> ranks out-of-stocks for replenishment and follows each task until the next shelf scan verifies it</li>
+                    <li><strong>Price and Label Agent:</strong> finds shelf tags showing the wrong price and the task that fixes each one. <span class="planned">Planned</span> Fixing the price through the electronic shelf label.</li>
+                    <li><strong>Front-End Agent:</strong> checks queues and wait times against the store's open-lane rule. <span class="planned">Planned</span> Raising the open-lane task and feeding queue trends to labor scheduling.</li>
+                    <li><strong>Loss Prevention Agent:</strong> lists the checkout exceptions waiting for review and what each review found, without describing any shopper</li>
+                    <li><strong>Store Insights Agent:</strong> <span class="planned">Planned</span> measures display lift, compares stores and flags where two vendors disagree about the same shelf</li>
                   </ul>
                 </li>
                 <li><strong>Seven Record Types:</strong> StoreLayout, ShelfObservation, ZoneMetric, ShopperPath, Incident, Evidence and Task, versioned together as v0.1</li>
                 <li><strong>Adapters and Validation:</strong> one adapter per vendor export, the <code>oiss-validate</code> schema validator, and a mapping from ShelfObservation to a GS1 EPCIS 2.0 ObjectEvent</li>
-                <li><strong>Storage and Query:</strong> current state and history for every record, and an evidence store that enforces retention</li>
-                <li><strong>Agent Access:</strong> an MCP server with tools such as out-of-stocks since a time, zone status, open incidents and create task</li>
-                <li><strong>Access Control:</strong> each record's privacy class limits what a reader sees, and guardrails check agent actions before they reach a store system</li>
+                <li><strong>Storage and Query:</strong> current state and history for every record, held in the browser in the demo. <span class="planned">Planned</span> A query API over a database, and an evidence store that enforces retention.</li>
+                <li><strong>Agent Access:</strong> <span class="planned">Planned</span> an MCP server with tools such as out-of-stocks since a time, zone status, open incidents and create task</li>
+                <li><strong>Access Control:</strong> every record carries a privacy class, and the demo's agents only read records. <span class="planned">Planned</span> Filtering what each reader sees by privacy class, and guardrails that check agent actions before they reach a store system.</li>
                 <li><strong>Traceability:</strong> every record carries its source system, model and version, a confidence and links to evidence</li>
               </ul>
 
@@ -161,17 +165,17 @@
               <p><strong>Open Standards</strong></p>
               <ul>
                 <li><a href="https://github.com/cloudevents/spec">CloudEvents 1.0</a></li>
-                <li>GS1 EPCIS 2.0 and GS1 identifiers (GTIN, GLN)</li>
-                <li>ONVIF Profile M object classes</li>
-                <li>JSON Schema 2020-12</li>
-                <li>Model Context Protocol</li>
+                <li><a href="https://www.gs1.org/standards/epcis">GS1 EPCIS 2.0</a> and GS1 identifiers (GTIN, GLN)</li>
+                <li><a href="https://www.onvif.org/wp-content/uploads/2021/06/onvif-profile-m-specification-v1-0.pdf">ONVIF Profile M</a> object classes</li>
+                <li><a href="https://json-schema.org/draft/2020-12">JSON Schema 2020-12</a></li>
+                <li><a href="https://modelcontextprotocol.io/specification/2026-07-28">Model Context Protocol</a></li>
               </ul>
               <p><strong>Reference Implementation</strong></p>
               <ul>
                 <li>TypeScript store simulator</li>
                 <li>React and SVG demo app</li>
                 <li>Python validator (<code>oiss-validate</code>)</li>
-                <li>An NVIDIA-hosted model for the Store Operations Assistant (coming in milestone M4)</li>
+                <li>NVIDIA Nemotron 3 Ultra (<code>nemotron-3-ultra-550b-a55b</code>), hosted by NVIDIA, for the Store Operations Assistant</li>
               </ul>
 
               <h2 id="ethical-considerations">Ethical Considerations</h2>
