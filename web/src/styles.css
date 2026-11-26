@@ -1097,3 +1097,12 @@ ol.beats .beat-why {
 ol.beats .beat-why {
   color: var(--muted);
 }
+
+/* What each source stands for. */
+.about {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  line-height: 1.4;
+}

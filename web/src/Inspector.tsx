@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SOURCE_INFO } from "./vendors.ts";
 import type { IndexedDay } from "./day.ts";
 import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
@@ -34,6 +35,7 @@ function ProvenanceRows({ p }: { p: Provenance }) {
       <dd>
         {p.system}
         {p.vendor ? `, ${p.vendor}` : ""}
+        {SOURCE_INFO[p.system] ? <span className="about">{SOURCE_INFO[p.system]!.kind}. {SOURCE_INFO[p.system]!.about}</span> : null}
       </dd>
       {p.model && (
         <>

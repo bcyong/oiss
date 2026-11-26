@@ -5,6 +5,7 @@ import { checkoutName, duration, observer, elapsed, flagDetail, flagName, humani
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { storyBeats, type Beat } from "./story.ts";
+import { SOURCE_INFO } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
@@ -853,7 +854,7 @@ export function App({ start }: { start?: AppStart } = {}) {
 
             {tab === "sources" && (
               <>
-                <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day.</p>
+                <p className="note top">Each feed stands for a kind of system retailers buy today. The vendors are mock, labeled A to D, and their formats are invented. Switch a feed off to see what the store would know without it. Counts are for the whole day.</p>
                 <table className="feeds">
                   <thead>
                     <tr>
@@ -873,6 +874,11 @@ export function App({ start }: { start?: AppStart } = {}) {
                               <span>
                                 {f.system}
                                 {f.vendor ? <span className="vendor">{f.vendor}</span> : null}
+                                {SOURCE_INFO[f.system] ? (
+                                  <span className="about">
+                                    <b>{SOURCE_INFO[f.system]!.kind}.</b> {SOURCE_INFO[f.system]!.about} {SOURCE_INFO[f.system]!.sends}
+                                  </span>
+                                ) : null}
                                 {fixed ? <span className="vendor">Always on: every record refers to it</span> : null}
                               </span>
                             </label>
