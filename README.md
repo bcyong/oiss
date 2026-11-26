@@ -74,7 +74,7 @@ Today the spec, schemas, examples, validator, store simulator, the demo replay w
 | [`examples`](examples) | One valid and one invalid record per type | M0 |
 | [`validator`](validator) | `oiss-validate`, a Python validator for vendors and integration teams | M0 |
 | [`sim`](sim) | Synthetic grocery store simulator that writes a day of OISS records from a seed | M1 |
-| [`web`](web) | The site: the OISS landing page at `/`, the demo store replay at `/demo/` and the spec browser at `/spec/` | M1–M2 |
+| [`web`](web) | The site, under one header: the blueprint landing page at `/`, the RFC at `/rfc/`, the demo store replay at `/demo/`, the spec browser at `/spec/` and a repository overview at `/github/` | M1–M2 |
 | [`adapters`](adapters) | Mock vendor exports and adapters into OISS | M3 |
 | [`server`](server) | Ingest, storage and the query API | Deferred until after the website |
 | [`mcp`](mcp) | MCP server and the Store Operations Assistant | M4 |
@@ -86,8 +86,8 @@ Needs Node 22.18 or later.
 
 ```sh
 npm install
-npm run dev             # the site at http://localhost:5173, the demo store at /demo/, the spec at /spec/
-npm test                # simulator, adapter and assistant tests
+npm run dev             # the site at http://localhost:5173: the RFC at /rfc/, the demo store at /demo/, the spec at /spec/
+npm test                # simulator, adapter, assistant and site tests
 npm run golden:check    # the golden day still matches its manifest
 ```
 

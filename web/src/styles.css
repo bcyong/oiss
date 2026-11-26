@@ -554,15 +554,6 @@ th {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.crumbs {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-.crumbs a {
-  font-weight: 600;
-  text-decoration: none;
-}
 .vendor {
   display: block;
   color: var(--muted);
@@ -769,7 +760,8 @@ a.link {
 }
 .spec-nav {
   position: sticky;
-  top: 16px;
+  /* Below the site header, which is 48 px tall and sticks too. */
+  top: 64px;
   display: grid;
   gap: 2px;
   font-size: 14px;
@@ -846,7 +838,7 @@ code {
   max-height: 520px;
 }
 .def {
-  scroll-margin-top: 16px;
+  scroll-margin-top: 64px;
 }
 @media (max-width: 760px) {
   .spec-layout {
