@@ -1111,6 +1111,9 @@ ol.beats .beat-why {
 }
 
 /* Who sends each feed. */
+.vendors {
+  margin-top: 12px;
+}
 .vendors section + section {
   border-top: 1px solid var(--line);
   margin-top: 12px;
