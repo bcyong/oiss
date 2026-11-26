@@ -199,3 +199,31 @@ test("each vendor's own export is what its adapter read", () => {
   for (const m of mockShelfScans) assert.equal(m.mock, true);
   for (const e of mockEsl) assert.equal(e.mock, true);
 });
+
+test("store tasks move forward through their states and a verified task names the record that showed the fix", () => {
+  const tasks = day.records.tasks;
+  assert.ok(tasks.length > 0);
+  assert.equal(new Set(tasks.map((r) => r.id)).size, tasks.length);
+  const ids = new Set([...day.records.shelfObservations, ...day.records.zoneMetrics, ...day.records.incidents].map((r) => r.id));
+  const order = ["open", "assigned", "in_progress", "done", "verified"];
+  const bySubject = new Map<string, typeof tasks>();
+  for (const r of tasks) bySubject.set(r.subject, [...(bySubject.get(r.subject) ?? []), r]);
+  for (const [, versions] of bySubject) {
+    const sorted = [...versions].sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    assert.equal(sorted[0]!.data.state, "open");
+    let last = -1;
+    for (const v of sorted) {
+      const d = v.data as { state: string; basedOn?: string[]; verification?: { required: boolean; verifiedBy?: string } };
+      for (const ref of d.basedOn ?? []) assert.ok(ids.has(ref), `${v.id} is based on a record that exists`);
+      if (d.state === "cancelled") continue;
+      const i = order.indexOf(d.state);
+      assert.ok(i > last, `${v.id} moves forward`);
+      last = i;
+      if (d.state === "verified") {
+        assert.ok(d.verification?.verifiedBy && ids.has(d.verification.verifiedBy), `${v.id} names a record that showed the fix`);
+        const proof = [...day.records.shelfObservations, ...day.records.zoneMetrics].find((r) => r.id === d.verification!.verifiedBy)!;
+        assert.ok(Date.parse(proof.time) <= Date.parse(v.time), `${v.id} is verified after the record that showed the fix`);
+      }
+    }
+  }
+});

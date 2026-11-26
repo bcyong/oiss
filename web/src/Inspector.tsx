@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { vendorOf } from "./vendors.ts";
 import type { IndexedDay } from "./day.ts";
-import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
+import { assigneeName, checkoutName, duration, summarize, TASK_KIND, TASK_STATE, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
 import { VENDOR_NAME, type VendorRaw, vendorRawFor } from "./vendorRaw.ts";
-import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, TaskData, ZoneMetricData } from "./oiss.ts";
 
 /** Lists longer than this are cut in the JSON view, so a StoreLayout or a long path stays readable. */
 const LIST_LIMIT = 12;
@@ -222,6 +222,79 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
                 <button type="button" className="link" onClick={() => onInspect(backs.id)}>
                   {typeName(backs.type)} {backs.id}
                 </button>
+              </dd>
+            </>
+          )}
+        </>
+      );
+    }
+    case "oiss.Task": {
+      const d = (record as OissRecord<TaskData>).data;
+      const view = day.taskBySubject.get(record.subject);
+      const where = d.location.facing ? `${itemNameAt(day, d.location.facing)}, ${zoneName(day, d.location.zone)}` : d.location.fixture ? `${checkoutName(d.location.fixture)}, ${zoneName(day, d.location.zone)}` : zoneName(day, d.location.zone);
+      const link = (id: string) => {
+        const r = day.byId.get(id);
+        return r ? (
+          <button type="button" className="link" onClick={() => onInspect(id)}>
+            {summarize(day, r)}
+          </button>
+        ) : (
+          <span className="mono small">{id}</span>
+        );
+      };
+      return (
+        <>
+          <dt>Task</dt>
+          <dd>{d.title}</dd>
+          <dt>Kind</dt>
+          <dd>{TASK_KIND[d.kind] ?? humanize(d.kind)}</dd>
+          <dt>Status</dt>
+          <dd>{TASK_STATE[d.state] ?? humanize(d.state)}</dd>
+          <dt>Where</dt>
+          <dd>{where}</dd>
+          {d.assignedTo && (
+            <>
+              <dt>Assigned to</dt>
+              <dd>{assigneeName(d.assignedTo)}</dd>
+            </>
+          )}
+          <dt>Raised by</dt>
+          <dd>{assigneeName(d.createdBy)}</dd>
+          {d.basedOn?.length ? (
+            <>
+              <dt>Raised on</dt>
+              <dd>
+                {d.basedOn.map((id) => (
+                  <div key={id}>{link(id)}</div>
+                ))}
+              </dd>
+            </>
+          ) : null}
+          {d.verification && (
+            <>
+              <dt>Check</dt>
+              <dd>{d.verification.verifiedBy ? <>Confirmed by {link(d.verification.verifiedBy)}</> : d.verification.required ? "Closes only when a later record shows the fix" : "No check needed"}</dd>
+            </>
+          )}
+          {view && view.versions.length > 1 && (
+            <>
+              <dt>History</dt>
+              <dd>
+                <ol className="task-history">
+                  {view.versions.map((v) => (
+                    <li key={v.id}>
+                      {v.id === record.id ? (
+                        <strong>
+                          {timeOf(day, v)} {TASK_STATE[v.data.state]}
+                        </strong>
+                      ) : (
+                        <button type="button" className="link" onClick={() => onInspect(v.id)}>
+                          {timeOf(day, v)} {TASK_STATE[v.data.state]}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ol>
               </dd>
             </>
           )}

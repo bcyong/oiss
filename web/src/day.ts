@@ -1,6 +1,6 @@
 import { adaptLpAlerts, demo001Config, type MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
 import type { DayFiles } from "./load.ts";
-import type { AnyRecord, EvidenceData, Facing, Fixture, IncidentData, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, Zone, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, Facing, Fixture, IncidentData, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, TaskData, Zone, ZoneMetricData } from "./oiss.ts";
 
 export interface Rect {
   x: number;
@@ -50,6 +50,14 @@ export interface RobotRun {
   /** Indexes into robot.stops. */
   first: number;
   last: number;
+}
+
+/** One store task and every status change to it, oldest first. */
+export interface TaskView {
+  subject: string;
+  versions: OissRecord<TaskData>[];
+  /** When each version was recorded, in seconds since store midnight. */
+  times: number[];
 }
 
 export interface IncidentSeries {
@@ -106,6 +114,10 @@ export interface IndexedDay {
   incidentsByFixture: Map<string, IncidentSeries>;
   /** What the loss prevention vendor sent for each Incident, found by running the adapter again. */
   vendorAlertFor: Map<string, MockLpAlert>;
+  /** Store tasks, ascending by when they were raised, and the same by subject and by facing. */
+  tasks: TaskView[];
+  taskBySubject: Map<string, TaskView>;
+  tasksByFacing: Map<string, TaskView[]>;
   /** Where the shelf-scanning robot stood for each bay column it photographed, from its ShelfObservations. */
   robot: { source: string; stops: RobotStop[]; times: number[]; runs: RobotRun[] };
   /** Out-of-stock facings, as last reported, every TIMELINE_STEP seconds from open to close. */
@@ -151,7 +163,7 @@ export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): Inde
   const full = allFiles.records;
   const on = <R extends AnyRecord>(rs: R[] | undefined): R[] => (rs ?? []).filter((r) => !off.has(r.data.provenance.system));
   const records: DayFiles["records"] = off.size
-    ? { ...full, shelfObservations: on(full.shelfObservations), zoneMetrics: on(full.zoneMetrics), shopperPaths: on(full.shopperPaths), evidence: on(full.evidence), incidents: on(full.incidents) }
+    ? { ...full, shelfObservations: on(full.shelfObservations), zoneMetrics: on(full.zoneMetrics), shopperPaths: on(full.shopperPaths), evidence: on(full.evidence), incidents: on(full.incidents), tasks: tasksOn(full, off) }
     : full;
   const files: DayFiles = off.size ? { ...allFiles, records } : allFiles;
   const layout = records.storeLayout.data;
@@ -264,8 +276,9 @@ export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): Inde
     }
   }
   const sourceCounts = new Map<string, { system: string; vendor?: string; type: string; records: number }>();
-  const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList, ...incidentList];
-  const everything: AnyRecord[] = off.size ? [full.storeLayout, ...full.shelfObservations, ...full.zoneMetrics, ...full.shopperPaths, ...(full.evidence ?? []), ...(full.incidents ?? [])] : all;
+  const taskList = records.tasks ?? [];
+  const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList, ...incidentList, ...taskList];
+  const everything: AnyRecord[] = off.size ? [full.storeLayout, ...full.shelfObservations, ...full.zoneMetrics, ...full.shopperPaths, ...(full.evidence ?? []), ...(full.incidents ?? []), ...(full.tasks ?? [])] : all;
   for (const r of everything) {
     const key = `${r.data.provenance.system}|${r.type}`;
     const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0 };
@@ -289,6 +302,21 @@ export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): Inde
       else if (st === "low_stock") lowStock++;
     }
     timeline.push({ t, outOfStock, lowStock });
+  }
+
+  const taskBySubject = new Map<string, TaskView>();
+  for (const r of [...taskList].sort((a, b) => sec(a.time) - sec(b.time))) {
+    const view = taskBySubject.get(r.subject) ?? { subject: r.subject, versions: [], times: [] };
+    view.versions.push(r);
+    view.times.push(sec(r.time));
+    taskBySubject.set(r.subject, view);
+  }
+  const tasks = [...taskBySubject.values()];
+  const tasksByFacing = new Map<string, TaskView[]>();
+  for (const v of tasks) {
+    const facing = v.versions[0]!.data.location.facing;
+    if (!facing) continue;
+    tasksByFacing.set(facing, [...(tasksByFacing.get(facing) ?? []), v]);
   }
 
   const robot = robotRoute(records.shelfObservations, facingIndex, zones, sec);
@@ -319,9 +347,30 @@ export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): Inde
     incidents,
     incidentsByFixture,
     vendorAlertFor,
+    tasks,
+    taskBySubject,
+    tasksByFacing,
     robot,
     timeline,
   };
+}
+
+/**
+ * The tasks a store would have had with some feeds off: none from the task system if it is off, and none
+ * raised only on records from feeds that are off, since those records never arrived. A task keeps its
+ * later status changes either way.
+ */
+function tasksOn(full: DayFiles["records"], off: Set<string>): OissRecord<TaskData>[] {
+  const list = full.tasks ?? [];
+  if (!list.length) return list;
+  const systemOf = new Map<string, string>();
+  for (const r of [...full.shelfObservations, ...full.zoneMetrics, ...(full.incidents ?? [])]) systemOf.set(r.id, r.data.provenance.system);
+  const raisedOnOff = new Set<string>();
+  for (const r of list) {
+    const refs = r.data.basedOn ?? [];
+    if (refs.length && refs.every((id) => off.has(systemOf.get(id) ?? ""))) raisedOnOff.add(r.subject);
+  }
+  return list.filter((r) => !off.has(r.data.provenance.system) && !raisedOnOff.has(r.subject));
 }
 
 export const ROBOT_SOURCE_SUFFIX = ":robot-1";
@@ -446,6 +495,22 @@ export function robotAt(day: IndexedDay, t: number): RobotAt | null {
     at = { x: s.x + (next.x - s.x) * f, y: s.y + (next.y - s.y) * f };
   }
   return { ...at, run, stop: i, trail: pieces(stops, run.first, i, at), route: pieces(stops, run.first, run.last) };
+}
+
+/** The task as it stood at time t, or undefined before it was raised. */
+export function taskAt(v: TaskView, t: number): OissRecord<TaskData> | undefined {
+  const i = lastAtOrBefore(v.times, t);
+  return i < 0 ? undefined : v.versions[i];
+}
+
+/** Every task raised by time t, as it stood then, the most recently changed first. */
+export function tasksAt(day: IndexedDay, t: number): { view: TaskView; latest: OissRecord<TaskData>; changed: number }[] {
+  const out: { view: TaskView; latest: OissRecord<TaskData>; changed: number }[] = [];
+  for (const view of day.tasks) {
+    const i = lastAtOrBefore(view.times, t);
+    if (i >= 0) out.push({ view, latest: view.versions[i]!, changed: view.times[i]! });
+  }
+  return out.sort((a, b) => b.changed - a.changed);
 }
 
 /** Incidents at or before time t. */

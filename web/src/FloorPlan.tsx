@@ -133,13 +133,15 @@ interface Props {
   onToggleCameras: () => void;
   incidents: Map<string, CheckoutIncidents>;
   robot: RobotAt | null;
+  /** Facings with an open store task, marked while the task board is open. */
+  taskMarks?: number[];
   selection: Selection | null;
   onSelect: (s: Selection | null) => void;
 }
 
 const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
 
-export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, selection, onSelect }: Props) {
+export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, taskMarks, selection, onSelect }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -282,6 +284,14 @@ export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queue
             ))}
         </g>
         <Facings day={day} statuses={statuses} flagged={flagged} selected={sel?.kind === "facing" ? sel.index : null} onSelect={onSelect} />
+        {taskMarks && (
+          <g className="task-marks">
+            {taskMarks.map((i) => {
+              const r = day.facings[i]!.rect;
+              return <circle key={i} className={`task-mark${sel?.kind === "facing" && sel.index === i ? " selected" : ""}`} cx={r.x + r.w / 2} cy={r.y + r.h / 2} r={0.7} onClick={() => onSelect({ kind: "facing", index: i })} />;
+            })}
+          </g>
+        )}
         {showCameras && <Cameras day={day} selected={sel?.kind === "camera" ? sel.id : null} onSelect={onSelect} />}
         <Labels day={day} />
         <g className="queues" aria-hidden="true">

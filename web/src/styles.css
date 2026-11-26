@@ -17,6 +17,7 @@
   --incident: #8a3ffc;
   --robot: #0f7f80;
   --flag: #c2185b;
+  --task: #b35c00;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -39,6 +40,7 @@
   --incident: #b78cff;
   --robot: #3cc8c4;
   --flag: #ff6fa8;
+  --task: #ff9d3d;
     color-scheme: dark;
   }
 }
@@ -61,6 +63,7 @@
   --incident: #b78cff;
   --robot: #3cc8c4;
   --flag: #ff6fa8;
+  --task: #ff9d3d;
   color-scheme: dark;
 }
 
@@ -1133,4 +1136,46 @@ ol.beats .beat-why {
 .vendors .feeds-of {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Store tasks: markers on the floor plan while the Tasks tab is open, and the board itself. */
+.task-mark {
+  fill: none;
+  stroke: var(--task);
+  stroke-width: 0.16;
+  cursor: pointer;
+}
+.task-mark.selected {
+  stroke-width: 0.3;
+}
+.task-swatch {
+  background: transparent;
+  border: 2px solid var(--task);
+  border-radius: 50%;
+}
+.task-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.task-summary b {
+  font-size: 16px;
+}
+.task-state {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.task-state.state-verified,
+.task-state.state-done {
+  color: var(--in);
+}
+.task-state.state-cancelled {
+  color: var(--unknown);
+}
+.task-history {
+  margin: 0;
+  padding-left: 18px;
 }

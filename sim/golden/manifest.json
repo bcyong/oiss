@@ -34,6 +34,11 @@
       "bytes": 20569,
       "sha256": "f1d7d9d49570d42c61e855261826e911604d12c2a453f19936dde083d11f2c66"
     },
+    "tasks.jsonl": {
+      "records": 642,
+      "bytes": 494446,
+      "sha256": "55d71b2515516fd30eb3aaca35171e41bb8a3517f03e197e77b844044de9c774"
+    },
     "vendor/mock-vendor-a-shelf-scans.ndjson": {
       "bytes": 1260777,
       "sha256": "c7b5f2bb635b0c01acf4efaf9770062e2e1e2df38f0384bafd136108a39ae574"
