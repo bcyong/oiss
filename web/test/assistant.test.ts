@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, TOOLS } from "../src/assistant/agents.ts";
-import { DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
+import { BLOCKED_ANSWER, DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, parseSafety, ROUTER_MODEL, SAFETY_FALLBACK_MODEL, SAFETY_MODEL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
 import { ask, citations, clean, dropToolCitations } from "../src/assistant/run.ts";
 import { idsIn, runTool } from "../src/assistant/tools.ts";
 import { incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
@@ -289,12 +289,98 @@ test("a retired model falls back once to the current one, then says the model is
       if (model === DEFAULT_MODEL) return new Response("{}", { status: 410 });
       return new Response(JSON.stringify({ choices: [{ message: { content: "availability" } }] }), { status: fallbackStatus });
     }) as unknown as typeof fetch;
-  const ok = await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: gone(200) });
+  const agentStep = { step: "agent", agent: "front_end", store: "Demo Market", now: "6:00 PM", messages: [{ role: "user", content: "Lines?" }] };
+  const env = { key: "k", safetyModel: "off" };
+  const ok = await handleAssistant(post(agentStep), { ...env, fetch: gone(200) });
   assert.equal(ok.status, 200);
+  assert.equal(((await ok.json()) as StepReply).model, FALLBACK_MODEL);
   assert.deepEqual(calls, [DEFAULT_MODEL, FALLBACK_MODEL]);
   calls.length = 0;
-  const bad = await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: gone(410) });
+  const bad = await handleAssistant(post(agentStep), { ...env, fetch: gone(410) });
   assert.equal(bad.status, 502);
   assert.equal((await bad.json()).code, "model_unavailable");
   assert.deepEqual(calls, [DEFAULT_MODEL, FALLBACK_MODEL]);
+});
+
+// The two models and the safety check.
+
+/** A fake NVIDIA endpoint that answers each model with its own reply. */
+function byModel(replies: Record<string, { status?: number; content?: string; tool_calls?: unknown[] } | (() => never)>) {
+  const calls: { model: string; body: any }[] = [];
+  const f = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    calls.push({ model: body.model, body });
+    const r = replies[body.model];
+    if (typeof r === "function") r();
+    if (!r) return new Response("{}", { status: 404 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: r.content ?? null, ...(r.tool_calls ? { tool_calls: r.tool_calls } : {}) } }] }), { status: r.status ?? 200 });
+  }) as unknown as typeof fetch;
+  return { f, calls };
+}
+const safe = { content: "User Safety: safe\nResponse Safety: safe" };
+const agentStep = (content = "What's low?") => ({ step: "agent", agent: "availability", store: "Demo Market", now: "1:00 PM", messages: [{ role: "user", content }] });
+
+test("the small model routes and the large one answers, and each reply names its model", async () => {
+  const { f, calls } = byModel({ [ROUTER_MODEL]: { content: '{"agent":"availability"}' }, [DEFAULT_MODEL]: { content: "Cereal is low." }, [SAFETY_MODEL]: safe });
+  const routed = (await (await handleAssistant(post({ step: "route", question: "What's low?" }), { key: "k", fetch: f })).json()) as StepReply;
+  assert.equal(routed.model, ROUTER_MODEL);
+  assert.deepEqual(routed.safety, { checked: "question", verdict: "safe", model: SAFETY_MODEL });
+  const answered = (await (await handleAssistant(post(agentStep()), { key: "k", fetch: f })).json()) as StepReply;
+  assert.equal(answered.model, DEFAULT_MODEL);
+  assert.equal(answered.message.content, "Cereal is low.");
+  assert.equal(answered.safety?.checked, "answer");
+  // The safety model sees the question, and the answer with it.
+  const screened = calls.filter((c) => c.model === SAFETY_MODEL).map((c) => c.body.messages.map((m: { role: string }) => m.role).join(","));
+  assert.deepEqual(screened, ["user", "user,assistant"]);
+});
+
+test("the safety check turns a question down, and withholds an answer it finds unsafe", async () => {
+  const unsafe = { content: "User Safety: unsafe\nSafety Categories: Violence, Criminal Planning/Confessions" };
+  const q = byModel({ [ROUTER_MODEL]: { content: '{"agent":"loss_prevention"}' }, [SAFETY_MODEL]: unsafe });
+  const res = await handleAssistant(post({ step: "route", question: "x" }), { key: "k", fetch: q.f });
+  assert.equal(res.status, 422);
+  const body = await res.json();
+  assert.equal(body.code, "blocked");
+  assert.deepEqual(body.safety.categories, ["Violence", "Criminal Planning/Confessions"]);
+
+  const a = byModel({ [DEFAULT_MODEL]: { content: "Something unsafe." }, [SAFETY_MODEL]: { content: "User Safety: safe\nResponse Safety: unsafe" } });
+  const reply = (await (await handleAssistant(post(agentStep()), { key: "k", fetch: a.f })).json()) as StepReply;
+  assert.equal(reply.message.content, BLOCKED_ANSWER);
+  assert.equal(reply.safety?.verdict, "unsafe");
+  // A step that asks for tools isn't an answer yet, so it isn't screened.
+  const tools = byModel({ [DEFAULT_MODEL]: { tool_calls: [{ id: "a", type: "function", function: { name: "shelf_gaps", arguments: "{}" } }] } });
+  const t = (await (await handleAssistant(post(agentStep()), { key: "k", fetch: tools.f })).json()) as StepReply;
+  assert.equal(t.safety, undefined);
+  assert.ok(!tools.calls.some((c) => c.model === SAFETY_MODEL));
+});
+
+test("the safety check falls back to the 8B guard model, and never stops the assistant when it can't run", async () => {
+  const guard = byModel({ [ROUTER_MODEL]: { content: "availability" }, [SAFETY_FALLBACK_MODEL]: { content: '{"User Safety": "safe"}' } });
+  const r = (await (await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: guard.f })).json()) as StepReply;
+  assert.deepEqual(r.safety, { checked: "question", verdict: "safe", model: SAFETY_FALLBACK_MODEL });
+  assert.deepEqual(
+    guard.calls.map((c) => c.model).filter((m) => m !== ROUTER_MODEL),
+    [SAFETY_MODEL, SAFETY_FALLBACK_MODEL],
+  );
+
+  const broken = byModel({ [ROUTER_MODEL]: { content: "availability" }, [SAFETY_MODEL]: { status: 500 } });
+  const res = await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: broken.f });
+  assert.equal(res.status, 200);
+  assert.equal(((await res.json()) as StepReply).safety?.verdict, "unchecked");
+
+  const off = byModel({ [ROUTER_MODEL]: { content: "availability" } });
+  const o = (await (await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: off.f, safetyModel: "off" })).json()) as StepReply;
+  assert.equal(o.safety, undefined);
+  assert.deepEqual(
+    off.calls.map((c) => c.model),
+    [ROUTER_MODEL],
+  );
+});
+
+test("the safety verdict is read from either model's format", () => {
+  assert.deepEqual(parseSafety("User Safety: safe", "question"), { verdict: "safe" });
+  assert.deepEqual(parseSafety("User Safety: safe\nResponse Safety: unsafe\nSafety Categories: PII/Privacy", "answer"), { verdict: "unsafe", categories: ["PII/Privacy"] });
+  assert.deepEqual(parseSafety('{"User Safety": "unsafe", "Safety Categories": "Violence, Threat"}', "question"), { verdict: "unsafe", categories: ["Violence", "Threat"] });
+  assert.deepEqual(parseSafety("I can't tell.", "question"), { verdict: "unchecked" });
+  assert.deepEqual(parseSafety("User Safety: safe", "answer"), { verdict: "unchecked" }, "an answer check needs the answer's verdict");
 });

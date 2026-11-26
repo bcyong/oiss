@@ -7,7 +7,7 @@
  */
 
 export interface Finding {
-  check: "citation" | "number" | "cause" | "name" | "role";
+  check: "citation" | "number" | "cause" | "name" | "role" | "action";
   detail: string;
 }
 
@@ -112,6 +112,14 @@ export function nonRecordCitations(answer: string): string[] {
   return [...new Set(out)];
 }
 
+/** Words that say the assistant raised or assigned a task itself, when it can only propose one. */
+const DID_IT = /\bI(?:'ve| have)? (?:created|raised|opened|assigned|added|submitted|scheduled|dispatched)\b|\btasks? (?:has|have) been (?:created|raised|opened|assigned|added)\b/gi;
+
+/** Phrases in the answer that claim a task was raised or assigned, which only the store manager's approval does. */
+export function claimedActions(answer: string): string[] {
+  return [...new Set([...answer.matchAll(DID_IT)].map((m) => m[0]))];
+}
+
 /** Every finding for one answer. */
 export function checkAnswer(a: { text: string; unverified: string[] }, toolText: string, question = ""): Finding[] {
   return [
@@ -120,6 +128,7 @@ export function checkAnswer(a: { text: string; unverified: string[] }, toolText:
     ...statedCauses(a.text, toolText).map((w) => ({ check: "cause" as const, detail: `gives a cause ("${w}") the records don't` })),
     ...unknownTeams(a.text, toolText).map((t) => ({ check: "name" as const, detail: `names "${t}", which no tool returned` })),
     ...unknownRoles(a.text, toolText, question).map((w) => ({ check: "role" as const, detail: `mentions a ${w.replace(/s$/, "")}, which no tool returned` })),
+    ...claimedActions(a.text).map((w) => ({ check: "action" as const, detail: `says "${w}", but the assistant only proposes tasks` })),
     ...nonRecordCitations(a.text).map((c) => ({ check: "citation" as const, detail: `cites ${c}, which isn't a record id` })),
   ];
 }

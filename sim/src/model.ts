@@ -26,6 +26,23 @@ export interface DayConfig {
    * tasks (see tasks.ts), so callers normally leave this empty.
    */
   workOrders?: WorkOrder[];
+  /**
+   * Shelf tasks a person asked for, such as a store manager approving one the Store Operations Assistant
+   * proposed. The store's task system raises each at its time and associates work it like any other.
+   */
+  requestedTasks?: RequestedTask[];
+}
+
+/** A shelf task someone other than the task system asked for, at a set time and facing. */
+export interface RequestedTask {
+  kind: "replenish" | "go_back" | "fix_shelf_tag";
+  facing: string;
+  /** Seconds since local midnight. */
+  t: number;
+  /** Records that led to the request. */
+  basedOn: string[];
+  /** Who raised it, such as "agent:store-operations-assistant". */
+  createdBy: string;
 }
 
 /** One piece of work an associate does for a store task, at a set time and facing. */
@@ -157,7 +174,7 @@ const QUEUE_STEP = 0.8;
 const DEFAULT_ROUNDS = [hours(11), hours(15), hours(19)];
 
 export function simulateDay(input: DayConfig): Ground {
-  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], workOrders: [], ...input };
+  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], workOrders: [], requestedTasks: [], ...input };
   const root = new Rng(config.seed);
   const layout = buildLayout();
   const clock = storeClock(config.date, layout.store.timezone);

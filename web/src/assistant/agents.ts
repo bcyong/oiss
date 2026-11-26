@@ -7,7 +7,7 @@
 
 export type AgentId = "availability" | "price_and_label" | "front_end" | "loss_prevention";
 
-export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record";
+export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record" | "propose_task";
 
 export interface ToolSpec {
   name: ToolName;
@@ -91,6 +91,21 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
       additionalProperties: false,
     },
   },
+  propose_task: {
+    name: "propose_task",
+    description:
+      "Propose a shelf task for the store manager to approve, for a facing that needs work no open task covers, such as a low-stock facing the task system doesn't raise a task for. The store's rules check it first: the latest records must show the work is needed, no task for it may be open, and a facing whose last replenishment was cancelled for no backroom stock needs a store order instead. A proposal only goes in front of the store manager on this page; nothing is raised or assigned until they approve it.",
+    parameters: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["replenish", "go_back", "fix_shelf_tag"] },
+        facing: { type: "string", description: "The facing id, copied from a tool result." },
+        reason: { type: "string", description: "Why, in a few words, such as 'low stock in the busiest zone'." },
+      },
+      required: ["kind", "facing"],
+      additionalProperties: false,
+    },
+  },
   get_record: {
     name: "get_record",
     description: "One OISS record by id, as it arrived, for details the other tools leave out. Restricted records (shopper paths, evidence) show only their envelope.",
@@ -104,7 +119,7 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
     name: "Availability agent",
     handles: "Out-of-stocks, low stock, empty shelves, replenishment priorities, go-backs and misplaced items, phantom inventory, store tasks and whether shelf work got done.",
     role: "You prioritize replenishment by likely lost sales and follow store tasks until a later shelf observation shows the fix.",
-    tools: ["store_summary", "shelf_gaps", "find_item", "store_tasks", "zone_traffic", "get_record"],
+    tools: ["store_summary", "shelf_gaps", "find_item", "store_tasks", "zone_traffic", "get_record", "propose_task"],
     start: [{ name: "store_summary", args: {} }, { name: "shelf_gaps", args: { status: "out_of_stock", limit: 10 } }],
   },
   price_and_label: {
@@ -112,7 +127,7 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
     name: "Price and label agent",
     handles: "Shelf tag prices, electronic shelf labels, sale signs left up, price mismatches and disagreements between the robot and the labels.",
     role: "You find shelf tags that don't match the register price and say where each fix stands, telling tags still wrong on the shelf apart from fixes that wait for the robot's next read.",
-    tools: ["shelf_tag_issues", "find_item", "store_tasks", "get_record"],
+    tools: ["shelf_tag_issues", "find_item", "store_tasks", "get_record", "propose_task"],
     start: [{ name: "shelf_tag_issues", args: { limit: 10 } }],
   },
   front_end: {
@@ -154,7 +169,9 @@ export function agentPrompt(id: AgentId, store: string, now: string): string {
     `It is ${now} at the store. Everything you know comes from the store's OISS records up to now, through your tools. Call tools before you answer; never guess a number, item or time.`,
     "Use standard retail terms (facing, out of stock, replenishment, go-back, shelf tag, front end, shrink). Your reader is a store or retail operations manager.",
     "Answer in at most 120 words: lead with the answer, then a few short bullet points if they help. Cite every fact with the id of the record it came from, copied exactly from a tool result, in square brackets. Only cite ids your tools returned, and never put a tool name or anything else that isn't a record id in square brackets.",
-    "You can only read records. If something should be done, say what and who would do it; don't claim you did it. Shopper paths and evidence are restricted: never describe a shopper, and never suggest acting toward one.",
+    a.tools.includes("propose_task")
+      ? "You read records and may propose shelf tasks with propose_task when a facing needs work no open task covers; propose at most three, the most important first. A proposal waits for the store manager to approve it on this page, so say you proposed it and for which team, never that it was raised, assigned or done. If propose_task turns one down, say why in a few words. Shopper paths and evidence are restricted: never describe a shopper, and never suggest acting toward one."
+      : "You can only read records. If something should be done, say what and who would do it; don't claim you did it. Shopper paths and evidence are restricted: never describe a shopper, and never suggest acting toward one.",
     "Your tools work out every status, count and priority. Use them as given: never recount them, add counts of different statuses together or regroup them, lead with the answer line when a tool gives one, and never call something wrong, open or done when its status says otherwise.",
     "A tool's rows are only the first few; say something about all of them only from the tool's counts and answer line, never from the rows shown.",
     "Recommend a next step only when the records support it, and never one a status argues against, such as raising a replenishment task again when the last one was cancelled for no backroom stock; that facing needs a store order, placed by the team in its assignedTo.",
@@ -183,6 +200,7 @@ export function parseRoute(reply: string, question: string): AgentId {
 /** Questions a visitor can tap. */
 export const SAMPLE_QUESTIONS = [
   "What should the grocery team replenish first right now?",
+  "Which low-stock items should we fill before they run out?",
   "Are any shelf tags showing the wrong price?",
   "Do we need another lane open at the front end?",
   "Which checkout exceptions need review?",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkAnswer, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
+import { checkAnswer, claimedActions, nonRecordCitations, statedCauses, unknownRoles, unknownTeams, unsupportedNumbers } from "../eval/checks.ts";
 
 const tools = JSON.stringify({
   counts: { wrongOnShelf: 2, fixedWaitingForRead: 4 },
@@ -47,6 +47,12 @@ test("roles, systems and vendors must come from the tool results or the question
 test("only record ids go in citation brackets", () => {
   assert.deepEqual(nonRecordCitations("Two are open [inc-20261117-000004, task-20261117-000010-v2]."), []);
   assert.deepEqual(nonRecordCitations("Three exceptions [checkout_incidents]; see [the guide](https://example.com)."), ["[checkout_incidents]"]);
+});
+
+test("an answer may propose a task but never say it raised one", () => {
+  assert.deepEqual(claimedActions("I proposed two replenishment tasks; approve them below."), []);
+  assert.deepEqual(claimedActions("I've created a replenishment task, and the task has been assigned to Dairy."), ["I've created", "task has been assigned"]);
+  assert.deepEqual(claimedActions("Two tasks have been raised for the Grocery team."), ["tasks have been raised"]);
 });
 
 test("every finding for an answer, including citations the tools didn't return", () => {

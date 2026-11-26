@@ -1,8 +1,9 @@
 name: Assistant answer check
 
 # Asks the Store Operations Assistant its sample questions at 9 AM, 1 PM and 6 PM on the golden day and
-# checks each answer against the records its tools returned: citations, numbers, causes and team names.
-# About 30 calls to the NVIDIA-hosted model. It reports; it doesn't block a merge unless the repository's
+# checks each answer against the records its tools returned: citations, numbers, causes, team names and
+# claims to have raised a task. About 35 calls to the NVIDIA-hosted models, plus a safety check on each
+# question and answer. It reports; it doesn't block a merge unless the repository's
 # branch protection is set to require it.
 
 on:
@@ -40,4 +41,6 @@ jobs:
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
+          NVIDIA_ROUTER_MODEL: ${{ vars.NVIDIA_ROUTER_MODEL }}
+          NVIDIA_SAFETY_MODEL: ${{ vars.NVIDIA_SAFETY_MODEL }}
         run: npm run eval:assistant -w web

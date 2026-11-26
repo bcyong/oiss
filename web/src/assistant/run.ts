@@ -1,7 +1,7 @@
 import { clock, type IndexedDay } from "../day.ts";
 import { AGENTS, LIMITS, parseRoute, TOOLS, type AgentId } from "./agents.ts";
-import type { ChatMessage, StepReply, StepRequest, ToolCall } from "./proxy.ts";
-import { idsIn, runTool, type ToolArgs } from "./tools.ts";
+import type { ChatMessage, SafetyCheck, StepReply, StepRequest, ToolCall } from "./proxy.ts";
+import { idsIn, runTool, type Proposal, type ToolArgs } from "./tools.ts";
 
 /**
  * One question to the Store Operations Assistant, run in the page: the router picks an agent, the page
@@ -28,6 +28,26 @@ export interface Answer {
   /** Record ids the answer cites that the tools returned, and any it cites that they didn't. */
   cited: string[];
   unverified: string[];
+  /** The models that routed the question and wrote the answer. */
+  models: { router?: string; agent?: string };
+  /** What the content safety model found in the question and the answer. */
+  safety: { question?: SafetyCheck; answer?: SafetyCheck };
+  /** Tasks the agent proposed, each waiting for the store manager's approval on the page. */
+  proposals: Proposal[];
+}
+
+/** A model's name as NVIDIA's catalog gives it: nvidia/nemotron-3-ultra-550b-a55b is Nemotron 3 Ultra. */
+export function modelName(id?: string): string | undefined {
+  if (!id) return undefined;
+  const known: Record<string, string> = {
+    "nvidia/nemotron-3-ultra-550b-a55b": "Nemotron 3 Ultra",
+    "nvidia/nemotron-3-super-120b-a12b": "Nemotron 3 Super",
+    "nvidia/nemotron-3-nano-30b-a3b": "Nemotron 3 Nano",
+    "nvidia/nemotron-3.5-lightning-30b-a3b": "Nemotron 3.5 Lightning",
+    "nvidia/nemotron-3.5-content-safety": "Nemotron 3.5 Content Safety",
+    "nvidia/llama-3.1-nemotron-safety-guard-8b-v3": "Nemotron Safety Guard 8B",
+  };
+  return known[id] ?? id.replace(/^[^/]+\//, "");
 }
 
 export class AssistantError extends Error {
@@ -51,6 +71,7 @@ export const httpStep =
     const body = (await res.json().catch(() => null)) as (StepReply & { code?: string; error?: string }) | null;
     if (!res.ok || !body?.message) {
       if (res.status === 404) throw new AssistantError("not_deployed", "The assistant runs on the deployed site, not on the local dev server.");
+      if (body?.code === "blocked") throw new AssistantError("blocked", body.error ?? "The safety check turned this question down.");
       throw new AssistantError(body?.code ?? "upstream", body?.error ?? `The assistant answered ${res.status}.`);
     }
     return body;
@@ -107,23 +128,31 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   let calls = 0;
   let agent: AgentId;
   let routedBy: Answer["routedBy"] = "model";
-  onProgress?.("Choosing an agent");
+  const models: Answer["models"] = {};
+  const safety: Answer["safety"] = {};
+  onProgress?.("Checking the question and choosing an agent");
   try {
     calls++;
     const r = await step({ step: "route", question: q });
     agent = parseRoute(r.message.content ?? "", q);
+    models.router = r.model;
+    safety.question = r.safety;
   } catch (err) {
-    // Only a missing key or a missing function stops the question; anything else falls back to keywords.
-    if (err instanceof AssistantError && (err.code === "not_configured" || err.code === "not_deployed" || err.code === "rate_limited" || err.code === "model_unavailable")) throw err;
+    // A missing key or function, a busy or retired model, or a question the safety check turned down stops
+    // the question; anything else falls back to keywords.
+    if (err instanceof AssistantError && ["not_configured", "not_deployed", "rate_limited", "model_unavailable", "blocked"].includes(err.code)) throw err;
     agent = parseRoute("", q);
     routedBy = "keywords";
   }
 
   const seen = new Set<string>();
   const tools: ToolUse[] = [];
+  const proposals: Proposal[] = [];
   const run = (name: string, args: ToolArgs) => {
     const result = runTool(day, t, agent, name, args);
     idsIn(result, seen);
+    const p = (result as { decision?: string; proposal?: Proposal }).proposal;
+    if (name === "propose_task" && p && !proposals.some((x) => x.kind === p.kind && x.facing === p.facing) && proposals.length < 3) proposals.push(p);
     tools.push({ name, args });
     return asText(result);
   };
@@ -140,7 +169,9 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   while (calls < LIMITS.maxModelCalls) {
     calls++;
     const final = calls === LIMITS.maxModelCalls;
-    const { message } = await step({ step: "agent", agent, store, now, messages, final });
+    const { message, model, safety: checked } = await step({ step: "agent", agent, store, now, messages, final });
+    models.agent = model ?? models.agent;
+    if (checked) safety.answer = checked;
     const wanted = final ? [] : (message.tool_calls ?? []).slice(0, MAX_CALLS_PER_TURN);
     if (!wanted.length) {
       text = dropToolCitations(clean(message.content ?? ""));
@@ -154,5 +185,5 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   }
   if (!text) text = "I couldn't put an answer together from the records. Try asking a narrower question.";
   const cited = citations(text);
-  return { question: q, t, agent, routedBy, text, tools, cited: cited.filter((id) => seen.has(id)), unverified: cited.filter((id) => !seen.has(id)) };
+  return { question: q, t, agent, routedBy, text, tools, cited: cited.filter((id) => seen.has(id)), unverified: cited.filter((id) => !seen.has(id)), models, safety, proposals };
 }

@@ -91,6 +91,8 @@ interface Plan {
   location: Record<string, string>;
   assignedTo: string;
   basedOn: string[];
+  /** Who raised it, when not the task system itself. */
+  createdBy?: string;
   verify: boolean;
   steps: Step[];
 }
@@ -146,6 +148,8 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
     return pos ? catalog.byGtin.get(pos.gtin) : undefined;
   };
   const plans: Plan[] = [];
+  const requested = new Map<string, Ground["config"]["requestedTasks"]>();
+  for (const q of g.config.requestedTasks) requested.set(q.facing, [...(requested.get(q.facing) ?? []), q]);
   const recovery = new Map<string, Ground["recoveryWork"]>();
   for (const w of g.recoveryWork) recovery.set(w.facing, [...(recovery.get(w.facing) ?? []), w]);
 
@@ -164,11 +168,13 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
     const name = item?.name ?? facing;
     const busyUntil: Record<"replenish" | "go_back" | "fix_shelf_tag", number> = { replenish: -1, go_back: -1, fix_shelf_tag: -1 };
 
-    for (const { t, r } of list) {
-      const flags = r.data.flags ?? [];
-      const raise = (kind: keyof typeof busyUntil, title: string, done: number | undefined, verifiedBy: (after: number) => { t: number; id: string } | undefined, cancelled?: number) => {
+    const asks = [...(requested.get(facing) ?? [])].sort((a, b) => a.t - b.t);
+    let at = 0;
+    const raiseAt = (from: number, location: Obs["data"]["location"], by: { basedOn: string[]; createdBy?: string }) => (kind: keyof typeof busyUntil, title: string, done: number | undefined, verifiedBy: (after: number) => { t: number; id: string } | undefined, cancelled?: number) => {
+        const t = from;
         if (t <= busyUntil[kind]) return;
-        const created = t + RAISE_DELAY;
+        // A task someone asked for is raised when they ask; the task system raises its own a little after the record.
+        const created = by.createdBy ? t : t + RAISE_DELAY;
         const steps: Step[] = [
           { t: created, state: "open" },
           { t: created + ASSIGN_DELAY, state: "assigned" },
@@ -190,30 +196,47 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
         busyUntil[kind] = end;
         const [lo, hi] = WORK_MINUTES[kind];
         const workAt = Math.round(created + ASSIGN_DELAY + 60 * new Rng(g.config.seed).fork(`task-work:${kind}:${facing}:${created}`).uniform(lo, hi));
-        plans.push({ kind, facing, workAt, title, location: facingLocation(r.data.location), assignedTo: teamFor(kind, facing), basedOn: [r.id], verify: true, steps });
+        plans.push({ kind, facing, workAt, title, location: facingLocation(location), assignedTo: teamFor(kind, facing), basedOn: by.basedOn, ...(by.createdBy ? { createdBy: by.createdBy } : {}), verify: true, steps });
       };
-      const next = (after: number, ok: (o: Obs) => boolean) => {
-        const hit = list.find((o) => o.t > after && ok(o.r));
-        return hit ? { t: hit.t, id: hit.r.id } : undefined;
-      };
-
-      if (r.data.status === "out_of_stock" || (r.data.status === "low_stock" && item?.promo)) {
+    // Requested tasks at or before a record are raised before the task system reads that record, so its own
+    // task for the same work waits until the requested one is through.
+    const requestsUpTo = (until: number) => {
+      while (at < asks.length && asks[at]!.t <= until) {
+        const q = asks[at++]!;
+        const seen = list.filter((o) => o.t <= q.t).at(-1) ?? list[0]!;
+        work(q.kind, q.t, q.t, raiseAt(q.t, seen.r.data.location, { basedOn: q.basedOn, createdBy: q.createdBy }));
+      }
+    };
+    const next = (after: number, ok: (o: Obs) => boolean) => {
+      const hit = list.find((o) => o.t > after && ok(o.r));
+      return hit ? { t: hit.t, id: hit.r.id } : undefined;
+    };
+    // The work one kind of shelf task asks for, as the day played out from time t, for a task raised at created.
+    function work(kind: keyof typeof busyUntil, t: number, created: number, raise: ReturnType<typeof raiseAt>) {
+      if (kind === "replenish") {
         // The associate works it in the next recovery round that reaches the facing: done if the backroom
         // had stock, cancelled if it had none, since only a store order can fix that.
-        const work = recovery.get(facing)?.find((w) => w.t > t + RAISE_DELAY + ASSIGN_DELAY);
-        raise("replenish", `Replenish ${name}`, work && work.units > 0 ? work.t : undefined, (after) => next(after, (o) => o.data.status === "in_stock"), work && work.units === 0 ? work.t : undefined);
-      }
-      if (flags.includes("misplaced_item")) {
+        const w = recovery.get(facing)?.find((x) => x.t > created + ASSIGN_DELAY);
+        raise("replenish", `Replenish ${name}`, w && w.units > 0 ? w.t : undefined, (after) => next(after, (o) => o.data.status === "in_stock"), w && w.units === 0 ? w.t : undefined);
+      } else if (kind === "go_back") {
         const fault = g.faultsAt(facing, t).find((f) => f.kind === "misplaced_item");
-        const done = fault?.end ?? undefined;
-        raise("go_back", `Clear a go-back from the ${name} facing`, done, (after) => next(after, (o) => o.data.status !== undefined && !(o.data.flags ?? []).includes("misplaced_item")));
-      }
-      if (flags.includes("price_mismatch")) {
+        raise("go_back", `Clear a go-back from the ${name} facing`, fault?.end ?? undefined, (after) => next(after, (o) => o.data.status !== undefined && !(o.data.flags ?? []).includes("misplaced_item")));
+      } else {
         const fault = g.faultsAt(facing, t).find((f) => f.kind === "price_mismatch");
-        const done = fault?.end ?? undefined;
-        raise("fix_shelf_tag", `Fix the shelf tag for ${name}`, done, (after) => next(after, (o) => o.data.tagPrice !== undefined && !(o.data.flags ?? []).includes("price_mismatch")));
+        raise("fix_shelf_tag", `Fix the shelf tag for ${name}`, fault?.end ?? undefined, (after) => next(after, (o) => o.data.tagPrice !== undefined && !(o.data.flags ?? []).includes("price_mismatch")));
       }
     }
+
+    for (const { t, r } of list) {
+      requestsUpTo(t);
+      const flags = r.data.flags ?? [];
+      const raise = raiseAt(t, r.data.location, { basedOn: [r.id] });
+      const created = t + RAISE_DELAY;
+      if (r.data.status === "out_of_stock" || (r.data.status === "low_stock" && item?.promo)) work("replenish", t, created, raise);
+      if (flags.includes("misplaced_item")) work("go_back", t, created, raise);
+      if (flags.includes("price_mismatch")) work("fix_shelf_tag", t, created, raise);
+    }
+    requestsUpTo(Infinity);
   }
 
   return plans;
@@ -303,7 +326,7 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
             kind: p.kind,
             state: s.state,
             title: p.title,
-            createdBy: CREATED_BY,
+            createdBy: p.createdBy ?? CREATED_BY,
             ...(s.state === "open" ? {} : { assignedTo: p.assignedTo }),
             basedOn: p.basedOn,
             verification: s.verifiedBy ? { required: p.verify, verifiedBy: s.verifiedBy } : { required: p.verify },

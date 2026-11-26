@@ -5,11 +5,20 @@ import { AGENT_IDS, agentPrompt, LIMITS, routerPrompt, toolsFor, type AgentId } 
  * server. It builds every model request itself from the agent definitions, so a visitor can send only a
  * question and the assistant's own tool turns, never a prompt or a tool of their own. The page runs the
  * tools; the server never sees the store's records.
+ *
+ * Like NVIDIA's Multi-Agent Intelligent Warehouse blueprint, it picks a model for each step: a small, fast
+ * Nemotron routes the question and the large one answers it. A content safety model screens the question
+ * before routing and the answer before it goes back.
  */
 
 export interface ProxyEnv {
   key?: string;
+  /** The model that answers. */
   model?: string;
+  /** The model that routes each question to an agent. */
+  routerModel?: string;
+  /** The content safety model. "off" turns the safety check off. */
+  safetyModel?: string;
   /** For tests. */
   fetch?: typeof fetch;
   now?: () => number;
@@ -19,6 +28,13 @@ export const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 export const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
 /** Tried once when the chosen model is gone (NVIDIA answers 404 or 410 for a retired model). */
 export const FALLBACK_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
+/** Routing is a one-word choice, so the small, fast Nemotron makes it. */
+export const ROUTER_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
+/** Screens each question and answer. The 8B guard model is tried once if this one is gone. */
+export const SAFETY_MODEL = "nvidia/nemotron-3.5-content-safety";
+export const SAFETY_FALLBACK_MODEL = "nvidia/llama-3.1-nemotron-safety-guard-8b-v3";
+/** The safety check gets at most this long; past it, the answer goes back marked as not checked. */
+const SAFETY_TIMEOUT_MS = 8_000;
 /** Netlify ends a synchronous function after 60 seconds; one model call gets at most 25. */
 const UPSTREAM_TIMEOUT_MS = 25_000;
 
@@ -37,8 +53,21 @@ export type ChatMessage =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
+export type SafetyVerdict = "safe" | "unsafe" | "unchecked";
+
+export interface SafetyCheck {
+  /** What was checked: the visitor's question, or the assistant's answer to it. */
+  checked: "question" | "answer";
+  verdict: SafetyVerdict;
+  model?: string;
+  categories?: string[];
+}
+
 export interface StepReply {
   message: { content: string | null; tool_calls?: ToolCall[] };
+  /** The model that wrote this step. */
+  model?: string;
+  safety?: SafetyCheck;
 }
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -122,6 +151,39 @@ export function modelRequest(req: StepRequest, model: string): Record<string, un
   return req.final ? base : { ...base, tools: toolsFor(req.agent), tool_choice: "auto" };
 }
 
+/** The content safety model's request: the question, and the answer when there is one. */
+export function safetyRequest(model: string, question: string, answer?: string): Record<string, unknown> {
+  return {
+    model,
+    max_tokens: 60,
+    temperature: 0.01,
+    top_p: 0.95,
+    stream: false,
+    chat_template_kwargs: { request_categories: "/categories" },
+    messages: [{ role: "user", content: question }, ...(answer !== undefined ? [{ role: "assistant", content: answer }] : [])],
+  };
+}
+
+/**
+ * Reads the safety model's verdict. Nemotron 3.5 Content Safety answers in lines ("User Safety: unsafe");
+ * the 8B guard model answers in JSON with the same names. Anything else counts as not checked.
+ */
+export function parseSafety(text: string, checked: SafetyCheck["checked"]): Pick<SafetyCheck, "verdict" | "categories"> {
+  const field = (name: string) => new RegExp(`"?${name}"?\\s*:\\s*"?([^"\\n,}]+(?:,[^"\\n}]+)*)`, "i").exec(text)?.[1]?.trim();
+  const user = field("User Safety")?.toLowerCase();
+  const response = field("Response Safety")?.toLowerCase();
+  const verdictOf = (v?: string): SafetyVerdict | undefined => (v?.startsWith("unsafe") ? "unsafe" : v?.startsWith("safe") ? "safe" : undefined);
+  const verdict = checked === "answer" ? verdictOf(response) : verdictOf(user);
+  if (!verdict) return { verdict: "unchecked" };
+  const categories = field("Safety Categories")
+    ?.split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  return verdict === "unsafe" && categories?.length ? { verdict, categories } : { verdict };
+}
+
+export const BLOCKED_ANSWER = "I can't share that answer: the safety check turned it down. Ask about the store's stock, shelf tags, lines or checkout exceptions.";
+
 /** Handles POST /api/assistant. */
 export async function handleAssistant(request: Request, env: ProxyEnv): Promise<Response> {
   if (request.method !== "POST") return fail(405, "method_not_allowed", "Use POST.");
@@ -144,19 +206,53 @@ export async function handleAssistant(request: Request, env: ProxyEnv): Promise<
   if (typeof req === "string") return fail(400, "bad_request", req);
 
   const doFetch = env.fetch ?? fetch;
-  const call = (model: string) =>
+  const post = (body: Record<string, unknown>, timeout: number) =>
     doFetch(NVIDIA_URL, {
       method: "POST",
       headers: { authorization: `Bearer ${env.key}`, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify(modelRequest(req, model)),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeout),
     });
-  const model = env.model || DEFAULT_MODEL;
+  const call = (model: string) => post(modelRequest(req, model), UPSTREAM_TIMEOUT_MS);
   const gone = (r: Response) => r.status === 404 || r.status === 410;
+
+  // The safety check. It never stops the assistant working: if the safety model can't be reached, the step
+  // goes on and says it wasn't checked.
+  const safetyModel = env.safetyModel || SAFETY_MODEL;
+  const screen = async (checked: SafetyCheck["checked"], question: string, answer?: string): Promise<SafetyCheck | undefined> => {
+    if (safetyModel === "off") return undefined;
+    const tryModel = async (model: string): Promise<SafetyCheck | "gone"> => {
+      const r = await post(safetyRequest(model, question, answer), SAFETY_TIMEOUT_MS);
+      if (gone(r)) return "gone";
+      if (!r.ok) return { checked, verdict: "unchecked", model };
+      const d = (await r.json().catch(() => null)) as { choices?: { message?: { content?: unknown } }[] } | null;
+      const text = d?.choices?.[0]?.message?.content;
+      return { checked, model, ...parseSafety(typeof text === "string" ? text : "", checked) };
+    };
+    try {
+      const first = await tryModel(safetyModel);
+      if (first !== "gone") return first;
+      if (safetyModel === SAFETY_FALLBACK_MODEL) return { checked, verdict: "unchecked" };
+      const second = await tryModel(SAFETY_FALLBACK_MODEL);
+      return second === "gone" ? { checked, verdict: "unchecked" } : second;
+    } catch {
+      return { checked, verdict: "unchecked", model: safetyModel };
+    }
+  };
+
+  // A small, fast model routes; the large one answers. Either falls back once if NVIDIA has retired it.
+  const model = req.step === "route" ? env.routerModel || ROUTER_MODEL : env.model || DEFAULT_MODEL;
+  const fallback = req.step === "route" ? env.model || DEFAULT_MODEL : FALLBACK_MODEL;
+  let used = model;
   let res: Response;
+  // The question is screened while the router works on it.
+  const questionCheck = req.step === "route" ? screen("question", req.question) : Promise.resolve(undefined);
   try {
     res = await call(model);
-    if (gone(res) && model !== FALLBACK_MODEL) res = await call(FALLBACK_MODEL);
+    if (gone(res) && model !== fallback) {
+      used = fallback;
+      res = await call(fallback);
+    }
   } catch (err) {
     const timeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
     return fail(504, timeout ? "timeout" : "upstream", timeout ? "The model took too long to answer." : "Couldn't reach the model.");
@@ -170,6 +266,8 @@ export async function handleAssistant(request: Request, env: ProxyEnv): Promise<
   const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: unknown; tool_calls?: unknown } }[] } | null;
   const msg = data?.choices?.[0]?.message;
   if (!msg) return fail(502, "upstream", "The model sent no answer.");
+  const asked = await questionCheck;
+  if (asked?.verdict === "unsafe") return json(422, { code: "blocked", error: "The safety check turned this question down.", safety: asked });
   const allowed = new Set<string>(req.step === "agent" && !req.final ? toolsFor(req.agent).map((t) => t.function.name) : []);
   const calls = Array.isArray(msg.tool_calls)
     ? (msg.tool_calls as Record<string, unknown>[])
@@ -181,6 +279,14 @@ export async function handleAssistant(request: Request, env: ProxyEnv): Promise<
         .filter((c) => allowed.has(c.function.name))
         .slice(0, 6)
     : [];
-  const reply: StepReply = { message: { content: typeof msg.content === "string" ? msg.content : null, ...(calls.length ? { tool_calls: calls } : {}) } };
+  let content = typeof msg.content === "string" ? msg.content : null;
+  let safety = asked;
+  // An answer, as opposed to a request for more tools, is screened with the question it answers.
+  if (req.step === "agent" && !calls.length && content?.trim()) {
+    const first = req.messages[0]!;
+    safety = await screen("answer", first.role === "user" ? first.content : "", content);
+    if (safety?.verdict === "unsafe") content = BLOCKED_ANSWER;
+  }
+  const reply: StepReply = { message: { content, ...(calls.length ? { tool_calls: calls } : {}) }, model: used, ...(safety ? { safety } : {}) };
   return json(200, reply);
 }
