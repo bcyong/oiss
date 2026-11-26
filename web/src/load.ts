@@ -1,4 +1,6 @@
+import type { MockEslEvent } from "@oiss/adapters/mock-esl";
 import type { MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
+import type { MockShelfScanMission } from "@oiss/adapters/mock-shelf-scan";
 import type { Injection, ShelfFault } from "@oiss/sim";
 import type { DayRecords, ItemMaster } from "./oiss.ts";
 
@@ -13,7 +15,7 @@ export interface DayFiles {
    * Vendor exports exactly as the mock vendors sent them, before any adapter. Not OISS: the demo
    * keeps them only to show what an adapter starts from.
    */
-  vendorFeeds?: { mockLpAlerts?: MockLpAlert[] };
+  vendorFeeds?: VendorFeeds;
   /** How long the browser took to simulate the day, for a day made in the browser. */
   simulatedInMs?: number;
   /**
@@ -21,6 +23,13 @@ export interface DayFiles {
    * happened on the shelf, kept so the demo can show whether any record has caught each one yet.
    */
   injected?: ShelfFault[];
+}
+
+export interface VendorFeeds {
+  mockShelfScans?: MockShelfScanMission[];
+  mockLpAlerts?: MockLpAlert[];
+  mockTrafficCsv?: string;
+  mockEsl?: MockEslEvent[];
 }
 
 const base = import.meta.env.BASE_URL;
@@ -42,14 +51,17 @@ export async function loadGoldenDay(): Promise<DayFiles> {
   const index = (await (await get("index.json")).json()) as { days: { store: string; date: string; seed: number; path: string }[] };
   const day = index.days[0];
   if (!day) throw new Error("No days in data/index.json");
-  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, mockLpAlerts, itemMaster] = await Promise.all([
+  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, mockShelfScans, mockLpAlerts, mockTrafficCsv, mockEsl, itemMaster] = await Promise.all([
     get(`${day.path}store-layout.json`).then((r) => r.json()),
     jsonl(`${day.path}shelf-observations.jsonl`),
     jsonl(`${day.path}zone-metrics.jsonl`),
     jsonl(`${day.path}shopper-paths.jsonl`),
     jsonl(`${day.path}evidence.jsonl`),
     jsonl(`${day.path}incidents.jsonl`),
+    jsonl<MockShelfScanMission>(`${day.path}vendor/mock-vendor-a-shelf-scans.ndjson`),
     jsonl<MockLpAlert>(`${day.path}vendor/mock-vendor-b-lp-alerts.ndjson`),
+    get(`${day.path}vendor/mock-vendor-c-traffic.csv`).then((r) => r.text()),
+    jsonl<MockEslEvent>(`${day.path}vendor/mock-vendor-d-esl.ndjson`),
     get(`${day.path}item-master.json`).then((r) => r.json()),
   ]);
   return {
@@ -59,7 +71,7 @@ export async function loadGoldenDay(): Promise<DayFiles> {
     origin: "golden",
     records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents } as DayRecords,
     itemMaster: itemMaster as ItemMaster,
-    vendorFeeds: { mockLpAlerts },
+    vendorFeeds: { mockShelfScans, mockLpAlerts, mockTrafficCsv, mockEsl },
   };
 }
 

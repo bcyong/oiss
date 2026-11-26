@@ -5,8 +5,9 @@
  *
  * - Misplaced item: an item left on another item's facing, usually by a shopper who changed their
  *   mind (a "go-back"). An associate clears go-backs during a recovery round, most of the time.
- * - Price mismatch: the shelf tag doesn't match the price in the price file, because a price change
- *   wasn't re-tagged or a sale tag was left up. It stays wrong until someone fixes the tag.
+ * - Price mismatch: the shelf tag doesn't match the price in the price file, because an electronic
+ *   shelf label didn't take a price change or a paper sale sign was left up over the label. It stays
+ *   wrong until someone fixes the tag.
  * - Phantom inventory: the units on a facing disappear without a sale (theft or damage that was
  *   never written off), so the store's system still counts them on hand. No replenishment order
  *   goes in and the backroom has none, so the facing stays out of stock while the system says it
@@ -22,6 +23,8 @@ import { hours } from "./time.ts";
 export type FaultKind = "misplaced_item" | "price_mismatch" | "phantom_inventory";
 
 export const FAULT_KINDS: FaultKind[] = ["misplaced_item", "price_mismatch", "phantom_inventory"];
+
+export type PriceMismatchCause = "label_not_updated" | "sale_sign_left_up";
 
 /** A fault to add to the day at a set time and facing. The details (which item, what price) come from the seed. */
 export interface Injection {
@@ -42,6 +45,12 @@ export interface ShelfFault {
   gtin?: string;
   /** Price mismatch: the price on the shelf tag. The price file keeps the item's own price. */
   tagPrice?: number;
+  /**
+   * Price mismatch: why the tag is wrong. label_not_updated: the electronic shelf label never took
+   * the price change, so the label system knows. sale_sign_left_up: the label is right, but a paper
+   * sale sign over it shows an old sale price, which only something that looks at the shelf sees.
+   */
+  cause?: PriceMismatchCause;
   injected: boolean;
 }
 
@@ -92,7 +101,12 @@ function details(kind: FaultKind, facing: string, start: number, ctx: Context, r
     }
     return { kind, facing, start, end, gtin: stray.gtin };
   }
-  if (kind === "price_mismatch") return { kind, facing, start, end: null, tagPrice: wrongPrice(own, rng) };
+  if (kind === "price_mismatch") {
+    const tagPrice = wrongPrice(own, rng);
+    // Only a lower price can be a sale sign left up; either can be a label that missed a price change.
+    const cause: PriceMismatchCause = tagPrice < own.price && rng.chance(0.5) ? "sale_sign_left_up" : "label_not_updated";
+    return { kind, facing, start, end: null, tagPrice, cause };
+  }
   return { kind, facing, start, end: null };
 }
 

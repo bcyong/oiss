@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
-import { arrivedCount, clock, clockOf, faultSeen, flagsAt, incidentsUpTo, indexDay, latestObservation, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type IndexedDay } from "./day.ts";
+import { arrivedCount, clock, clockOf, faultSeen, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type IndexedDay } from "./day.ts";
 import { checkoutName, duration, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
-import type { AnyRecord, ShelfStatus } from "./oiss.ts";
+import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
 
 const SPEEDS = [
@@ -34,6 +34,7 @@ const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
 function observer(r: { source: string; data: { location: { camera?: string } } }): string {
   if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
   if (r.source.endsWith(":robot-1")) return "the robot";
+  if (r.source.endsWith(":esl")) return "the shelf labels";
   return r.source;
 }
 
@@ -305,9 +306,11 @@ export function App({ start }: { start?: AppStart } = {}) {
   if (selection?.kind === "facing") {
     const v = day.facings[selection.index]!;
     const obs = latestObservation(v, t);
+    const latest = latestRecord(v, t);
     const item = day.items.get(v.facing.gtin);
-    following = obs;
+    following = latest;
     related = v.obs.filter((_, i) => v.times[i]! <= t).reverse();
+    const label = related.find((r) => r.source.endsWith(":esl")) as OissRecord<ShelfObservationData> | undefined;
     selectionCard = (
       <>
         <h2>{item?.name ?? v.facing.gtin}</h2>
@@ -323,12 +326,21 @@ export function App({ start }: { start?: AppStart } = {}) {
             {v.facing.facings} facings, capacity {v.facing.capacity}, {money(v.facing.shelfPrice)}
           </dd>
           <dt>On the shelf</dt>
-          <dd>{obs ? `${STATUS_LABEL[obs.data.status]}${obs.data.fillLevel !== undefined ? `, ${pct(obs.data.fillLevel)} full` : ""}, at ${clockOf(day, obs.data.window.end)}` : "Not observed yet today"}</dd>
-          {obs?.data.flags?.length ? (
+          <dd>{obs?.data.status ? `${STATUS_LABEL[obs.data.status]}${obs.data.fillLevel !== undefined ? `, ${pct(obs.data.fillLevel)} full` : ""}, at ${clockOf(day, obs.data.window.end)}` : "Not observed yet today"}</dd>
+          {label && (
+            <>
+              <dt>Shelf label</dt>
+              <dd>
+                Shows {money(label.data.tagPrice)}
+                {label.data.flags?.includes("price_mismatch") ? ", which didn't take its new price" : ", confirmed"}, at {clockOf(day, label.time)}
+              </dd>
+            </>
+          )}
+          {latest?.data.flags?.length ? (
             <>
               <dt>Flagged</dt>
               <dd>
-                {obs.data.flags.map(flagName).join(", ")}: {flagDetail(day, obs.data)}
+                {latest.data.flags.map(flagName).join(", ")}: {flagDetail(day, latest.data)}
               </dd>
             </>
           ) : null}

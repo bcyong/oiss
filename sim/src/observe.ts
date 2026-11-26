@@ -11,6 +11,11 @@
  *   misplaced items included. They can't read shelf tags.
  * - Mock vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
  * - Mock vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
+ * - Mock vendor D, electronic shelf labels: a price check each time a label confirms a price
+ *   change or fails to (see esl.ts). Labels can't see the shelf, so these checks carry no status.
+ *
+ * Mock vendors A, C (counting) and D send their own formats, as mock vendor B does for loss
+ * prevention. Their adapters in adapters/src turn them into the OISS records here.
  *
  * Shelf images back every low-stock, out-of-stock and flagged read from the robot and the shelf cameras, as
  * Evidence records cropped to the shelf. The demo has no real frames yet, so each Evidence record
@@ -21,6 +26,11 @@ import type { Ground, TrackPoint } from "./model.ts";
 import { inPolygon, round } from "./geometry.ts";
 import { byTime, idMaker, type OissRecord, type Provenance, record } from "./records.ts";
 import { Rng } from "./rng.ts";
+import type { LayoutData } from "../../adapters/src/common.ts";
+import { adaptEslEvents, demo001EslConfig } from "../../adapters/src/mock-esl.ts";
+import { eslEvents, type MockEslEvent } from "./esl.ts";
+import { adaptTraffic, DEMO_001_TRAFFIC_ZONES, demo001TrafficConfig, type MockTrafficRow } from "../../adapters/src/mock-traffic-csv.ts";
+import { adaptShelfScans, DEMO_001_SECTIONS, demo001ShelfScanConfig, type MockShelfCapture, type MockShelfRead, type MockShelfScanMission } from "../../adapters/src/mock-shelf-scan.ts";
 import { hours, storeClock } from "./time.ts";
 
 export interface ObservedDay {
@@ -29,6 +39,12 @@ export interface ObservedDay {
   zoneMetrics: OissRecord[];
   shopperPaths: OissRecord[];
   evidence: OissRecord[];
+  /** The robot's missions in Mock vendor A's own format, before the adapter. */
+  shelfScanMissions: MockShelfScanMission[];
+  /** The people-counting vendor's CSV rows, before the adapter. */
+  trafficRows: MockTrafficRow[];
+  /** The shelf label system's reports, before the adapter. */
+  eslEvents: MockEslEvent[];
 }
 
 /** How long shelf images are kept, and who may view them. */
@@ -39,7 +55,6 @@ const MODEL = { name: "store-sim", version: "0.1.0" };
 
 const PROV = {
   planning: { system: "Demo Grocery space planning", synthetic: true },
-  robot: { system: "Mock shelf-scanning robot", vendor: "Mock vendor A", model: { name: "shelf-detector", version: "0.1" }, synthetic: true },
   shelfCams: { system: "Store shelf cameras (in-house)", model: { name: "shelf-vision", version: "0.3" }, synthetic: true },
   counting: { system: "Mock people-counting system", vendor: "Mock vendor C", model: { name: "people-counter", version: "0.2" }, synthetic: true },
   tracker: { system: "Mock multi-camera tracker", vendor: "Mock vendor C", model: { name: "mtmc-tracker", version: "0.2" }, synthetic: true },
@@ -66,6 +81,8 @@ interface Findings {
 
 /** How likely each source is to spot a misplaced item on one look. */
 const SPOT_MISPLACED = { robot: 0.9, shelfCams: 0.85 };
+
+const VENDOR_STATE = { in_stock: "OK", low_stock: "LOW", out_of_stock: "OOS", unknown: "NOREAD" } as const;
 
 function statusOf(fill: number): Status {
   if (fill <= 0.025) return "out_of_stock";
@@ -210,23 +227,57 @@ export function observeDay(g: Ground): ObservedDay {
     }
     return found;
   };
+  // The robot reports in Mock vendor A's own format; the mock-shelf-scan adapter turns that into OISS records.
+  const sectionOf = new Map(Object.entries(DEMO_001_SECTIONS).map(([code, fixture]) => [fixture, code]));
+  const ean = (gtin: string) => gtin.slice(1);
+  const vendorTime = (t: number) => new Date(clock.epochMs(t)).toISOString();
+  const missions: MockShelfScanMission[] = [];
   for (const start of ROBOT_RUNS) {
+    const missionId = `MVA-${date.replaceAll("-", "")}-${String(start / 3600).padStart(2, "0")}00`;
+    const captures: MockShelfCapture[] = [];
     robotPositions.forEach((pos, i) => {
       const t = start + i * ROBOT_SECONDS_PER_POSITION;
+      const captureId = `C${String(i + 1).padStart(4, "0")}`;
+      const levels = fixtureById.get(pos.fixture)!.levels!;
+      const shelves: MockShelfRead[] = [];
       for (const facing of pos.facings) {
-        const capacity = catalog.byFacing.get(facing)!.capacity;
+        const slot = slotById.get(facing)!;
+        const plan = catalog.byFacing.get(facing)!;
+        const shelf = levels - slot.level;
         const cooler = ["cooler", "freezer"].includes(fixtureById.get(pos.fixture)!.kind);
         if (robotRng.chance(cooler ? 0.03 : 0.012)) {
-          shelfObservations.push(shelfRecord(facing, t, 4, { status: "unknown", confidence: round(robotRng.uniform(0.2, 0.4)) }, `urn:oiss:${store}:mock-vendor-a:robot-1`, PROV.robot, undefined, true));
+          shelves.push({ shelf, state: "NOREAD", expected: ean(plan.gtin), conf: round(robotRng.uniform(0.2, 0.4)), exceptions: [] });
           continue;
         }
-        const fill = readFill(g.unitsAt(facing, t), capacity, cooler ? 0.08 : 0.05, robotRng);
-        const confidence = round(robotRng.uniform(cooler ? 0.78 : 0.86, cooler ? 0.92 : 0.97));
+        const fill = readFill(g.unitsAt(facing, t), plan.capacity, cooler ? 0.08 : 0.05, robotRng);
+        const conf = round(robotRng.uniform(cooler ? 0.78 : 0.86, cooler ? 0.92 : 0.97));
         const found = robotFindings(g.faultsAt(facing, t));
-        shelfObservations.push(shelfRecord(facing, t, 4, { status: statusOf(fill), fill, confidence }, `urn:oiss:${store}:mock-vendor-a:robot-1`, PROV.robot, undefined, true, found));
+        const status = statusOf(fill);
+        const seen = status !== "out_of_stock";
+        const detected = found.observedGtin ?? (seen ? plan.gtin : undefined);
+        const price = itemPrice(plan.gtin);
+        shelves.push({
+          shelf,
+          state: VENDOR_STATE[status],
+          fill_pct: Math.round(fill * 100),
+          expected: ean(plan.gtin),
+          ...(detected ? { detected: ean(detected) } : {}),
+          conf,
+          tag_price: found.tagPrice ?? price,
+          price_file: price,
+          exceptions: found.flags.map((f) => (f === "misplaced_item" ? "PLUG" : "PRICE")),
+          // A shelf image backs every low-stock, out-of-stock and exception read.
+          ...(status !== "in_stock" || found.flags.length ? { image: `${captureId}-S${shelf}.jpg` } : {}),
+        });
       }
+      captures.push({ capture_id: captureId, ts: vendorTime(t), section: sectionOf.get(pos.fixture)!, position: pos.sequence, shelves });
     });
+    missions.push({ mission_id: missionId, site: "DG0001", robot: "MVA-R1", started_at: vendorTime(start), ended_at: captures[captures.length - 1]!.ts, captures, mock: true });
   }
+  const scans = adaptShelfScans(missions, demo001ShelfScanConfig(storeLayout.data as unknown as LayoutData));
+  if (scans.rejected.length) throw new Error(`the shelf-scan adapter rejected ${scans.rejected.length} reads: ${scans.rejected[0]!.reason}`);
+  shelfObservations.push(...(scans.observations as unknown as OissRecord[]));
+  evidence.push(...(scans.evidence as unknown as OissRecord[]));
 
   // ---- ShelfObservation: in-house shelf cameras, change-based ----
   const camRng = rng.fork("shelf-cams");
@@ -270,6 +321,12 @@ export function observeDay(g: Ground): ObservedDay {
       }
     }
   }
+  // ---- ShelfObservation: electronic shelf label price checks, through the mock-esl adapter ----
+  const labelEvents = eslEvents(g);
+  const labels = adaptEslEvents(labelEvents, demo001EslConfig(storeLayout.data as unknown as LayoutData));
+  if (labels.rejected.length) throw new Error(`the shelf label adapter rejected ${labels.rejected.length} reports: ${labels.rejected[0]!.reason}`);
+  shelfObservations.push(...(labels.observations as unknown as OissRecord[]));
+
   // Number records in time order, so that a change late in the day never renumbers a record sent earlier.
   renumberShelfRecords(shelfObservations, evidence, date);
 
@@ -305,9 +362,9 @@ export function observeDay(g: Ground): ObservedDay {
     }
   }
 
-  const zmId = idMaker("zm", date);
   const zmRng = rng.fork("counting");
-  const zoneMetrics: OissRecord[] = [];
+  const trafficCodeOf = new Map(Object.entries(DEMO_001_TRAFFIC_ZONES).map(([code, zone]) => [zone, code]));
+  const trafficRows: MockTrafficRow[] = [];
   const noisy = (n: number, sd: number) => Math.max(0, n * (1 + zmRng.normal(0, sd)));
   const snapshotAt = (t: number) => {
     let s = g.frontEnd[0];
@@ -345,25 +402,27 @@ export function observeDay(g: Ground): ObservedDay {
         if (starts.length) metrics.avgWaitSeconds = Math.round(noisy(starts.reduce((a, s) => a + s.waitSeconds, 0) / starts.length, 0.05));
         metrics.openLanes = staffed ? snap.openLanes : layout.selfCheckoutStations;
       }
-      zoneMetrics.push(
-        record("ZoneMetric", {
-          id: zmId(),
-          source: `urn:oiss:${store}:mock-vendor-c:people-counting`,
-          time: clock.iso(w1),
-          subject: z.id,
-          store,
-          privacy: "aggregate",
-          data: {
-            provenance: PROV.counting,
-            window: { start: clock.iso(w0), end: clock.iso(w1) },
-            location: { zone: z.id },
-            metrics,
-            confidence: round(zmRng.uniform(0.84, 0.93)),
-          },
-        }),
-      );
+      const cell = (k: string) => (metrics[k] === undefined ? "" : String(metrics[k]));
+      trafficRows.push({
+        site_id: layout.store.storeNumber,
+        zone_code: trafficCodeOf.get(z.id)!,
+        interval_start: clock.iso(w0).slice(0, 16).replace("T", " "),
+        interval_min: String(METRIC_WINDOW / 60),
+        entries: cell("traffic"),
+        avg_occupancy: cell("avgOccupancy"),
+        peak_occupancy: cell("peakOccupancy"),
+        avg_dwell_sec: cell("avgDwellSeconds"),
+        queue_length: cell("queueLength"),
+        avg_wait_sec: cell("avgWaitSeconds"),
+        lanes_open: cell("openLanes"),
+        accuracy_pct: String(Math.round(round(zmRng.uniform(0.84, 0.93)) * 100)),
+      });
     });
   }
+  // Mock vendor C sends a CSV; the mock-traffic-csv adapter turns it into ZoneMetric records.
+  const traffic = adaptTraffic(trafficRows, demo001TrafficConfig());
+  if (traffic.rejected.length) throw new Error(`the traffic adapter rejected ${traffic.rejected.length} rows: ${traffic.rejected[0]!.reason}`);
+  const zoneMetrics = traffic.metrics as unknown as OissRecord[];
   zoneMetrics.sort(byTime);
 
   // ---- ShopperPath ----
@@ -415,7 +474,7 @@ export function observeDay(g: Ground): ObservedDay {
   }
   renumberByTime(shopperPaths, idMaker("sp", date));
 
-  return { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence };
+  return { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, shelfScanMissions: missions, trafficRows, eslEvents: labelEvents };
 }
 
 /** Sort records by time, keeping the order they were made in for equal times, and give them ids in that order. */
@@ -449,7 +508,9 @@ function renumberShelfRecords(observations: OissRecord[], evidence: OissRecord[]
     if (!id) throw new Error(`evidence ${e.id} backs no observation`);
     e.id = id;
     e.subject = id;
-    (e.data as { uri: string }).uri = `evidence/${date}/${id}.jpg`;
+    const data = e.data as { uri: string };
+    // In-house shelf images are named by record id; a vendor's images keep the vendor's own names.
+    if (data.uri.startsWith("evidence/")) data.uri = `evidence/${date}/${id}.jpg`;
   }
   evidence.sort(byTime);
 }

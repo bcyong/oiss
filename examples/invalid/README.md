@@ -6,6 +6,7 @@ Each file breaks one rule. The validator must reject every one of them.
 | --- | --- |
 | `store-layout-dangling-shelf.json` | shelf points at a fixture that isn't in the map (map-references) |
 | `shelf-observation-bad-check-digit.json` | GTIN check digit is wrong (schema format gtin) |
+| `shelf-observation-no-status-or-price.json` | reports neither on-shelf availability nor a tag price (schema anyOf) |
 | `zone-metric-window-reversed.json` | window starts after it ends (window-order) |
 | `shopper-path-face-field.json` | carries a biometric field, which OISS doesn't allow (schema unevaluatedProperties) |
 | `incident-wrong-privacy.json` | an Incident must be privacy class restricted (schema) |

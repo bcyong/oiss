@@ -18,6 +18,9 @@ export interface FacingView {
   /** Observation times in seconds since store midnight, ascending, with the matching records. */
   times: number[];
   obs: OissRecord<ShelfObservationData>[];
+  /** The same for the observations that report on-shelf availability, leaving out shelf label price checks. */
+  statusTimes: number[];
+  statusObs: OissRecord<ShelfObservationData>[];
 }
 
 export interface PathView {
@@ -163,7 +166,7 @@ export function indexDay(files: DayFiles): IndexedDay {
           ? { x: box.x + pos, y: box.y + shelf.level * band, w: len, h: band }
           : { x: box.x + shelf.level * band, y: box.y + pos, w: band, h: len };
       pos += len;
-      const view: FacingView = { facing: f, fixture, zone: fixture.zone, level: shelf.level, rect, times: [], obs: [] };
+      const view: FacingView = { facing: f, fixture, zone: fixture.zone, level: shelf.level, rect, times: [], obs: [], statusTimes: [], statusObs: [] };
       facings.push(view);
       facingIndex.set(f.id, view);
     }
@@ -178,6 +181,11 @@ export function indexDay(files: DayFiles): IndexedDay {
     const order = v.times.map((_, i) => i).sort((a, b) => v.times[a]! - v.times[b]!);
     v.times = order.map((i) => v.times[i]!);
     v.obs = order.map((i) => v.obs[i]!);
+    v.obs.forEach((r, i) => {
+      if (r.data.status === undefined) return;
+      v.statusTimes.push(v.times[i]!);
+      v.statusObs.push(r);
+    });
   }
 
   const zones = new Map(layout.zones.map((z) => [z.id, z]));
@@ -247,9 +255,9 @@ export function indexDay(files: DayFiles): IndexedDay {
     let outOfStock = 0;
     let lowStock = 0;
     for (const v of facings) {
-      const i = lastAtOrBefore(v.times, t);
+      const i = lastAtOrBefore(v.statusTimes, t);
       if (i < 0) continue;
-      const st = v.obs[i]!.data.status;
+      const st = v.statusObs[i]!.data.status;
       if (st === "out_of_stock") outOfStock++;
       else if (st === "low_stock") lowStock++;
     }
@@ -390,12 +398,19 @@ export function incidentsUpTo(series: IncidentSeries | undefined, t: number): Oi
 /** Each facing's latest observed status at time t, or "none" before its first observation. */
 export function statusesAt(day: IndexedDay, t: number): (ShelfStatus | "none")[] {
   return day.facings.map((v) => {
-    const i = lastAtOrBefore(v.times, t);
-    return i < 0 ? "none" : v.obs[i]!.data.status;
+    const i = lastAtOrBefore(v.statusTimes, t);
+    return i < 0 ? "none" : v.statusObs[i]!.data.status!;
   });
 }
 
+/** The facing's latest observation at time t that reports on-shelf availability. */
 export function latestObservation(v: FacingView, t: number): OissRecord<ShelfObservationData> | undefined {
+  const i = lastAtOrBefore(v.statusTimes, t);
+  return i < 0 ? undefined : v.statusObs[i];
+}
+
+/** The facing's latest observation of any kind at time t, price checks included. */
+export function latestRecord(v: FacingView, t: number): OissRecord<ShelfObservationData> | undefined {
   const i = lastAtOrBefore(v.times, t);
   return i < 0 ? undefined : v.obs[i];
 }

@@ -5,7 +5,7 @@ Each record type has its own schema for `data` in [`schemas/v0.1`](../schemas/v0
 | Record | About (`subject`) | What it says | Typical sources | Privacy floor |
 | --- | --- | --- | --- | --- |
 | StoreLayout | the store | Zones, fixtures, shelves and facings, with the planogram and camera placement | Space planning and planogram systems, ESL and item-location platforms | operational |
-| ShelfObservation | a facing | On-shelf availability (in stock, low stock, out of stock), planogram compliance and price integrity | Shelf-scanning robots, fixed shelf cameras, associate audits | operational |
+| ShelfObservation | a facing | On-shelf availability (in stock, low stock, out of stock), planogram compliance and price integrity | Shelf-scanning robots, fixed shelf cameras, electronic shelf labels, associate audits | operational |
 | ZoneMetric | a zone | Traffic, dwell, queue length, wait time and open lanes over one interval | People counting, shopper analytics, video analytics | aggregate |
 | ShopperPath | an anonymous path | One shopper's path on the floor plan | Multi-camera tracking; off by default | anonymous_path |
 | Incident | an incident | A loss-prevention exception or safety incident, with a confidence | Loss-prevention and front-end vision, safety detection | restricted |
@@ -14,7 +14,7 @@ Each record type has its own schema for `data` in [`schemas/v0.1`](../schemas/v0
 
 ## Rules worth calling out
 
-- **ShelfObservation** needs `status`, `location` (with the facing), `confidence` and the scan `window`. `observedGtin` is the item seen and `planogramGtin` the item the planogram assigns, so a misplaced item shows in the data. `tagPrice` is what the shelf tag or ESL shows and `systemPrice` what the price file or POS charges, so a price mismatch shows too.
+- **ShelfObservation** needs `location` (with the facing), `confidence` and the scan `window`, and at least one of `status` and `tagPrice`. A source that sees the shelf reports `status`. A source that only knows the price, such as an electronic shelf label (ESL) system confirming the price a label shows, sends a price check with `tagPrice` and `systemPrice` and no `status`, and consumers MUST NOT read a missing `status` as a change in availability. `observedGtin` is the item seen and `planogramGtin` the item the planogram assigns, so a misplaced item shows in the data. `tagPrice` is what the shelf tag or ESL shows and `systemPrice` what the price file or POS charges, so a price mismatch shows too.
 - **ZoneMetric** is aggregate only: counts and averages, never individual shoppers.
 - **ShopperPath** carries an anonymous path id that rotates. `idValidUntil` says when the producer must switch to a new id, and every point must come before it. Points are in time order and inside the window. No appearance, face or other biometric field is allowed.
 - **Incident** is a signal, not an accusation. Its `status` starts at `open`, and only a person moves it to `confirmed` or `dismissed`.

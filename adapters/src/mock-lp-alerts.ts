@@ -59,6 +59,10 @@ export interface LpAdapterConfig {
   accessRoles: string[];
 }
 
+import { SCHEMA_BASE, localIso, midnightAfter, toGtin14 } from "./common.ts";
+
+export { gs1CheckDigit, localIso, toGtin14 } from "./common.ts";
+
 export const ADAPTER = { name: "mock-lp-alerts", version: "0.1.0" };
 
 /** The mapping the retailer keeps for store demo-001. */
@@ -79,7 +83,6 @@ export function demo001Config(): LpAdapterConfig {
 
 const INCIDENT_TYPE = { NSCN: "non_scan", BOTB: "bottom_of_basket", TKSW: "ticket_switching", SWHT: "sweethearting" } as const;
 const LABEL = { NSCN: "non-scan", BOTB: "bottom-of-basket", TKSW: "ticket switch", SWHT: "sweethearting" } as const;
-const SCHEMA_BASE = "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/";
 
 export interface AdaptedRecord {
   specversion: "1.0";
@@ -102,48 +105,6 @@ export interface AdaptResult {
   /** Vendor alert id -> the Incident record id it became. */
   incidentFor: Record<string, string>;
   rejected: { alert_id: string; reason: string }[];
-}
-
-/** GS1 check digit for the digits before it. */
-export function gs1CheckDigit(body: string): number {
-  let sum = 0;
-  for (let i = 0; i < body.length; i++) sum += Number(body[body.length - 1 - i]) * (i % 2 === 0 ? 3 : 1);
-  return (10 - (sum % 10)) % 10;
-}
-
-/** An EAN-13, UPC-A or GTIN-14 as a 14-digit GTIN, or null if it isn't a valid one. */
-export function toGtin14(code: string): string | null {
-  if (!/^\d{12,14}$/.test(code)) return null;
-  const gtin = code.padStart(14, "0");
-  return gs1CheckDigit(gtin.slice(0, 13)) === Number(gtin[13]) ? gtin : null;
-}
-
-/** The UTC offset of a time zone at an instant, as "-08:00". */
-function offsetAt(ms: number, timezone: string): string {
-  const name = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "longOffset" }).formatToParts(new Date(ms)).find((p) => p.type === "timeZoneName")?.value ?? "GMT";
-  if (name === "GMT") return "+00:00";
-  const m = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(name);
-  if (!m) throw new Error(`can't read the UTC offset for ${timezone}: ${name}`);
-  return `${m[1]}${m[2]!.padStart(2, "0")}:${m[3] ?? "00"}`;
-}
-
-/** Epoch milliseconds -> RFC 3339 in the store's local time, to the second. */
-export function localIso(ms: number, timezone: string): string {
-  const offset = offsetAt(ms, timezone);
-  const sign = offset.startsWith("-") ? -1 : 1;
-  const minutes = sign * (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(4, 6)));
-  const local = new Date(Math.round(ms / 1000) * 1000 + minutes * 60_000);
-  return local.toISOString().slice(0, 19) + offset;
-}
-
-/** Local midnight, a number of days after the local date of an instant. */
-function midnightAfter(ms: number, days: number, timezone: string): string {
-  const date = localIso(ms, timezone).slice(0, 10);
-  const later = new Date(`${date}T12:00:00Z`);
-  later.setUTCDate(later.getUTCDate() + days);
-  const day = later.toISOString().slice(0, 10);
-  // Read the offset at local noon that day, so a daylight saving change in between is handled.
-  return `${day}T00:00:00${offsetAt(Date.parse(`${day}T12:00:00Z`), timezone)}`;
 }
 
 const severityOf = (value: number): "low" | "medium" | "high" => (value < 10 ? "low" : value < 40 ? "medium" : "high");

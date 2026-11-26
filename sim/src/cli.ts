@@ -5,14 +5,19 @@
  *
  * Output, under DIR/<store>/<date>/:
  *   store-layout.json         the StoreLayout record (planogram included)
- *   shelf-observations.jsonl  ShelfObservation records, one per line, in time order
- *   zone-metrics.jsonl        ZoneMetric records
+ *   shelf-observations.jsonl  ShelfObservation records, one per line, in time order: shelf scans
+ *                             (through the mock-shelf-scan adapter), shelf cameras, and shelf label
+ *                             price checks (through the mock-esl adapter)
+ *   zone-metrics.jsonl        ZoneMetric records, through the mock-traffic-csv adapter
  *   shopper-paths.jsonl       ShopperPath records
  *   evidence.jsonl            Evidence records: shelf images behind low-stock and out-of-stock reads,
  *                             and checkout clips behind loss prevention alerts
  *   incidents.jsonl           Incident records: loss prevention alerts, through the mock-lp-alerts adapter
- *   vendor/mock-vendor-b-lp-alerts.ndjson
- *                             the loss prevention vendor's own feed, before the adapter (not OISS)
+ *   vendor/                   each mock vendor's own export, before its adapter (not OISS):
+ *     mock-vendor-a-shelf-scans.ndjson  the shelf-scanning robot's missions, one per line
+ *     mock-vendor-b-lp-alerts.ndjson    the loss prevention alerts
+ *     mock-vendor-c-traffic.csv         the people-counting CSV
+ *     mock-vendor-d-esl.ndjson          the shelf label system's price reports
  *   item-master.json          the synthetic item master (not an OISS record)
  *   summary.json              ground-truth totals for the day (not an OISS record)
  * plus DIR/index.json listing the days written.
@@ -51,7 +56,10 @@ const files: Record<string, { text: string; records?: number }> = {
   "shopper-paths.jsonl": { text: jsonl(day.records.shopperPaths), records: day.records.shopperPaths.length },
   "evidence.jsonl": { text: jsonl(day.records.evidence), records: day.records.evidence.length },
   "incidents.jsonl": { text: jsonl(day.records.incidents), records: day.records.incidents.length },
+  "vendor/mock-vendor-a-shelf-scans.ndjson": { text: jsonl(day.vendorExports.mockShelfScans) },
   "vendor/mock-vendor-b-lp-alerts.ndjson": { text: jsonl(day.vendorExports.mockLpAlerts) },
+  "vendor/mock-vendor-c-traffic.csv": { text: day.vendorExports.mockTrafficCsv },
+  "vendor/mock-vendor-d-esl.ndjson": { text: jsonl(day.vendorExports.mockEsl) },
   "item-master.json": { text: JSON.stringify(day.itemMaster, null, 2) + "\n" },
   "summary.json": { text: JSON.stringify(day.summary, null, 2) + "\n" },
 };
@@ -78,7 +86,7 @@ writeFileSync(join(values.out!, "index.json"), JSON.stringify({ days: [{ store, 
 
 const total = Object.values(manifest.files).reduce((a, f) => a + ("records" in f ? (f.records as number) : 0), 0);
 console.log(`${store} ${values.date} seed ${seed}: ${total} OISS records in ${dir}`);
-for (const [name, f] of Object.entries(manifest.files)) console.log(`  ${name.padEnd(26)} ${"records" in f ? String(f.records).padStart(6) : "      "}  ${(f.bytes / 1024).toFixed(0).padStart(6)} KB`);
+for (const [name, f] of Object.entries(manifest.files)) console.log(`  ${name.padEnd(40)} ${"records" in f ? String(f.records).padStart(6) : "      "}  ${(f.bytes / 1024).toFixed(0).padStart(6)} KB`);
 
 if (values["write-manifest"]) {
   writeFileSync(values["write-manifest"], JSON.stringify(manifest, null, 2) + "\n");
