@@ -10,76 +10,79 @@
       "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
     },
     "shelf-observations.jsonl": {
-      "records": 7612,
-      "bytes": 7507523,
-      "sha256": "dbebd477e1b045b700934fb03ccc08d1a7cc0bb3fe7152f4d0bd635653537aca"
+      "records": 7590,
+      "bytes": 7481725,
+      "sha256": "49c1be1608e7a886139c17817b88c4940d56b72fe6a991f9c7f302891fbf94ec"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
-      "bytes": 864250,
-      "sha256": "490e96aaf9713004c212cab091e0d8cd848d17256ef5de36779d93c294d9278a"
+      "bytes": 864246,
+      "sha256": "51521813ad5cff2e1d35107cb853e893b80b6b73c84589ff928a73c067e4dd02"
     },
     "shopper-paths.jsonl": {
-      "records": 2330,
-      "bytes": 6337423,
-      "sha256": "2173ad6b9a3eb7f76be02e73452ec32a1cdfb095abe8922b2f5fcedf0e07efa0"
+      "records": 2332,
+      "bytes": 6342890,
+      "sha256": "8a7eb9466f6b7138f9db4891fb5ba8b79df0ce98589246addf76fd82090cecef"
     },
     "evidence.jsonl": {
-      "records": 1039,
-      "bytes": 1003744,
-      "sha256": "fa4bdaac172a16bc41bb307fcb4df71e07a30b5e08ff909a5cb3cf4ef250f35f"
+      "records": 971,
+      "bytes": 936561,
+      "sha256": "4d01aaa9f870a9cd9cb88082fdc87ed4390749966c16b5d4c600ceda5d5d2311"
     },
     "incidents.jsonl": {
       "records": 21,
-      "bytes": 20569,
-      "sha256": "f1d7d9d49570d42c61e855261826e911604d12c2a453f19936dde083d11f2c66"
+      "bytes": 20623,
+      "sha256": "e585bcbda84581f3e37f375cc3a70433046ccbe258a1f15a3b14730ba50e956b"
     },
     "tasks.jsonl": {
-      "records": 642,
-      "bytes": 494446,
-      "sha256": "55d71b2515516fd30eb3aaca35171e41bb8a3517f03e197e77b844044de9c774"
+      "records": 778,
+      "bytes": 602023,
+      "sha256": "6c31bb805ec9cd5730ae08fc547391f2ca34879534898a596fcf0c83a013f483"
     },
     "vendor/mock-vendor-a-shelf-scans.ndjson": {
-      "bytes": 1260777,
-      "sha256": "c7b5f2bb635b0c01acf4efaf9770062e2e1e2df38f0384bafd136108a39ae574"
+      "bytes": 1258828,
+      "sha256": "9842fd5d52fea9ac668a32ac3bddc25957fa624c3e1f8807bc525950d8a4c975"
     },
     "vendor/mock-vendor-b-lp-alerts.ndjson": {
-      "bytes": 7129,
-      "sha256": "9035f1f0632c91c9a3990b3fea1458824b76e88bd41d3fc9809adfa281e7985c"
+      "bytes": 7227,
+      "sha256": "6c746aa9d7a472bace06408876e5c2ea3d76969addf4a25c888a884a8032c0b7"
     },
     "vendor/mock-vendor-c-traffic.csv": {
-      "bytes": 52753,
-      "sha256": "2c3e5da438da04bc2ed04eec41c2d209c446327315780913dc978b75b89f874c"
+      "bytes": 52749,
+      "sha256": "bc4500f9e960abbaa551cf51dbfba7abf99cc63cd5439875d71095f2e4493ff0"
     },
     "vendor/mock-vendor-d-esl.ndjson": {
-      "bytes": 26932,
-      "sha256": "7b8f5c222fe5a8c7bbb37fc813fc9e06792c240b399c775f305740c958e5ce58"
+      "bytes": 11129,
+      "sha256": "819e017cf5c80673392c826c97aa32a0157d89f82b4636124c57d208093cc460"
     },
     "item-master.json": {
       "bytes": 300731,
       "sha256": "6d11ce219737e3c2052e94d73ebf0c8916c64887d4123bb75df3a8ade95684e6"
     },
     "summary.json": {
-      "bytes": 709,
-      "sha256": "5808bc5a557dc13aaef6bf352e8c943d5e77e36848a80c775907e61d82f3c902"
+      "bytes": 802,
+      "sha256": "347b6a7fe14889ed310149fb687a7e8f757f439e491afc242072101ee9f42c15"
     }
   },
   "stats": {
     "shoppers": 1626,
-    "unitsSold": 24787,
-    "unitsMissed": 1247,
-    "salesDollars": 153638.23,
-    "missedDollars": 7943.13,
-    "avgWaitStaffedSeconds": 89,
+    "unitsSold": 25087,
+    "unitsMissed": 947,
+    "salesDollars": 155394.63,
+    "missedDollars": 6186.73,
+    "avgWaitStaffedSeconds": 88,
     "avgWaitSelfSeconds": 0,
     "maxStaffedWaiting": 19,
-    "facingsOutOfStockAtClose": 126,
-    "recoveryUnits": 11447,
+    "facingsOutOfStockAtClose": 85,
+    "recoveryUnits": 12342,
+    "taskFillUnits": 1789,
+    "goBacksClearedForTasks": 15,
+    "shelfTagsFixedForTasks": 11,
     "phantomUnits": 26
   },
   "lossPrevention": {
     "exceptions": 22,
-    "valueNotPaid": 187.85,
+    "valueNotPaid": 187.64,
     "alerts": 21,
     "trueAlerts": 17,
     "falseAlerts": 4,

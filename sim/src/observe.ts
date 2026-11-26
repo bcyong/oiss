@@ -97,7 +97,12 @@ function readFill(units: number, capacity: number, sd: number, rng: Rng): number
   return Math.round(fill * 20) / 20;
 }
 
-export function observeDay(g: Ground): ObservedDay {
+/**
+ * shelvesOnly: report only the StoreLayout and the shelf reads (robot, shelf cameras and labels), which
+ * is all the store's task system needs to raise shelf work. runDay uses it while it works out what the
+ * associates did.
+ */
+export function observeDay(g: Ground, opts: { shelvesOnly?: boolean } = {}): ObservedDay {
   const rng = new Rng(g.config.seed).fork("observe");
   const { layout, catalog, clock } = g;
   const store = layout.store.id;
@@ -212,12 +217,14 @@ export function observeDay(g: Ground): ObservedDay {
       robotPositions.push({ fixture: f.id, sequence: seq, facings });
     }
   }
-  // Fault draws use their own streams, so a fault changes nothing else the sources report.
+  // Fault draws use their own streams, so a fault changes nothing else the sources report. Each look at
+  // a facing gets its own draws, so what happens on one facing (a fault, a fill an associate did for a
+  // store task) changes nothing reported about another.
   const robotFaultRng = rng.fork("robot-faults");
-  const robotFindings = (faults: ShelfFault[]): Findings => {
+  const robotFindings = (faults: ShelfFault[], look: Rng): Findings => {
     const found: Findings = { flags: [] };
     for (const f of faults) {
-      if (f.kind === "misplaced_item" && robotFaultRng.chance(SPOT_MISPLACED.robot)) {
+      if (f.kind === "misplaced_item" && look.chance(SPOT_MISPLACED.robot)) {
         found.observedGtin = f.gtin;
         found.flags.push("misplaced_item");
       } else if (f.kind === "price_mismatch") {
@@ -245,13 +252,14 @@ export function observeDay(g: Ground): ObservedDay {
         const plan = catalog.byFacing.get(facing)!;
         const shelf = levels - slot.level;
         const cooler = ["cooler", "freezer"].includes(fixtureById.get(pos.fixture)!.kind);
-        if (robotRng.chance(cooler ? 0.03 : 0.012)) {
-          shelves.push({ shelf, state: "NOREAD", expected: ean(plan.gtin), conf: round(robotRng.uniform(0.2, 0.4)), exceptions: [] });
+        const look = robotRng.fork(`${start}:${facing}`);
+        if (look.chance(cooler ? 0.03 : 0.012)) {
+          shelves.push({ shelf, state: "NOREAD", expected: ean(plan.gtin), conf: round(look.uniform(0.2, 0.4)), exceptions: [] });
           continue;
         }
-        const fill = readFill(g.unitsAt(facing, t), plan.capacity, cooler ? 0.08 : 0.05, robotRng);
-        const conf = round(robotRng.uniform(cooler ? 0.78 : 0.86, cooler ? 0.92 : 0.97));
-        const found = robotFindings(g.faultsAt(facing, t));
+        const fill = readFill(g.unitsAt(facing, t), plan.capacity, cooler ? 0.08 : 0.05, look);
+        const conf = round(look.uniform(cooler ? 0.78 : 0.86, cooler ? 0.92 : 0.97));
+        const found = robotFindings(g.faultsAt(facing, t), robotFaultRng.fork(`${start}:${facing}`));
         const status = statusOf(fill);
         const seen = status !== "out_of_stock";
         const detected = found.observedGtin ?? (seen ? plan.gtin : undefined);
@@ -296,11 +304,13 @@ export function observeDay(g: Ground): ObservedDay {
   const pending = new Map<string, string>();
   for (let t = g.open; t <= g.close; t += SHELF_CAM_INTERVAL) {
     for (const { facing, camera } of watched) {
-      const fill = readFill(g.unitsAt(facing, t), catalog.byFacing.get(facing)!.capacity, 0.04, camRng);
+      const look = camRng.fork(`${t}:${facing}`);
+      const fill = readFill(g.unitsAt(facing, t), catalog.byFacing.get(facing)!.capacity, 0.04, look);
       const status = statusOf(fill);
       const found: Findings = { flags: [] };
+      const faultLook = camFaultRng.fork(`${t}:${facing}`);
       for (const f of g.faultsAt(facing, t)) {
-        if (f.kind === "misplaced_item" && camFaultRng.chance(SPOT_MISPLACED.shelfCams)) {
+        if (f.kind === "misplaced_item" && faultLook.chance(SPOT_MISPLACED.shelfCams)) {
           found.observedGtin = f.gtin;
           found.flags.push("misplaced_item");
         }
@@ -313,7 +323,7 @@ export function observeDay(g: Ground): ObservedDay {
       if (first || (key !== last && pending.get(facing) === key)) {
         reported.set(facing, key);
         pending.delete(facing);
-        shelfObservations.push(shelfRecord(facing, t, 10, { status, fill, confidence: round(camRng.uniform(0.9, 0.98)) }, `urn:oiss:${store}:store-vision:${camera}`, PROV.shelfCams, camera, false, found));
+        shelfObservations.push(shelfRecord(facing, t, 10, { status, fill, confidence: round(look.uniform(0.9, 0.98)) }, `urn:oiss:${store}:store-vision:${camera}`, PROV.shelfCams, camera, false, found));
       } else if (key !== last) {
         pending.set(facing, key);
       } else {
@@ -329,6 +339,7 @@ export function observeDay(g: Ground): ObservedDay {
 
   // Number records in time order, so that a change late in the day never renumbers a record sent earlier.
   renumberShelfRecords(shelfObservations, evidence, date);
+  if (opts.shelvesOnly) return { storeLayout, shelfObservations, zoneMetrics: [], shopperPaths: [], evidence, shelfScanMissions: missions, trafficRows: [], eslEvents: labelEvents };
 
   // ---- ZoneMetric ----
   const zones = layout.zones.filter((z) => z.public);

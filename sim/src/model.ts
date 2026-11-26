@@ -21,6 +21,19 @@ export interface DayConfig {
   recoveryRounds?: number[];
   /** Faults to add to the day, on top of the ones that come at set rates. */
   injections?: Injection[];
+  /**
+   * Work associates do because a store task asked for it. runDay works these out from the day's own
+   * tasks (see tasks.ts), so callers normally leave this empty.
+   */
+  workOrders?: WorkOrder[];
+}
+
+/** One piece of work an associate does for a store task, at a set time and facing. */
+export interface WorkOrder {
+  kind: "replenish" | "go_back" | "fix_shelf_tag";
+  facing: string;
+  /** Seconds since local midnight. */
+  t: number;
 }
 
 export type Mission = "quick_trip" | "fill_in" | "stock_up";
@@ -82,6 +95,11 @@ export interface DayStats {
   maxStaffedWaiting: number;
   facingsOutOfStockAtClose: number;
   recoveryUnits: number;
+  /** Of those, units filled because a store task asked for them. */
+  taskFillUnits: number;
+  /** Go-backs cleared and shelf tags fixed because a store task asked for it. */
+  goBacksClearedForTasks: number;
+  shelfTagsFixedForTasks: number;
   /** Units that disappeared from shelves without a sale, behind phantom inventory. */
   phantomUnits: number;
 }
@@ -98,8 +116,11 @@ export interface Ground {
   tracks: ShopperTrack[];
   /** Per facing: [time, units on the shelf] at each change, in time order, starting at the overnight fill. */
   shelfHistory: Map<string, [number, number][]>;
-  /** Each facing an associate worked in a recovery round, in time order, and the units they filled from the backroom (0 when it had none). */
-  recoveryWork: { t: number; facing: string; units: number }[];
+  /**
+   * Each facing an associate filled from the backroom, in time order, and the units they filled (0 when
+   * the backroom had none): in a recovery round, or because a store task asked for it.
+   */
+  recoveryWork: { t: number; facing: string; units: number; by: "recovery_round" | "task" }[];
   frontEnd: FrontEndSnapshot[];
   serviceStarts: ServiceStart[];
   transactions: Transaction[];
@@ -136,7 +157,7 @@ const QUEUE_STEP = 0.8;
 const DEFAULT_ROUNDS = [hours(11), hours(15), hours(19)];
 
 export function simulateDay(input: DayConfig): Ground {
-  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], ...input };
+  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], workOrders: [], ...input };
   const root = new Rng(config.seed);
   const layout = buildLayout();
   const clock = storeClock(config.date, layout.store.timezone);
@@ -168,33 +189,53 @@ export function simulateDay(input: DayConfig): Ground {
   };
 
   let recoveryUnits = 0;
+  let taskFillUnits = 0;
   const recoveryWork: Ground["recoveryWork"] = [];
-  const recover = (facing: string) => {
+  const recover = (facing: string, by: "recovery_round" | "task") => {
     const cap = catalog.byFacing.get(facing)!.capacity;
     const have = units.get(facing)!;
     const fill = Math.max(0, Math.min(cap - have, backroom.get(facing)!));
-    recoveryWork.push({ t: sched.now, facing, units: fill });
+    recoveryWork.push({ t: sched.now, facing, units: fill, by });
     if (fill <= 0) return;
     backroom.set(facing, backroom.get(facing)! - fill);
     recoveryUnits += fill;
+    if (by === "task") taskFillUnits += fill;
     setUnits(facing, have + fill);
   };
 
   // The store's own recovery rounds: an associate works the aisles in order and fills what is low, missing some.
+  // Each facing gets its own draw, so work done on one facing changes nothing about another.
   const roundRng = root.fork("recovery");
   for (const start of config.recoveryRounds) {
     sched.at(start, () => {
       const low = layout.slots.filter((s) => {
         const pos = catalog.byFacing.get(s.id);
-        return pos && units.get(s.id)! < 0.5 * pos.capacity && roundRng.chance(0.7);
+        return pos && units.get(s.id)! < 0.5 * pos.capacity && roundRng.fork(`${start}:${s.id}`).chance(0.7);
       });
       const span = hours(1, 15);
-      low.forEach((s, i) => sched.at(start + (span * (i + 1)) / (low.length + 1), () => recover(s.id)));
+      low.forEach((s, i) => sched.at(start + (span * (i + 1)) / (low.length + 1), () => recover(s.id, "recovery_round")));
     });
   }
 
+  // Backroom fills that store tasks asked for.
+  for (const o of config.workOrders) if (o.kind === "replenish") sched.at(o.t, () => recover(o.facing, "task"));
+
   // ---- shelf faults ----
   const faults = planFaults({ seed: config.seed, catalog, open: OPEN, lastEntry: LAST_ENTRY, hourly: HOURLY, recoveryRounds: config.recoveryRounds, injections: config.injections });
+  // A go-back cleared or a shelf tag fixed for a store task ends the fault then, if nothing ended it sooner.
+  let goBacksClearedForTasks = 0;
+  let shelfTagsFixedForTasks = 0;
+  for (const o of config.workOrders) {
+    if (o.kind === "replenish") continue;
+    const kind = o.kind === "go_back" ? "misplaced_item" : "price_mismatch";
+    for (const f of faults) {
+      if (f.kind !== kind || f.facing !== o.facing || f.start > o.t || (f.end !== null && f.end <= o.t)) continue;
+      f.end = o.t;
+      f.endedBy = "task";
+      if (o.kind === "go_back") goBacksClearedForTasks++;
+      else shelfTagsFixedForTasks++;
+    }
+  }
   const faultsByFacing = new Map<string, ShelfFault[]>();
   for (const f of faults) faultsByFacing.set(f.facing, [...(faultsByFacing.get(f.facing) ?? []), f]);
   let phantomUnits = 0;
@@ -515,6 +556,9 @@ export function simulateDay(input: DayConfig): Ground {
     maxStaffedWaiting: Math.max(0, ...frontEnd.map((f) => f.staffedWaiting)),
     facingsOutOfStockAtClose: catalog.planogram.filter((p) => unitsAt(p.facing, CLOSE) === 0).length,
     recoveryUnits,
+    taskFillUnits,
+    goBacksClearedForTasks,
+    shelfTagsFixedForTasks,
     phantomUnits,
   };
 

@@ -1,4 +1,4 @@
-import { simulateDay, type DayConfig, type DayStats, type Ground } from "./model.ts";
+import { simulateDay, type DayConfig, type DayStats, type Ground, type WorkOrder } from "./model.ts";
 import { adaptLpAlerts, demo001Config } from "../../adapters/src/mock-lp-alerts.ts";
 import { type LossPreventionDay, lossPreventionDay, type MockLpAlert } from "./lossPrevention.ts";
 import type { MockShelfScanMission } from "../../adapters/src/mock-shelf-scan.ts";
@@ -7,7 +7,7 @@ import type { MockEslEvent } from "./esl.ts";
 import { FAULT_KINDS, type FaultKind } from "./faults.ts";
 import { observeDay, type ObservedDay } from "./observe.ts";
 import { byTime, type OissRecord, SIM_VERSION } from "./records.ts";
-import { storeTasks } from "./tasks.ts";
+import { storeTasks, workOrders } from "./tasks.ts";
 
 export interface ItemMasterEntry {
   gtin: string;
@@ -36,8 +36,27 @@ export interface SimulatedDay {
   summary: { store: string; date: string; seed: number; generator: string; stats: DayStats; shelfFaults: Record<FaultKind, number> & { injected: number }; lossPrevention: LossPreventionDay["scorecard"] };
 }
 
+/** Most passes runDay takes to settle what the associates did for the day's tasks. */
+const MAX_TASK_PASSES = 25;
+
+/**
+ * Runs the day, then again with the shelf work its tasks asked for, until that work stops changing.
+ * Work done at a time changes the day only from then on, and tasks raise work only later, so each
+ * pass settles at least one more piece of work on every facing, and the day converges.
+ */
+function settleDay(config: DayConfig): Ground {
+  let orders: WorkOrder[] = [];
+  for (let pass = 0; pass < MAX_TASK_PASSES; pass++) {
+    const ground = simulateDay({ ...config, workOrders: orders });
+    const next = workOrders(ground, observeDay(ground, { shelvesOnly: true }).shelfObservations);
+    if (JSON.stringify(next) === JSON.stringify(orders)) return ground;
+    orders = next;
+  }
+  throw new Error(`the store's task work did not settle in ${MAX_TASK_PASSES} passes`);
+}
+
 export function runDay(config: DayConfig): SimulatedDay {
-  const ground = simulateDay(config);
+  const ground = settleDay(config);
   const observed = observeDay(ground);
   const lp = lossPreventionDay(ground);
   const adapted = adaptLpAlerts(lp.alerts, demo001Config());
