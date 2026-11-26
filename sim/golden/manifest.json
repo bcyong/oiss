@@ -10,9 +10,9 @@
       "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
     },
     "shelf-observations.jsonl": {
-      "records": 2494,
-      "bytes": 2321684,
-      "sha256": "746b20e5f28fff862b171d66469ce476e9850bd1234e243b6a31583fc4f3bc8a"
+      "records": 7504,
+      "bytes": 7056966,
+      "sha256": "9c373fc19eb96bdb14a804571bda117d4f0ad71d561286f47ca5d15191e5d8fd"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
@@ -25,17 +25,26 @@
       "sha256": "aa3cd6cf92c818ff0b16e00cb64bc566086605e71a246f67330fc0da802a5583"
     },
     "evidence.jsonl": {
-      "records": 331,
-      "bytes": 307139,
-      "sha256": "0a72067d9d1100a6e92fc20d4fa71daa406e13a3d49edc344fc400d811a0f6f4"
+      "records": 993,
+      "bytes": 920275,
+      "sha256": "5ae32b0702684130752850d9628924982598d2772985e037e5b24dd8c6902ed0"
+    },
+    "incidents.jsonl": {
+      "records": 25,
+      "bytes": 24566,
+      "sha256": "ebfe332263cfffe45c68661626b1198a99118149ff399f571276cddca72a85f4"
+    },
+    "vendor/mock-vendor-b-lp-alerts.ndjson": {
+      "bytes": 8462,
+      "sha256": "a4cdc08cd354ba08e7b823874f9e080ca2a9bbd8452499b4993f63cea0d994c4"
     },
     "item-master.json": {
       "bytes": 300731,
       "sha256": "6d11ce219737e3c2052e94d73ebf0c8916c64887d4123bb75df3a8ade95684e6"
     },
     "summary.json": {
-      "bytes": 405,
-      "sha256": "b3a6af5736210f11d3ce9e9410ea5b02b771ad39d3eeaa5ca2649752f1dd679e"
+      "bytes": 560,
+      "sha256": "580f89cbda9473ef4864c2c3a9c3c34c6b64ac3d797da0a1fb1a1d64de221f9e"
     }
   },
   "stats": {
@@ -49,5 +58,13 @@
     "maxStaffedWaiting": 16,
     "facingsOutOfStockAtClose": 123,
     "recoveryUnits": 11568
+  },
+  "lossPrevention": {
+    "exceptions": 22,
+    "valueNotPaid": 194.54,
+    "alerts": 25,
+    "trueAlerts": 17,
+    "falseAlerts": 8,
+    "missed": 5
   }
 }

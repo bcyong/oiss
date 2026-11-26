@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { IndexedDay } from "./day.ts";
-import { duration, humanize, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
+import { checkoutName, duration, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
-import type { AnyRecord, EvidenceData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
 
 /** Lists longer than this are cut in the JSON view, so a StoreLayout or a long path stays readable. */
 const LIST_LIMIT = 12;
@@ -129,9 +129,50 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
         </>
       );
     }
+    case "oiss.Incident": {
+      const d = (record as OissRecord<IncidentData>).data;
+      const items = (d.gtins ?? []).map((g) => day.items.get(g)?.name ?? g);
+      return (
+        <>
+          <dt>Exception</dt>
+          <dd>{INCIDENT_LABEL[d.incidentType] ?? humanize(d.incidentType)}</dd>
+          <dt>Where</dt>
+          <dd>
+            {checkoutName(d.location.fixture)}, {zoneName(day, d.location.zone)}
+          </dd>
+          <dt>When</dt>
+          <dd>
+            {timeOf(day, { ...record, time: d.window.start })}, a {duration((Date.parse(d.window.end) - Date.parse(d.window.start)) / 1000)} window
+          </dd>
+          {items.length > 0 && (
+            <>
+              <dt>{items.length === 1 ? "Item" : "Items"}</dt>
+              <dd>{items.join(", ")}</dd>
+            </>
+          )}
+          {d.severity && (
+            <>
+              <dt>Severity</dt>
+              <dd>{humanize(d.severity)}</dd>
+            </>
+          )}
+          <dt>Status</dt>
+          <dd>{INCIDENT_STATUS[d.status] ?? humanize(d.status)}</dd>
+          <dt>Confidence</dt>
+          <dd>{pct(d.confidence)}</dd>
+          {d.summary && (
+            <>
+              <dt>Summary</dt>
+              <dd>{d.summary}</dd>
+            </>
+          )}
+        </>
+      );
+    }
     case "oiss.Evidence": {
       const d = (record as OissRecord<EvidenceData>).data;
-      const backs = day.files.records.shelfObservations.find((o) => o.data.evidence?.includes(record.id));
+      const backs: AnyRecord | undefined =
+        day.files.records.shelfObservations.find((o) => o.data.evidence?.includes(record.id)) ?? (day.files.records.incidents ?? []).find((o) => o.data.evidence?.includes(record.id));
       return (
         <>
           <dt>Media</dt>
@@ -149,7 +190,7 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
               <dt>Backs</dt>
               <dd>
                 <button type="button" className="link" onClick={() => onInspect(backs.id)}>
-                  ShelfObservation {backs.id}
+                  {typeName(backs.type)} {backs.id}
                 </button>
               </dd>
             </>
@@ -188,6 +229,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
   const asEvidence = record.type === "oiss.Evidence" ? (record as OissRecord<EvidenceData>) : undefined;
   const observation = asEvidence ? day.files.records.shelfObservations.find((o) => o.data.evidence?.includes(record.id)) : record.type === "oiss.ShelfObservation" ? (record as OissRecord<ShelfObservationData>) : undefined;
   const slug = SPEC_SLUG[record.type];
+  const vendorAlert = record.type === "oiss.Incident" ? day.vendorAlertFor.get(record.id) : undefined;
 
   const copy = () => {
     navigator.clipboard
@@ -252,6 +294,15 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
             )}
           </dl>
           {asEvidence && <EvidencePreview day={day} evidence={asEvidence} observation={observation} />}
+          {vendorAlert && (
+            <details className="vendor-raw">
+              <summary>What Mock vendor B sent</summary>
+              <p className="note">
+                The vendor's own alert, before the adapter. The retailer's mapping table turned site {vendorAlert.site} into store {record.oissstore}, register {vendorAlert.register} into {checkoutName((record.data as IncidentData).location.fixture)}, EAN codes into GTINs, UTC milliseconds into store time and a score of {vendorAlert.score} into a confidence of {pct((record.data as IncidentData).confidence)}.
+              </p>
+              <pre className="json">{JSON.stringify(vendorAlert, null, 2)}</pre>
+            </details>
+          )}
           {evidenceIds.map((id) => {
             const ev = day.evidence.get(id);
             return ev ? <EvidencePreview key={id} day={day} evidence={ev} observation={observation} onInspect={onInspect} /> : null;

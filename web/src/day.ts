@@ -1,5 +1,6 @@
+import { adaptLpAlerts, demo001Config, type MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
 import type { DayFiles } from "./load.ts";
-import type { AnyRecord, EvidenceData, Facing, Fixture, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, Zone, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, Facing, Fixture, IncidentData, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, Zone, ZoneMetricData } from "./oiss.ts";
 
 export interface Rect {
   x: number;
@@ -34,6 +35,26 @@ export interface ZoneSeries {
   recs: OissRecord<ZoneMetricData>[];
 }
 
+/** One stop of the shelf-scanning robot: the bay column it photographed, and where it stood. */
+export interface RobotStop extends Point {
+  t: number;
+  fixture: string;
+}
+
+export interface RobotRun {
+  start: number;
+  end: number;
+  /** Indexes into robot.stops. */
+  first: number;
+  last: number;
+}
+
+export interface IncidentSeries {
+  /** Incident times, ascending. */
+  t: number[];
+  recs: OissRecord<IncidentData>[];
+}
+
 export interface IndexedDay {
   files: DayFiles;
   layout: StoreLayoutData;
@@ -57,6 +78,13 @@ export interface IndexedDay {
   streamTimes: number[];
   byId: Map<string, AnyRecord>;
   evidence: Map<string, OissRecord<EvidenceData>>;
+  /** Every Incident, ascending by time, and the same by checkout lane or station. */
+  incidents: IncidentSeries;
+  incidentsByFixture: Map<string, IncidentSeries>;
+  /** What the loss prevention vendor sent for each Incident, found by running the adapter again. */
+  vendorAlertFor: Map<string, MockLpAlert>;
+  /** Where the shelf-scanning robot stood for each bay column it photographed, from its ShelfObservations. */
+  robot: { source: string; stops: RobotStop[]; times: number[]; runs: RobotRun[] };
   /** Out-of-stock facings, as last reported, every TIMELINE_STEP seconds from open to close. */
   timeline: { t: number; outOfStock: number; lowStock: number }[];
 }
@@ -176,8 +204,33 @@ export function indexDay(files: DayFiles): IndexedDay {
   const close = ends.length ? Math.ceil(Math.max(...ends) / 3600) * 3600 : 22 * 3600;
 
   const evidenceList = records.evidence ?? [];
+  const incidentList = records.incidents ?? [];
+  const incidents: IncidentSeries = { t: [], recs: [] };
+  const incidentsByFixture = new Map<string, IncidentSeries>();
+  for (const r of [...incidentList].sort((a, b) => sec(a.time) - sec(b.time))) {
+    incidents.t.push(sec(r.time));
+    incidents.recs.push(r);
+    const fx = r.data.location.fixture;
+    if (!fx) continue;
+    const series = incidentsByFixture.get(fx) ?? { t: [], recs: [] };
+    series.t.push(sec(r.time));
+    series.recs.push(r);
+    incidentsByFixture.set(fx, series);
+  }
+
+  // The vendor's alerts don't carry an OISS id, and an Incident doesn't carry the vendor's alert id.
+  // The adapter is deterministic, so running it again on the same feed links the two.
+  const vendorAlertFor = new Map<string, MockLpAlert>();
+  const alerts = files.vendorFeeds?.mockLpAlerts ?? [];
+  if (alerts.length && files.store === "demo-001") {
+    const { incidentFor } = adaptLpAlerts(alerts, demo001Config());
+    for (const a of alerts) {
+      const id = incidentFor[a.alert_id];
+      if (id) vendorAlertFor.set(id, a);
+    }
+  }
   const sourceCounts = new Map<string, { system: string; vendor?: string; type: string; records: number }>();
-  const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList];
+  const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList, ...incidentList];
   for (const r of all) {
     const key = `${r.data.provenance.system}|${r.type}`;
     const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0 };
@@ -203,6 +256,8 @@ export function indexDay(files: DayFiles): IndexedDay {
     timeline.push({ t, outOfStock, lowStock });
   }
 
+  const robot = robotRoute(records.shelfObservations, facingIndex, zones, sec);
+
   return {
     files,
     layout,
@@ -223,8 +278,113 @@ export function indexDay(files: DayFiles): IndexedDay {
     streamTimes,
     byId: new Map(all.map((r) => [r.id, r])),
     evidence: new Map(evidenceList.map((r) => [r.id, r])),
+    incidents,
+    incidentsByFixture,
+    vendorAlertFor,
+    robot,
     timeline,
   };
+}
+
+export const ROBOT_SOURCE_SUFFIX = ":robot-1";
+/** A gap longer than this between two robot stops starts a new scan run. */
+const RUN_GAP = 600;
+/** How far from the fixture's face the robot drives, in meters. */
+const ROBOT_OFFSET = 0.7;
+
+/**
+ * The robot's route, from nothing but its ShelfObservations: each run photographs one bay column at a
+ * time, so every distinct record time is a stop in front of the facings it read.
+ */
+function robotRoute(obs: OissRecord<ShelfObservationData>[], facingIndex: Map<string, FacingView>, zones: Map<string, Zone>, sec: (iso: string) => number): IndexedDay["robot"] {
+  const mine = obs.filter((r) => r.source.endsWith(ROBOT_SOURCE_SUFFIX));
+  const source = mine[0]?.source ?? "";
+  const byTime = new Map<string, FacingView[]>();
+  for (const r of mine) {
+    const v = facingIndex.get(r.data.location.facing);
+    if (!v) continue;
+    const list = byTime.get(r.time) ?? [];
+    list.push(v);
+    byTime.set(r.time, list);
+  }
+  const stops: RobotStop[] = [];
+  for (const [time, views] of byTime) {
+    const fixture = views[0]!.fixture;
+    const box = bbox(fixture.footprint);
+    const alongX = box.w >= box.h;
+    const along = views.reduce((s, v) => s + (alongX ? v.rect.x + v.rect.w / 2 : v.rect.y + v.rect.h / 2), 0) / views.length;
+    const zone = zones.get(fixture.zone);
+    const zc = zone ? centroidOf(zone.polygon) : { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    // Stand on the side of the fixture that faces its zone's open floor.
+    const side = alongX ? (zc.y >= box.y + box.h / 2 ? box.y + box.h + ROBOT_OFFSET : box.y - ROBOT_OFFSET) : zc.x >= box.x + box.w / 2 ? box.x + box.w + ROBOT_OFFSET : box.x - ROBOT_OFFSET;
+    stops.push({ t: sec(time), fixture: fixture.id, x: alongX ? along : side, y: alongX ? side : along });
+  }
+  stops.sort((a, b) => a.t - b.t);
+  const runs: RobotRun[] = [];
+  stops.forEach((s, i) => {
+    const run = runs[runs.length - 1];
+    if (run && s.t - stops[i - 1]!.t <= RUN_GAP) {
+      run.end = s.t;
+      run.last = i;
+    } else runs.push({ start: s.t, end: s.t, first: i, last: i });
+  });
+  return { source, stops, times: stops.map((s) => s.t), runs };
+}
+
+function centroidOf(ps: Point[]): Point {
+  return { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
+}
+
+/** A stop this close to the next one, at the same fixture, is a straight drive between them. */
+const DRIVE_GAP = 60;
+
+export interface RobotAt extends Point {
+  run: RobotRun;
+  /** Index of the last stop reached. */
+  stop: number;
+  /** The route driven so far in this run, as separate pieces where it moved between fixtures. */
+  trail: Point[][];
+  /** The whole run's route, for a faint preview. */
+  route: Point[][];
+}
+
+function pieces(stops: RobotStop[], from: number, to: number, end?: Point): Point[][] {
+  const out: Point[][] = [];
+  let piece: Point[] = [];
+  for (let i = from; i <= to; i++) {
+    const s = stops[i]!;
+    const prev = stops[i - 1];
+    if (piece.length && prev && (prev.fixture !== s.fixture || s.t - prev.t > DRIVE_GAP)) {
+      out.push(piece);
+      piece = [];
+    }
+    piece.push(s);
+  }
+  if (end) piece.push(end);
+  if (piece.length) out.push(piece);
+  return out;
+}
+
+/** Where the robot is at time t, while a scan run is under way. */
+export function robotAt(day: IndexedDay, t: number): RobotAt | null {
+  const { stops, times, runs } = day.robot;
+  const run = runs.find((r) => t >= r.start && t <= r.end + DRIVE_GAP);
+  if (!run) return null;
+  const i = Math.min(run.last, Math.max(run.first, lastAtOrBefore(times, t)));
+  const s = stops[i]!;
+  const next = stops[i + 1];
+  let at: Point = s;
+  if (next && i < run.last && next.fixture === s.fixture && next.t - s.t <= DRIVE_GAP) {
+    const f = Math.min(1, Math.max(0, (t - s.t) / (next.t - s.t)));
+    at = { x: s.x + (next.x - s.x) * f, y: s.y + (next.y - s.y) * f };
+  }
+  return { ...at, run, stop: i, trail: pieces(stops, run.first, i, at), route: pieces(stops, run.first, run.last) };
+}
+
+/** Incidents at or before time t. */
+export function incidentsUpTo(series: IncidentSeries | undefined, t: number): OissRecord<IncidentData>[] {
+  if (!series) return [];
+  return series.recs.slice(0, lastAtOrBefore(series.t, t) + 1);
 }
 
 /** Each facing's latest observed status at time t, or "none" before its first observation. */

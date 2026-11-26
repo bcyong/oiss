@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { IndexedDay, ShopperDot } from "./day.ts";
+import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import type { IndexedDay, RobotAt, ShopperDot } from "./day.ts";
 import type { Camera, Point, ShelfStatus } from "./oiss.ts";
 
 const pts = (ps: Point[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
@@ -11,7 +11,19 @@ function centroid(ps: Point[]): Point {
 }
 
 /** What the visitor has picked on the floor plan. */
-export type Selection = { kind: "facing"; index: number } | { kind: "zone"; id: string } | { kind: "shopper"; path: number } | { kind: "camera"; id: string };
+export type Selection =
+  | { kind: "facing"; index: number }
+  | { kind: "zone"; id: string }
+  | { kind: "shopper"; path: number }
+  | { kind: "camera"; id: string }
+  | { kind: "checkout"; id: string }
+  | { kind: "robot" };
+
+/** Incidents so far at one checkout lane or station, and whether one came in the last few minutes. */
+export interface CheckoutIncidents {
+  count: number;
+  recent: boolean;
+}
 
 /** Zones, fixtures and labels: the parts of the floor plan that never change during the day. */
 const StaticPlan = memo(function StaticPlan({ day }: { day: IndexedDay }) {
@@ -116,11 +128,16 @@ interface Props {
   shoppers: ShopperDot[];
   queues: Map<string, number>;
   showCameras: boolean;
+  onToggleCameras: () => void;
+  incidents: Map<string, CheckoutIncidents>;
+  robot: RobotAt | null;
   selection: Selection | null;
   onSelect: (s: Selection | null) => void;
 }
 
-export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, selection, onSelect }: Props) {
+const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
+
+export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, selection, onSelect }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -227,7 +244,8 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
   const queueZones = day.layout.zones.filter((z) => queues.has(z.id));
 
   return (
-    <div className="plan-wrap">
+    // The store's outer wall sits 1 m inside the plan's edge; the controls sit just inside the wall at any width.
+    <div className="plan-wrap" style={{ "--wall-x": `${(100 * -full.x) / full.w}%`, "--wall-y": `${(100 * -full.y) / full.h}%` } as CSSProperties}>
       <svg
         ref={svgRef}
         className={`plan${view.k > 1 ? " zoomed" : ""}`}
@@ -275,6 +293,41 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
             );
           })}
         </g>
+        {robot && (
+          <g className={`robot${sel?.kind === "robot" ? " selected" : ""}`}>
+            {robot.route.map((piece, i) => (
+              <polyline key={`r${i}`} className="robot-route" points={line(piece)} />
+            ))}
+            {robot.trail.map((piece, i) => (
+              <polyline key={`t${i}`} className="robot-trail" points={line(piece)} />
+            ))}
+            <g className="robot-body" transform={`translate(${robot.x} ${robot.y})`} onClick={() => onSelect({ kind: "robot" })}>
+              <rect x={-0.55} y={-0.55} width={1.1} height={1.1} rx={0.25} />
+              <text className="robot-label" textAnchor="middle" dominantBaseline="central">
+                R
+              </text>
+            </g>
+          </g>
+        )}
+        <g className="incidents">
+          {day.layout.fixtures
+            .filter((f) => incidents.has(f.id))
+            .map((f) => {
+              const n = incidents.get(f.id)!;
+              const c = centroid(f.footprint);
+              const lane = f.kind === "checkout_lane";
+              const y = lane ? Math.min(...f.footprint.map((p) => p.y)) - 0.7 : c.y;
+              const picked = sel?.kind === "checkout" && sel.id === f.id;
+              return (
+                <g key={f.id} className={`incident${n.recent ? " recent" : ""}${picked ? " selected" : ""}`} transform={`translate(${c.x} ${y})`} onClick={() => onSelect({ kind: "checkout", id: f.id })}>
+                  <path d="M0,-0.62 L0.62,0 L0,0.62 L-0.62,0 Z" />
+                  <text textAnchor="middle" dominantBaseline="central">
+                    {n.count}
+                  </text>
+                </g>
+              );
+            })}
+        </g>
         {selectedPath && <polyline className="path-trace" points={selectedPath.x.map((x, i) => `${x},${selectedPath.y[i]}`).join(" ")} />}
         <g className="shoppers">
           {shoppers.map((p) => (
@@ -282,6 +335,15 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
           ))}
         </g>
       </svg>
+      <div className="map-controls">
+        <button type="button" className={`layer${showCameras ? " on" : ""}`} aria-pressed={showCameras} aria-label="Cameras" onClick={onToggleCameras} title={showCameras ? "Hide cameras" : "Show cameras"}>
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <rect x="1.5" y="4.5" width="9" height="7" rx="1.8" />
+            <path d="M10.5 7.2l3.3-1.9a.5.5 0 0 1 .7.4v4.6a.5.5 0 0 1-.7.4l-3.3-1.9" />
+            {!showCameras && <path className="slash" d="M2 2.5l12 11" />}
+          </svg>
+        </button>
+      </div>
       <div className="zoom" role="group" aria-label="Zoom">
         <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={view.k >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in">
           +
@@ -289,8 +351,10 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
         <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={view.k <= 1} aria-label="Zoom out" title="Zoom out">
           −
         </button>
-        <button type="button" className="fit" onClick={() => setView(home)} disabled={view.k === 1} title="Show the whole store">
-          Reset
+        <button type="button" className="fit" onClick={() => setView(home)} disabled={view.k === 1} aria-label="Show the whole store" title="Show the whole store">
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path d="M2 6V4.5A2.5 2.5 0 0 1 4.5 2H6M10 2h1.5A2.5 2.5 0 0 1 14 4.5V6M14 10v1.5a2.5 2.5 0 0 1-2.5 2.5H10M6 14H4.5A2.5 2.5 0 0 1 2 11.5V10" />
+          </svg>
         </button>
       </div>
       {view.k > 1 && <span className="zoom-level">{Math.round(view.k * 100)}%</span>}

@@ -183,7 +183,7 @@ function FieldTable({ list }: { list: Row[] }) {
           {list.map((r) => (
             <tr key={r.name} className={r.depth ? "nested" : undefined}>
               <td>
-                <code style={{ paddingLeft: r.depth * 14 }}>{r.depth ? r.name.split(/\.|\[\]\./).pop() : r.name}</code>
+                <code style={{ marginLeft: r.depth * 14 }}>{r.depth ? r.name.split(/\.|\[\]\./).pop() : r.name}</code>
                 {r.shared && <span className="tag">shared</span>}
               </td>
               <td>{typeOf(r.schema)}</td>

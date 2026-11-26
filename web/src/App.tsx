@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { arrivedCount, clock, clockOf, indexDay, latestObservation, recentRecords, shoppersAt, statusesAt, zoneMetricAt, type IndexedDay } from "./day.ts";
-import { duration, humanize, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
-import { FloorPlan, type Selection } from "./FloorPlan.tsx";
+import { arrivedCount, clock, clockOf, incidentsUpTo, indexDay, latestObservation, recentRecords, robotAt, shoppersAt, statusesAt, zoneMetricAt, type IndexedDay } from "./day.ts";
+import { checkoutName, duration, humanize, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, ShelfStatus } from "./oiss.ts";
@@ -13,13 +13,17 @@ const SPEEDS = [
   { label: "15 min/s", value: 900 },
 ];
 
-const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperPath", "oiss.Evidence"] as const;
+const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperPath", "oiss.Evidence", "oiss.Incident"] as const;
+
+/** An incident marker stays bright for this long after the alert arrives. */
+const RECENT_INCIDENT = 15 * 60;
 
 export type Tab = "now" | "stream" | "sources";
 
 /** The thing on the floor plan that a record is about, so picking a record also picks it on the map. */
 function selectionFor(day: IndexedDay, r: AnyRecord): Selection | null {
-  const loc = (r.data as { location?: { facing?: string; zone?: string } }).location;
+  const loc = (r.data as { location?: { facing?: string; zone?: string; fixture?: string } }).location;
+  if (loc?.fixture && day.incidentsByFixture.has(loc.fixture) && (r.type === "oiss.Incident" || r.type === "oiss.Evidence")) return { kind: "checkout", id: loc.fixture };
   if (loc?.facing) {
     const index = day.facingById.get(loc.facing);
     if (index !== undefined) return { kind: "facing", index };
@@ -52,7 +56,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [selection, setSelection] = useState<Selection | null>(start?.selection ?? null);
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
-  const [showCameras, setShowCameras] = useState(start?.showCameras ?? false);
+  const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
   const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
   const [streamType, setStreamType] = useState<string>("");
 
@@ -122,6 +126,21 @@ export function App({ start }: { start?: AppStart } = {}) {
   }, [day, bucket]);
 
   const shoppers = useMemo(() => (day ? shoppersAt(day, t) : []), [day, t]);
+  const robot = useMemo(() => (day ? robotAt(day, t) : null), [day, t]);
+
+  // Incident markers change when an alert arrives or stops being recent, so a minute's resolution is enough.
+  const minute = Math.floor(t / 60) * 60;
+  const incidentMarks = useMemo(() => {
+    const m = new Map<string, CheckoutIncidents>();
+    if (!day) return m;
+    for (const [fixture, series] of day.incidentsByFixture) {
+      const so = incidentsUpTo(series, minute);
+      if (!so.length) continue;
+      const lastAt = (Date.parse(so[so.length - 1]!.time) - day.midnightMs) / 1000;
+      m.set(fixture, { count: so.length, recent: minute - lastAt < RECENT_INCIDENT });
+    }
+    return m;
+  }, [day, minute]);
 
   // Records from each in-house shelf camera, for the camera card.
   const byCamera = useMemo(() => {
@@ -159,6 +178,8 @@ export function App({ start }: { start?: AppStart } = {}) {
   const sco = zoneMetricAt(day, "self-checkout", t)?.data.metrics;
   const staffedLanes = day.layout.fixtures.filter((f) => f.kind === "checkout_lane").length;
   const total = day.stream.length;
+  const forReview = incidentsUpTo(day.incidents, t).filter((r) => r.data.status === "open" || r.data.status === "under_review").length;
+  const nextRun = day.robot.runs.find((r) => r.start > t);
   const arrived = arrivedCount(day, t);
 
   const runNewDay = () => {
@@ -260,6 +281,55 @@ export function App({ start }: { start?: AppStart } = {}) {
         </dl>
       </>
     ) : null;
+  } else if (selection?.kind === "checkout") {
+    const series = day.incidentsByFixture.get(selection.id);
+    const so = incidentsUpTo(series, t);
+    const fixture = day.layout.fixtures.find((f) => f.id === selection.id);
+    following = so[so.length - 1];
+    related = [...so].reverse();
+    selectionCard = (
+      <>
+        <h2>{checkoutName(selection.id)}</h2>
+        <dl>
+          <dt>Kind</dt>
+          <dd>{fixture?.kind === "self_checkout" ? "Self-checkout station" : "Staffed checkout lane"}</dd>
+          <dt>For review</dt>
+          <dd>
+            {so.length} possible {so.length === 1 ? "exception" : "exceptions"} so far today, of {series?.recs.length ?? 0} for the day
+          </dd>
+        </dl>
+        <p className="note top">Each one is an alert from the loss prevention vendor, written as an open Incident for asset protection to review. It is not an accusation.</p>
+      </>
+    );
+  } else if (selection?.kind === "robot") {
+    const run = robot?.run;
+    const runIndex = run ? day.robot.runs.indexOf(run) : -1;
+    const done = robot ? robot.stop - run!.first + 1 : 0;
+    const total = run ? run.last - run.first + 1 : 0;
+    const facing = robot ? day.files.records.shelfObservations.find((r) => r.source === day.robot.source && (Date.parse(r.time) - day.midnightMs) / 1000 === day.robot.stops[robot.stop]!.t) : undefined;
+    following = facing;
+    selectionCard = (
+      <>
+        <h2>Shelf-scanning robot</h2>
+        <dl>
+          <dt>Made by</dt>
+          <dd>Mock vendor A</dd>
+          <dt>Scan run</dt>
+          <dd>{run ? `Run ${runIndex + 1} of ${day.robot.runs.length}, started ${clock(run.start)}` : "Not scanning now"}</dd>
+          {run && (
+            <>
+              <dt>Progress</dt>
+              <dd>
+                {done} of {total} bay positions, now at fixture {robot && `${day.robot.stops[robot.stop]!.fixture}, ${zoneName(day, day.layout.fixtures.find((f) => f.id === day.robot.stops[robot.stop]!.fixture)?.zone)}`}
+              </dd>
+            </>
+          )}
+          <dt>Today</dt>
+          <dd>{day.robot.runs.length} scan runs, the first at {clock(day.robot.runs[0]?.start ?? 0)} and the last ending at {clock(day.robot.runs[day.robot.runs.length - 1]?.end ?? 0)}</dd>
+        </dl>
+        <p className="note top">The route is drawn only from the robot's ShelfObservation records: each bay column it photographs is one stop. OISS needs no separate location feed for it.</p>
+      </>
+    );
   }
   const pinnedRecord = pinned ? day.byId.get(pinned) : undefined;
   const shown = pinnedRecord ?? following;
@@ -276,7 +346,7 @@ export function App({ start }: { start?: AppStart } = {}) {
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
             A synthetic grocery day, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, replayed only from{" "}
-            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras and a mock people-counting vendor. Tap anything on the floor plan to inspect the records behind it.
+            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor and a mock loss prevention vendor. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
@@ -289,7 +359,7 @@ export function App({ start }: { start?: AppStart } = {}) {
 
       <div className="layout">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} selection={selection} onSelect={select} />
+          <FloorPlan day={day} statuses={statuses} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
           <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
@@ -305,10 +375,14 @@ export function App({ start }: { start?: AppStart } = {}) {
               <i className="swatch zone-swatch" />
               Zone occupancy
             </span>
-            <label className="toggle">
-              <input type="checkbox" checked={showCameras} onChange={(e) => setShowCameras(e.target.checked)} />
-              Cameras
-            </label>
+            <span>
+              <i className="swatch incident-swatch" />
+              Incidents at a checkout
+            </span>
+            <span>
+              <i className="swatch robot-swatch" />
+              Robot and its route
+            </span>
           </div>
           <Timeline day={day} t={t} onSeek={setT} />
           <div className="playback">
@@ -326,7 +400,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             </select>
           </div>
           <p className="note">
-            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press Reset to see the whole store.
+            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press the corners button to see the whole store.
           </p>
         </section>
 
@@ -357,7 +431,7 @@ export function App({ start }: { start?: AppStart } = {}) {
               )}
             </section>
           ) : (
-            !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper or a camera to see the OISS records behind it, or pick a record from the stream.</p>
+            !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper, the robot, a checkout incident or a camera to see the OISS records behind it, or pick a record from the stream.</p>
           )}
 
           {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} />}
@@ -403,6 +477,14 @@ export function App({ start }: { start?: AppStart } = {}) {
                   <div>
                     <b>{duration(front?.avgWaitSeconds)}</b>
                     <span>Average wait, staffed</span>
+                  </div>
+                  <div>
+                    <b>{forReview}</b>
+                    <span>Checkout incidents waiting for review</span>
+                  </div>
+                  <div>
+                    <b>{robot ? "Scanning" : nextRun ? clock(nextRun.start) : "Done"}</b>
+                    <span>{robot ? `Robot, ${robot.stop - robot.run.first + 1} of ${robot.run.last - robot.run.first + 1} bay positions` : nextRun ? "Robot's next scan run" : "Robot's scan runs for today"}</span>
                   </div>
                 </div>
                 <p className="note">

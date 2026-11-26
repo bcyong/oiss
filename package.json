@@ -8,6 +8,7 @@
     "node": ">=22.18"
   },
   "workspaces": [
+    "adapters",
     "sim",
     "web"
   ],

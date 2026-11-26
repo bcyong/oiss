@@ -1,3 +1,4 @@
+import type { MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
 import type { DayRecords, ItemMaster } from "./oiss.ts";
 
 export interface DayFiles {
@@ -7,6 +8,11 @@ export interface DayFiles {
   origin: "golden" | "browser";
   records: DayRecords;
   itemMaster: ItemMaster;
+  /**
+   * Vendor exports exactly as the mock vendors sent them, before any adapter. Not OISS: the demo
+   * keeps them only to show what an adapter starts from.
+   */
+  vendorFeeds?: { mockLpAlerts?: MockLpAlert[] };
   /** How long the browser took to simulate the day, for a day made in the browser. */
   simulatedInMs?: number;
 }
@@ -30,12 +36,14 @@ export async function loadGoldenDay(): Promise<DayFiles> {
   const index = (await (await get("index.json")).json()) as { days: { store: string; date: string; seed: number; path: string }[] };
   const day = index.days[0];
   if (!day) throw new Error("No days in data/index.json");
-  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, itemMaster] = await Promise.all([
+  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, mockLpAlerts, itemMaster] = await Promise.all([
     get(`${day.path}store-layout.json`).then((r) => r.json()),
     jsonl(`${day.path}shelf-observations.jsonl`),
     jsonl(`${day.path}zone-metrics.jsonl`),
     jsonl(`${day.path}shopper-paths.jsonl`),
     jsonl(`${day.path}evidence.jsonl`),
+    jsonl(`${day.path}incidents.jsonl`),
+    jsonl<MockLpAlert>(`${day.path}vendor/mock-vendor-b-lp-alerts.ndjson`),
     get(`${day.path}item-master.json`).then((r) => r.json()),
   ]);
   return {
@@ -43,8 +51,9 @@ export async function loadGoldenDay(): Promise<DayFiles> {
     date: day.date,
     seed: day.seed,
     origin: "golden",
-    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence } as DayRecords,
+    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents } as DayRecords,
     itemMaster: itemMaster as ItemMaster,
+    vendorFeeds: { mockLpAlerts },
   };
 }
 
@@ -52,10 +61,10 @@ export async function loadGoldenDay(): Promise<DayFiles> {
 export function simulateInBrowser(seed: number, date: string): Promise<DayFiles> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (e: MessageEvent<{ records: DayRecords; itemMaster: ItemMaster; ms: number } | { error: string }>) => {
+    worker.onmessage = (e: MessageEvent<{ records: DayRecords; itemMaster: ItemMaster; vendorFeeds: DayFiles["vendorFeeds"]; ms: number } | { error: string }>) => {
       worker.terminate();
       if ("error" in e.data) return reject(new Error(e.data.error));
-      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, simulatedInMs: e.data.ms });
+      resolve({ store: e.data.records.storeLayout.oissstore, date, seed, origin: "browser", records: e.data.records, itemMaster: e.data.itemMaster, vendorFeeds: e.data.vendorFeeds, simulatedInMs: e.data.ms });
     };
     worker.onerror = (e) => {
       worker.terminate();

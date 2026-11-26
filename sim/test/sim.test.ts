@@ -86,13 +86,13 @@ test("shopper path ids rotate at least every 15 minutes and never repeat", () =>
 });
 
 test("records in each file are in time order", () => {
-  for (const list of [day.records.shelfObservations, day.records.zoneMetrics, day.records.shopperPaths, day.records.evidence]) {
+  for (const list of [day.records.shelfObservations, day.records.zoneMetrics, day.records.shopperPaths, day.records.evidence, day.records.incidents]) {
     for (let k = 1; k < list.length; k++) assert.ok(list[k - 1]!.time <= list[k]!.time);
   }
 });
 
 test("a shelf image backs every low-stock and out-of-stock read, and nothing else", () => {
-  const evidence = new Map(day.records.evidence.map((r) => [r.id, r]));
+  const evidence = new Map(day.records.evidence.filter((r) => !r.id.startsWith("ev-lp-")).map((r) => [r.id, r]));
   const used = new Set<string>();
   for (const r of day.records.shelfObservations) {
     const d = r.data as { status: string; evidence?: string[]; location: { facing: string } };
@@ -108,6 +108,31 @@ test("a shelf image backs every low-stock and out-of-stock read, and nothing els
     }
   }
   assert.equal(used.size, evidence.size);
-  const retain = (day.records.evidence[0]!.data as { retainUntil: string }).retainUntil;
+  const retain = (day.records.evidence.find((r) => r.id.startsWith("ev-2"))!.data as { retainUntil: string }).retainUntil;
   assert.equal(retain, "2026-12-17T00:00:00-08:00");
+});
+
+test("loss prevention: every alert becomes an Incident backed by a clip, and the scorecard adds up", () => {
+  const lp = day.summary.lossPrevention;
+  assert.ok(lp.exceptions > 0 && lp.alerts > 0);
+  assert.equal(lp.trueAlerts + lp.falseAlerts, lp.alerts);
+  assert.equal(lp.trueAlerts + lp.missed, lp.exceptions);
+  assert.equal(day.records.incidents.length, day.vendorExports.mockLpAlerts.length);
+  const evidence = new Map(day.records.evidence.map((r) => [r.id, r]));
+  const lanes = new Set(day.ground.layout.fixtures.filter((f) => f.kind === "checkout_lane" || f.kind === "self_checkout").map((f) => f.id));
+  for (const inc of day.records.incidents) {
+    const d = inc.data as { evidence: string[]; location: { fixture: string }; status: string; confidence: number };
+    assert.equal(inc.oissprivacy, "restricted");
+    assert.equal(d.status, "open");
+    assert.ok(lanes.has(d.location.fixture), d.location.fixture);
+    assert.ok(d.confidence > 0 && d.confidence < 1);
+    for (const id of d.evidence) assert.equal((evidence.get(id)!.data as { mediaType: string }).mediaType, "video/mp4");
+  }
+  for (const a of day.vendorExports.mockLpAlerts) assert.ok(day.incidentFor[a.alert_id], a.alert_id);
+});
+
+test("every checkout is a transaction with what the shopper bought", () => {
+  const bought = day.ground.tracks.reduce((a, t) => a + t.unitsBought, 0);
+  const paid = day.ground.transactions.reduce((a, t) => a + t.lines.reduce((b, l) => b + l.qty, 0), 0);
+  assert.equal(paid, bought);
 });

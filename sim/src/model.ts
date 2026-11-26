@@ -56,6 +56,18 @@ export interface ServiceStart {
   waitSeconds: number;
 }
 
+/** One completed checkout: who paid, where, when, and what they bought. */
+export interface Transaction {
+  shopper: number;
+  kind: "staffed" | "self";
+  /** A staffed lane id (lane-01) or a self-checkout station id (sco-01). */
+  lane: string;
+  start: number;
+  end: number;
+  /** Units bought, by GTIN. */
+  lines: { gtin: string; qty: number }[];
+}
+
 export interface DayStats {
   shoppers: number;
   unitsSold: number;
@@ -83,6 +95,7 @@ export interface Ground {
   shelfHistory: Map<string, [number, number][]>;
   frontEnd: FrontEndSnapshot[];
   serviceStarts: ServiceStart[];
+  transactions: Transaction[];
   stats: DayStats;
   /** Units on the shelf at facing f at time t. */
   unitsAt(facing: string, t: number): number;
@@ -225,7 +238,10 @@ export function simulateDay(input: DayConfig): Ground {
     else frontEnd.push(s);
   };
 
-  interface Live { track: ShopperTrack; speed: number; joinedAt: number; items: number; rng: Rng }
+  interface Live { track: ShopperTrack; speed: number; joinedAt: number; items: number; lines: Map<string, number>; rng: Rng }
+  const transactions: Transaction[] = [];
+  const pay = (s: Live, kind: "staffed" | "self", lane: string, start: number) =>
+    transactions.push({ shopper: s.track.shopper, kind, lane, start, end: sched.now, lines: [...s.lines].map(([gtin, qty]) => ({ gtin, qty })) });
   const live = new Map<number, Live>();
   const moveTo = (s: Live, p: Point, seconds?: number) => {
     const pts = s.track.points;
@@ -264,7 +280,9 @@ export function simulateDay(input: DayConfig): Ground {
     stepUp(l.waiting, l.lane.queueHead);
     snapshot();
     const service = (40 + 3.2 * s.items) * s.rng.lognormal(1, 0.2);
+    const begin = sched.now + walk;
     sched.after(walk + service, () => {
+      pay(s, "staffed", l.lane.id, begin);
       l.serving = null;
       leave(s, l.lane.service);
       if (l.closing && l.waiting.length === 0) {
@@ -286,7 +304,9 @@ export function simulateDay(input: DayConfig): Ground {
       const walk = moveTo(s, st.at);
       stepUp(selfWaiting, selfLane.queueHead);
       const service = (55 + 5 * s.items) * s.rng.lognormal(1, 0.25);
+      const begin = sched.now + walk;
       sched.after(walk + service, () => {
+        pay(s, "self", st.id, begin);
         st.busy = false;
         leave(s, st.at);
         startSelf();
@@ -341,7 +361,10 @@ export function simulateDay(input: DayConfig): Ground {
     const facing = slotByGtin.get(item.gtin)!.id;
     const have = units.get(facing)!;
     const take = Math.min(have, qty);
-    if (take > 0) setUnits(facing, have - take);
+    if (take > 0) {
+      setUnits(facing, have - take);
+      s.lines.set(item.gtin, (s.lines.get(item.gtin) ?? 0) + take);
+    }
     s.items += take;
     s.track.unitsBought += take;
     s.track.unitsMissed += qty - take;
@@ -364,7 +387,7 @@ export function simulateDay(input: DayConfig): Ground {
       const stops = [...basket.values()].map((b) => ({ ...b, slot: slotByGtin.get(b.item.gtin)! })).sort((a, b) => tourKey(a.slot.access) - tourKey(b.slot.access));
       const track: ShopperTrack = { shopper: index, mission: d.mission, arrival, exit: arrival, points: [{ t: arrival, ...layout.entrance }], unitsBought: 0, unitsMissed: 0, checkout: "staffed", lane: "" };
       tracks.push(track);
-      const s: Live = { track, speed: rng.uniform(...WALK_SPEED), joinedAt: 0, items: 0, rng };
+      const s: Live = { track, speed: rng.uniform(...WALK_SPEED), joinedAt: 0, items: 0, lines: new Map(), rng };
       live.set(index, s);
 
       // Lay out the whole shopping trip now; picks happen at their times.
@@ -466,7 +489,7 @@ export function simulateDay(input: DayConfig): Ground {
     recoveryUnits,
   };
 
-  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, frontEnd, serviceStarts, stats, unitsAt };
+  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, frontEnd, serviceStarts, transactions: transactions.sort((a, b) => a.end - b.end || a.shopper - b.shopper), stats, unitsAt };
 }
 
 export { routeLength };
