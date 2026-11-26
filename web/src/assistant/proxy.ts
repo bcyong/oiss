@@ -223,6 +223,8 @@ export async function handleAssistant(request: Request, env: ProxyEnv): Promise<
     if (safetyModel === "off") return undefined;
     const tryModel = async (model: string): Promise<SafetyCheck | "gone"> => {
       const r = await post(safetyRequest(model, question, answer), SAFETY_TIMEOUT_MS);
+      // The status, and the start of NVIDIA's error, go to the function's own log, never to the page.
+      if (!r.ok || r.status === 202) console.warn(`Safety model ${model} answered ${r.status}: ${(await r.clone().text().catch(() => "")).slice(0, 200)}`);
       if (gone(r)) return "gone";
       if (!r.ok) return { checked, verdict: "unchecked", model };
       const d = (await r.json().catch(() => null)) as { choices?: { message?: { content?: unknown } }[] } | null;
