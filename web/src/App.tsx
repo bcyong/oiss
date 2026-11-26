@@ -9,6 +9,7 @@ import { VENDORS } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus, TaskData, TaskState } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
+import { Tour, tourSeen } from "./Tour.tsx";
 import { AssistantPanel, type ChatEntry } from "./AssistantPanel.tsx";
 import { approveTask, type Approval } from "./approve.ts";
 import type { Proposal } from "./assistant/tools.ts";
@@ -130,6 +131,8 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** The view to go back to after inspecting a record from it. */
   const [back, setBack] = useState<Panel | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** The first-visit tour. It shows once per browser and can be replayed from More. */
+  const [touring, setTouring] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   /** The map's key starts closed so it doesn't cover the store. */
   const [keyOpen, setKeyOpen] = useState(false);
@@ -159,6 +162,8 @@ export function App({ start }: { start?: AppStart } = {}) {
   useEffect(() => {
     if (!moreOpen) return;
     const close = (e: MouseEvent) => {
+      // The tour opens the menu itself, so its own buttons don't close it.
+      if ((e.target as Element | null)?.closest?.(".tour")) return;
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
@@ -183,6 +188,12 @@ export function App({ start }: { start?: AppStart } = {}) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [live, base]);
+
+  // A first visit starts with the tour, once the store day has loaded.
+  const loaded = base !== null;
+  useEffect(() => {
+    if (!start && loaded && !tourSeen()) setTouring(true);
+  }, [loaded]);
 
   // Playback: advance the store clock with the animation frame.
   const last = useRef<number | null>(null);
@@ -321,6 +332,15 @@ export function App({ start }: { start?: AppStart } = {}) {
     setBack(null);
     setSelection(null);
     setPinned(null);
+  };
+  const startTour = () => {
+    setMoreOpen(false);
+    setPanel(null);
+    setBack(null);
+    setSelection(null);
+    setPinned(null);
+    setPlaying(false);
+    setTouring(true);
   };
   // Picking something on the floor plan shows its details, except while choosing a facing for a shelf fault.
   const select = (s: Selection | null) => {
@@ -729,6 +749,10 @@ export function App({ start }: { start?: AppStart } = {}) {
             </button>
             {moreOpen && (
               <div className="menu" role="menu">
+                <button type="button" role="menuitem" onClick={startTour}>
+                  Take the tour
+                </button>
+                <hr />
                 {MORE_PANELS.map((x) => (
                   <button key={x} type="button" role="menuitem" aria-current={panel === x ? "true" : undefined} onClick={() => openPanel(x)}>
                     {PANEL_TITLE[x]}
@@ -1200,6 +1224,7 @@ export function App({ start }: { start?: AppStart } = {}) {
           )}
         </aside>
       </div>
+      {touring && <Tour onClose={() => setTouring(false)} onStory={() => openPanel("story")} onMore={setMoreOpen} />}
     </div>
   );
 }
