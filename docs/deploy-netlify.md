@@ -1,6 +1,6 @@
 # Deploy the demo on Netlify
 
-The site is static: the OISS landing page at `/` and the demo store at `/demo/`. Netlify builds it from this repository on every push, using the settings in [`netlify.toml`](../netlify.toml), so there is nothing to configure in the Netlify dashboard beyond linking the repo.
+The site is static, the OISS landing page at `/` and the demo store at `/demo/`, plus one Netlify Function for the demo's Store Operations Assistant. Netlify builds it from this repository on every push, using the settings in [`netlify.toml`](../netlify.toml), so the only things to set in the Netlify dashboard are the linked repo and the assistant's API key.
 
 ## Link the repository (once)
 
@@ -15,6 +15,17 @@ After that:
 
 - Every push to `main` deploys the live site.
 - Every pull request gets its own deploy preview, linked from the pull request.
+
+## Switch on the Store Operations Assistant
+
+The demo's **Ask the store** tab calls an NVIDIA-hosted model through the function in [`netlify/functions/assistant.mts`](../netlify/functions/assistant.mts), served at `/api/assistant`. The key stays on the server: the page never sees it.
+
+1. Get an API key from [build.nvidia.com](https://build.nvidia.com).
+2. In Netlify, open the project's **Project configuration** → **Environment variables** and add `NVIDIA_API_KEY` with the key, scoped to Functions.
+3. Optionally add `NVIDIA_MODEL` to use another NVIDIA-hosted model that supports tool calling. The default is `nvidia/nemotron-3-super-120b-a12b`.
+4. Redeploy. Until the key is set, the tab says the assistant isn't switched on yet.
+
+The function builds every model request itself from the agent definitions in `web/src/assistant/agents.ts`, so the key can only answer the assistant's questions. It refuses other sites' pages, caps each request's size and limits each visitor to 60 model calls per 10 minutes. That limit is kept in memory by each function instance, so it is best effort; a durable per-visitor limit and a daily spending cap come with the server work in M5. Each model call gets at most 25 seconds, well inside Netlify's 60-second limit for a function.
 
 ## What the build does
 
@@ -33,3 +44,5 @@ npm run dev            # generates the golden day, then serves the site at http:
 npm run build:web      # the same build Netlify runs
 npm run preview -w web # serves web/dist
 ```
+
+The local dev server has no functions, so **Ask the store** says the assistant runs on the deployed site. To try it locally, run the site with the Netlify CLI (`netlify dev`) with `NVIDIA_API_KEY` set in your shell.

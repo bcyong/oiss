@@ -1179,3 +1179,107 @@ ol.beats .beat-why {
   margin: 0;
   padding-left: 18px;
 }
+
+/* The Store Operations Assistant. */
+.assistant .samples {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.assistant .samples button {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+.assistant .samples button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+ol.chat {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+ol.chat .question {
+  margin: 0 0 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+ol.chat .question .time {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+ol.chat .answer {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  font-size: 14px;
+}
+.answer-text p {
+  margin: 0 0 6px;
+}
+.answer-text ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.answer-text li {
+  margin-bottom: 3px;
+}
+.cite button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--floor);
+  color: var(--accent);
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 4px;
+  margin: 0 1px;
+  cursor: pointer;
+}
+.cite button:hover {
+  border-color: var(--accent);
+}
+.answer-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.note.warn {
+  color: var(--out);
+}
+.assistant form.ask {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.assistant form.ask input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+}
+.assistant form.ask button {
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--panel);
+  cursor: pointer;
+}
+.assistant form.ask button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
