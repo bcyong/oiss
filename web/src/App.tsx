@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
-import { checkoutName, duration, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { checkoutName, duration, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
+import { storyBeats, type Beat } from "./story.ts";
+import { VENDORS } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
@@ -21,7 +23,7 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "now" | "faults" | "disagreements" | "stream" | "sources";
+export type Tab = "story" | "now" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
 
 /** The faults a visitor can inject, in a store team's words. */
 const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
@@ -29,14 +31,6 @@ const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
   { kind: "price_mismatch", button: "Mistag the price", what: "The shelf tag stops matching the price file." },
   { kind: "phantom_inventory", button: "Empty it without a sale", what: "The units go missing, but the system still counts them: phantom inventory." },
 ];
-
-/** Where a shelf observation came from, in a few words. */
-function observer(r: { source: string; data: { location: { camera?: string } } }): string {
-  if (r.data.location.camera) return `shelf camera ${r.data.location.camera}`;
-  if (r.source.endsWith(ROBOT_SOURCE_SUFFIX)) return "the robot";
-  if (r.source.endsWith(LABEL_SOURCE_SUFFIX)) return "the shelf labels";
-  return r.source;
-}
 
 /** What two sources said about a facing, in a store team's words. */
 function disagreementText(day: IndexedDay, d: Disagreement): string {
@@ -98,7 +92,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
-  const [tab, setTab] = useState<Tab>(start?.tab ?? "now");
+  const [tab, setTab] = useState<Tab>(start?.tab ?? "story");
   const [streamType, setStreamType] = useState<string>("");
   /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
   const [live, setLive] = useState(false);
@@ -226,6 +220,9 @@ export function App({ start }: { start?: AppStart } = {}) {
     return m;
   }, [day]);
 
+  // The day's story, found in its records.
+  const beats = useMemo(() => (day ? storyBeats(day) : []), [day]);
+
   if (error) return <main className="message">{error}</main>;
   if (!day) return <main className="message">Loading the store day…</main>;
 
@@ -251,6 +248,13 @@ export function App({ start }: { start?: AppStart } = {}) {
   const forReview = incidentsUpTo(day.incidents, t).filter((r) => r.data.status === "open" || r.data.status === "under_review").length;
   const nextRun = day.robot.runs.find((r) => r.start > t);
   const disputes = groupDisagreements(disagreementsUpTo(day, t));
+  const showBeat = (b: Beat) => {
+    setPlaying(false);
+    setLive(false);
+    setT(b.t);
+    setSelection(b.selection);
+    setPinned(b.record.id);
+  };
 
   // Each source system is one feed the visitor can switch off. The store layout is the frame every
   // record refers to, so it stays on.
@@ -391,9 +395,17 @@ export function App({ start }: { start?: AppStart } = {}) {
               <dt>Sources disagree</dt>
               {disputes.map((g) => (
                 <dd key={g.latest.kind}>
-                  <button type="button" className="link" onClick={() => inspect(g.latest.robot.id)}>
+                  {/* A link, not a button, so the text after it stays on the same line when it wraps. */}
+                  <a
+                    href={`#${g.latest.robot.id}`}
+                    className="link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      inspect(g.latest.robot.id);
+                    }}
+                  >
                     {disagreementText(day, g.latest)}
-                  </button>
+                  </a>
                   , since {clock(g.first)}
                 </dd>
               ))}
@@ -490,7 +502,7 @@ export function App({ start }: { start?: AppStart } = {}) {
         <h2>Shelf-scanning robot</h2>
         <dl>
           <dt>Made by</dt>
-          <dd>Mock vendor A</dd>
+          <dd>Vendor A</dd>
           <dt>Scan run</dt>
           <dd>{run ? `Run ${runIndex + 1} of ${day.robot.runs.length}, started ${clock(run.start)}` : "Not scanning now"}</dd>
           {run && (
@@ -523,7 +535,7 @@ export function App({ start }: { start?: AppStart } = {}) {
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
             A synthetic grocery day{live ? " running live" : ""}, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, {live ? "simulated" : "replayed"} only from{" "}
-            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor, a mock loss prevention vendor and mock electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
+            <a href="/spec/">OISS</a> records sent by Vendor A's shelf-scanning robot, in-house shelf cameras, Vendor B's checkout loss prevention, Vendor C's people counting and Vendor D's electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
@@ -628,6 +640,9 @@ export function App({ start }: { start?: AppStart } = {}) {
 
           <section className="card">
             <div className="tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={tab === "story"} onClick={() => setTab("story")}>
+                Story
+              </button>
               <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
                 At {clock(t)}
               </button>
@@ -643,7 +658,36 @@ export function App({ start }: { start?: AppStart } = {}) {
               <button type="button" role="tab" aria-selected={tab === "sources"} onClick={() => setTab("sources")}>
                 Sources
               </button>
+              <button type="button" role="tab" aria-selected={tab === "vendors"} onClick={() => setTab("vendors")}>
+                Vendors
+              </button>
             </div>
+
+            {tab === "story" && (
+              <>
+                <p className="note top">Four moments from this store day that a store team would act on, each found in the day's OISS records. Tap one to jump there.</p>
+                {beats.length ? (
+                  <ol className="beats">
+                    {beats.map((b, i) => (
+                      <li key={b.id} className={shown?.id === b.record.id ? "current" : undefined}>
+                        <button type="button" onClick={() => showBeat(b)}>
+                          <span className="step">{i + 1}</span>
+                          <span>
+                            <span className="beat-title">
+                              {b.title} <span className="time">{clock(b.t)}</span>
+                            </span>
+                            <span className="beat-what">{b.what}</span>
+                            <span className="beat-why">{b.why}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="note">None of the story's moments are in the feeds that are on.</p>
+                )}
+              </>
+            )}
 
             {tab === "now" && (
               <>
@@ -819,9 +863,28 @@ export function App({ start }: { start?: AppStart } = {}) {
               </>
             )}
 
+            {tab === "vendors" && (
+              <>
+                <p className="note top">The vendors are made up, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
+                <div className="vendors">
+                  {VENDORS.map((v) => (
+                    <section key={v.name}>
+                      <h3>
+                        {v.name} <span className="vendor">{v.kind}</span>
+                      </h3>
+                      {v.about.map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                      <p className="feeds-of">Feeds in this demo: {v.systems.join(", ")}</p>
+                    </section>
+                  ))}
+                </div>
+              </>
+            )}
+
             {tab === "sources" && (
               <>
-                <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day.</p>
+                <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day. Vendors describes who sends each feed.</p>
                 <table className="feeds">
                   <thead>
                     <tr>

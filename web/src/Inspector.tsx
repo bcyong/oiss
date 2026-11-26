@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { vendorOf } from "./vendors.ts";
 import type { IndexedDay } from "./day.ts";
 import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
@@ -34,6 +35,7 @@ function ProvenanceRows({ p }: { p: Provenance }) {
       <dd>
         {p.system}
         {p.vendor ? `, ${p.vendor}` : ""}
+        {vendorOf(p.system) ? <span className="about">{vendorOf(p.system)!.kind}</span> : null}
       </dd>
       {p.model && (
         <>
@@ -325,7 +327,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
           {asEvidence && <EvidencePreview day={day} evidence={asEvidence} observation={observation} />}
           {vendorAlert && (
             <details className="vendor-raw">
-              <summary>What Mock vendor B sent</summary>
+              <summary>What Vendor B sent</summary>
               <p className="note">
                 The vendor's own alert, before the adapter. The retailer's mapping table turned site {vendorAlert.site} into store {record.oissstore}, register {vendorAlert.register} into {checkoutName((record.data as IncidentData).location.fixture)}, EAN codes into GTINs, UTC milliseconds into store time and a score of {vendorAlert.score} into a confidence of {pct((record.data as IncidentData).confidence)}.
               </p>

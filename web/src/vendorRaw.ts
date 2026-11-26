@@ -88,7 +88,7 @@ export function vendorRawFor(day: IndexedDay, record: AnyRecord): VendorRaw | un
 
 /** What vendor sent it, in a few words. */
 export const VENDOR_NAME: Record<VendorRaw["kind"], string> = {
-  "shelf-scan": "Mock vendor A",
-  traffic: "Mock vendor C",
-  esl: "Mock vendor D",
+  "shelf-scan": "Vendor A",
+  traffic: "Vendor C",
+  esl: "Vendor D",
 };

@@ -482,6 +482,7 @@ aside {
 .card-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 8px;
 }
 .close {
@@ -596,7 +597,8 @@ th {
 .dl-row {
   display: contents;
 }
-button.link {
+button.link,
+a.link {
   border: none;
   background: none;
   padding: 0;
@@ -628,6 +630,7 @@ button.link {
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 12px;
@@ -1040,4 +1043,94 @@ table.feeds td.num div {
 }
 table.feeds tr.off td {
   color: var(--muted);
+}
+
+/* The day's story. */
+ol.beats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+ol.beats button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+ol.beats li.current button {
+  border-color: var(--accent);
+}
+ol.beats .step {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--panel);
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+ol.beats .beat-title {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+ol.beats .beat-title .time {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 4px;
+}
+ol.beats .beat-what,
+ol.beats .beat-why {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+}
+ol.beats .beat-why {
+  color: var(--muted);
+}
+
+/* What each source stands for. */
+.about {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Who sends each feed. */
+.vendors {
+  margin-top: 12px;
+}
+.vendors section + section {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.vendors h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.vendors h3 .vendor {
+  font-weight: 400;
+}
+.vendors p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.vendors .feeds-of {
+  color: var(--muted);
+  font-size: 13px;
 }

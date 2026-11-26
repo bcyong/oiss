@@ -11,28 +11,28 @@
     },
     "shelf-observations.jsonl": {
       "records": 7612,
-      "bytes": 7543188,
-      "sha256": "5bf88e769bb00b68a545fbc9400e71c41c9e695d3c10c11ab41210bdfc9027c1"
+      "bytes": 7507523,
+      "sha256": "dbebd477e1b045b700934fb03ccc08d1a7cc0bb3fe7152f4d0bd635653537aca"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
-      "bytes": 869520,
-      "sha256": "0dd633317fb011e2af03762b1f4251aba2c4bc18e69f8e823e77a76cfb7186b5"
+      "bytes": 864250,
+      "sha256": "490e96aaf9713004c212cab091e0d8cd848d17256ef5de36779d93c294d9278a"
     },
     "shopper-paths.jsonl": {
       "records": 2330,
-      "bytes": 6349073,
-      "sha256": "69803548d1af465ca60cc1774a3d85ba60d19dbab71b6888ec0eb4ce484aa0b3"
+      "bytes": 6337423,
+      "sha256": "2173ad6b9a3eb7f76be02e73452ec32a1cdfb095abe8922b2f5fcedf0e07efa0"
     },
     "evidence.jsonl": {
       "records": 1039,
-      "bytes": 1007824,
-      "sha256": "c1d54a1bb47c6b2fe28456afe786a030ced030fa24288bb21ebb465e463df3a9"
+      "bytes": 1003744,
+      "sha256": "fa4bdaac172a16bc41bb307fcb4df71e07a30b5e08ff909a5cb3cf4ef250f35f"
     },
     "incidents.jsonl": {
       "records": 21,
-      "bytes": 20674,
-      "sha256": "74ead408de6804b978e5d006262f2419675af4c75c951d0cf2828fcc9034108f"
+      "bytes": 20569,
+      "sha256": "f1d7d9d49570d42c61e855261826e911604d12c2a453f19936dde083d11f2c66"
     },
     "vendor/mock-vendor-a-shelf-scans.ndjson": {
       "bytes": 1260777,

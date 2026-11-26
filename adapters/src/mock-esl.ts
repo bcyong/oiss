@@ -1,7 +1,7 @@
 /**
- * Adapter: Mock vendor D's electronic shelf label events -> OISS ShelfObservation records.
+ * Adapter: Vendor D's electronic shelf label events -> OISS ShelfObservation records.
  *
- * Mock vendor D is invented for the demo and labeled as mock. An electronic shelf label (ESL)
+ * Vendor D is invented for the demo and labeled as mock. An electronic shelf label (ESL)
  * system knows two things about each label: the item it is linked to and the price it shows. When
  * the retailer's price file changes, the ESL system sends each label its new price and reports
  * whether the label confirmed it. Its export is a stream of those reports, with the vendor's own
@@ -21,7 +21,7 @@
  */
 import { type Envelope, envelope, facingLocation, idCounter, type LayoutData, layoutIndex, localIso, toGtin14 } from "./common.ts";
 
-/** One report in Mock vendor D's feed (newline-delimited JSON). */
+/** One report in Vendor D's feed (newline-delimited JSON). */
 export interface MockEslEvent {
   event_id: string;
   /** The vendor's code for the store. */
@@ -83,7 +83,7 @@ export interface EslResult {
 export function adaptEslEvents(events: MockEslEvent[], config: EslAdapterConfig): EslResult {
   const index = layoutIndex(config.layout);
   const source = `urn:oiss:${config.store}:mock-vendor-d:esl`;
-  const provenance = { system: "Mock electronic shelf labels", vendor: "Mock vendor D", adapter: ADAPTER, synthetic: true };
+  const provenance = { system: "Mock electronic shelf labels", vendor: "Vendor D", adapter: ADAPTER, synthetic: true };
   const result: EslResult = { observations: [], rejected: [] };
   const nextId = idCounter(config.timezone);
   for (const e of events) {

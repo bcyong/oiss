@@ -13,7 +13,7 @@
   "data": {
     "provenance": {
       "system": "Mock shelf-scanning robot",
-      "vendor": "Mock vendor A",
+      "vendor": "Vendor A",
       "model": {
         "name": "shelf-detector",
         "version": "0.1"
