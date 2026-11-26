@@ -1408,8 +1408,27 @@ ol.chat .answer {
 /* Fixed width, so the chart doesn't move when the speed picker becomes the Live controls. */
 .timebar .playback {
   margin: 0;
-  gap: 8px;
-  width: 232px;
+  gap: 10px;
+  width: 268px;
+}
+/* The main control on the page, so it reads as one: wide, tall and in the accent color. */
+.timebar .play {
+  width: 64px;
+  height: 44px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+}
+.timebar .play:hover {
+  filter: brightness(1.08);
+}
+.timebar .play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .timebar .timeline {
   margin: 0;
@@ -1660,5 +1679,95 @@ ol.chat .answer {
   }
   .key {
     max-width: calc(100% - 12px);
+  }
+}
+
+/* ---- First-visit tour ----
+   One part of the page at a time is ringed, the rest dimmed, with a card beside it. Nothing under the tour
+   can be clicked while it shows. */
+.tour-block {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.tour-dim,
+.tour-ring {
+  position: fixed;
+  z-index: 101;
+  pointer-events: none;
+}
+.tour-dim {
+  inset: 0;
+  background: rgba(12, 14, 11, 0.5);
+}
+.tour-ring {
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(12, 14, 11, 0.5);
+}
+.tour-card {
+  position: fixed;
+  z-index: 102;
+  width: 380px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 16px 18px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  outline: none;
+}
+.tour-count {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tour-card h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.tour-card p {
+  margin: 0;
+  font-size: 14px;
+}
+.tour-items {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  display: grid;
+  gap: 3px;
+}
+.tour-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.tour-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.tour-card button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.tour-skip {
+  border: none;
+  padding: 6px 0;
+  color: var(--muted);
+  background: transparent;
+}
+@media (max-width: 960px) {
+  .tour-card {
+    width: auto;
+  }
+  .tour-buttons {
+    flex-wrap: wrap;
   }
 }
