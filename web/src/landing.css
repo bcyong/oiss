@@ -281,8 +281,7 @@ td:first-child {
 }
 .d-group rect {
   fill: none;
-  stroke: #444;
-  stroke-dasharray: 4 4;
+  stroke: #3a3a3a;
 }
 .d-box rect {
   fill: var(--surface-2);
