@@ -36,6 +36,7 @@ test("every page carries the shared header", () => {
     assert.match(html, /<!--site-header(:#[\w-]+)?-->/, page);
     assert.match(html, /href="\/src\/site\.css"/, page);
     assert.doesNotMatch(html, /<header class="topbar">/, `${page} has its own header`);
+    assert.doesNotMatch(html, /role="tablist"/, `${page} has page tabs; the header is the site's navigation`);
   }
 });
 
