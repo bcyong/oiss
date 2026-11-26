@@ -114,7 +114,8 @@ export function clean(text: string): string {
 export function dropToolCitations(text: string): string {
   return text.replace(/ ?\[([^\]\n]+)\](?!\()/g, (whole, inner: string) => {
     const parts = inner.split(/\s*[,;]\s*/);
-    const kept = parts.filter((p) => !Object.hasOwn(TOOLS, p.trim()));
+    // "[front_end_status]" and "[front_end_status answer]" both name a tool, not a record.
+    const kept = parts.filter((p) => !Object.hasOwn(TOOLS, p.trim().split(/\s+/)[0]!));
     if (kept.length === parts.length) return whole;
     return kept.length ? `${whole.startsWith(" ") ? " " : ""}[${kept.join(", ")}]` : "";
   });

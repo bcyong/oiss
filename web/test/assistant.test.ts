@@ -163,6 +163,7 @@ test("answers keep only cited ids and drop shown reasoning", () => {
   assert.deepEqual(citations("Milk is out [so-20261117-000123] and [task-20261117-000004-v2, inc-20261117-000001]. See [ev-lp-20261117-000002]. Not [this]."), ["so-20261117-000123", "task-20261117-000004-v2", "inc-20261117-000001", "ev-lp-20261117-000002"]);
   assert.equal(dropToolCitations("Two need review [checkout_incidents]. One is open [inc-20261117-000001; checkout_incidents]."), "Two need review. One is open [inc-20261117-000001].");
   assert.equal(dropToolCitations("Out [so-20261117-000123]. See [the board](/demo/)."), "Out [so-20261117-000123]. See [the board](/demo/).");
+  assert.equal(dropToolCitations("Open another lane [front_end_status answer]."), "Open another lane.");
   assert.equal(clean("<think>hmm</think>\nAnswer."), "Answer.");
 });
 

@@ -99,7 +99,8 @@ const valuesOf = (toolText: string) => toolText.replace(/"[A-Za-z_]+"\s*:/g, " "
 export function unknownRoles(answer: string, toolText: string, question = ""): string[] {
   const known = `${valuesOf(toolText)} ${question.toLowerCase()}`;
   const out: string[] = [];
-  for (const m of answer.matchAll(ROLE)) {
+  // The store manager is who approves a proposed task on the page, so the agents are told of one.
+  for (const m of answer.replace(/\bstore manager(?:'s)?\b/gi, " ").matchAll(ROLE)) {
     const word = (m[1] ?? m[2]!).toLowerCase();
     const stem = word.replace(/s$/, "");
     if (new RegExp(`\\b${stem}s?\\b`).test(known)) continue;
