@@ -436,13 +436,19 @@ function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResu
     .map((r) => ({ r, review: reviewOf(day, r, t) }))
     .reverse();
   const reviews: Record<ReviewBucket, number> = { notReviewed: 0, reviewed: 0, reviewCancelled: 0 };
-  for (const { review } of list) reviews[review.bucket]++;
+  const byType: Record<string, number> = {};
+  for (const { r, review } of list) {
+    reviews[review.bucket]++;
+    const type = INCIDENT_LABEL[r.data.incidentType] ?? r.data.incidentType;
+    byType[type] = (byType[type] ?? 0) + 1;
+  }
   // Those still waiting for a person come first.
   list.sort((a, b) => (a.review.bucket === "notReviewed" ? 0 : 1) - (b.review.bucket === "notReviewed" ? 0 : 1));
   return {
     answer: `${plural(list.length, "checkout exception", "checkout exceptions")} so far: ${reviews.notReviewed} not reviewed yet, ${reviews.reviewed} reviewed${reviews.reviewCancelled ? `, ${reviews.reviewCancelled} with the review cancelled` : ""}.`,
     total: list.length,
     reviews,
+    byType,
     incidents: list.slice(0, n).map(({ r, review }) => ({
       id: r.id,
       at: clock(secondsOf(day, r.time)),

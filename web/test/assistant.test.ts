@@ -83,6 +83,7 @@ test("shelf gaps say where replenishment stands, including tasks cancelled with 
 test("checkout incidents give the store's own review status apart from the vendor's", () => {
   const c = tool("loss_prevention", "checkout_incidents", { limit: 25 });
   assert.equal(c.reviews.notReviewed + c.reviews.reviewed + c.reviews.reviewCancelled, c.total);
+  assert.equal(Object.values(c.byType as Record<string, number>).reduce((a, b) => a + b, 0), c.total);
   for (const i of c.incidents) {
     if (!i.review.startsWith("Reviewed")) continue;
     const task = day.byId.get(i.reviewTask.id)!.data as { kind: string; state: string; basedOn: string[] };
