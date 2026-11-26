@@ -60,6 +60,7 @@ const FAILED: Record<string, string> = {
   not_configured: "The assistant isn't switched on for this site yet. It needs an NVIDIA API key in the site's environment variables.",
   not_deployed: "The assistant runs on the deployed site, where its server function is. The local dev server doesn't have it.",
   rate_limited: "The assistant is busy right now. Try again in a few minutes.",
+  model_unavailable: "NVIDIA no longer serves the model this site uses. Set NVIDIA_MODEL in the site's environment variables to a current one.",
 };
 
 export function AssistantPanel({ day, t, onInspect, entries, setEntries, step = httpStep() }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; step?: Step }) {

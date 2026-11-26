@@ -22,7 +22,7 @@ The demo's **Ask the store** tab calls an NVIDIA-hosted model through the functi
 
 1. Get an API key from [build.nvidia.com](https://build.nvidia.com).
 2. In Netlify, open the project's **Project configuration** → **Environment variables** and add `NVIDIA_API_KEY` with the key, scoped to Functions.
-3. Optionally add `NVIDIA_MODEL` to use another NVIDIA-hosted model that supports tool calling. The default is `nvidia/nemotron-3-super-120b-a12b`.
+3. Optionally add `NVIDIA_MODEL` to use another NVIDIA-hosted model that supports tool calling. The default is `nvidia/nemotron-3-ultra-550b-a55b`. If NVIDIA has retired the model (it answers 404 or 410), the function tries `nvidia/nemotron-3.5-lightning-30b-a3b` once before giving up.
 4. Redeploy. Until the key is set, the tab says the assistant isn't switched on yet.
 
 The function builds every model request itself from the agent definitions in `web/src/assistant/agents.ts`, so the key can only answer the assistant's questions. It refuses other sites' pages, caps each request's size and limits each visitor to 60 model calls per 10 minutes. That limit is kept in memory by each function instance, so it is best effort; a durable per-visitor limit and a daily spending cap come with the server work in M5. Each model call gets at most 25 seconds, well inside Netlify's 60-second limit for a function.

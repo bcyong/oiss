@@ -101,7 +101,7 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     agent = parseRoute(r.message.content ?? "", q);
   } catch (err) {
     // Only a missing key or a missing function stops the question; anything else falls back to keywords.
-    if (err instanceof AssistantError && (err.code === "not_configured" || err.code === "not_deployed" || err.code === "rate_limited")) throw err;
+    if (err instanceof AssistantError && (err.code === "not_configured" || err.code === "not_deployed" || err.code === "rate_limited" || err.code === "model_unavailable")) throw err;
     agent = parseRoute("", q);
     routedBy = "keywords";
   }

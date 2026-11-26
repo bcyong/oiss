@@ -16,7 +16,9 @@ export interface ProxyEnv {
 }
 
 export const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-export const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+export const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+/** Tried once when the chosen model is gone (NVIDIA answers 404 or 410 for a retired model). */
+export const FALLBACK_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 /** Netlify ends a synchronous function after 60 seconds; one model call gets at most 25. */
 const UPSTREAM_TIMEOUT_MS = 25_000;
 
@@ -142,20 +144,26 @@ export async function handleAssistant(request: Request, env: ProxyEnv): Promise<
   if (typeof req === "string") return fail(400, "bad_request", req);
 
   const doFetch = env.fetch ?? fetch;
-  let res: Response;
-  try {
-    res = await doFetch(NVIDIA_URL, {
+  const call = (model: string) =>
+    doFetch(NVIDIA_URL, {
       method: "POST",
       headers: { authorization: `Bearer ${env.key}`, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify(modelRequest(req, env.model || DEFAULT_MODEL)),
+      body: JSON.stringify(modelRequest(req, model)),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
+  const model = env.model || DEFAULT_MODEL;
+  const gone = (r: Response) => r.status === 404 || r.status === 410;
+  let res: Response;
+  try {
+    res = await call(model);
+    if (gone(res) && model !== FALLBACK_MODEL) res = await call(FALLBACK_MODEL);
   } catch (err) {
     const timeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
     return fail(504, timeout ? "timeout" : "upstream", timeout ? "The model took too long to answer." : "Couldn't reach the model.");
   }
   if (!res.ok) {
     // Don't pass the provider's error text on: it can echo the request.
+    if (gone(res)) return fail(502, "model_unavailable", "The model provider no longer serves this site's model.");
     const code = res.status === 429 ? "rate_limited" : res.status === 401 || res.status === 403 ? "not_configured" : "upstream";
     return fail(res.status === 429 ? 429 : 502, code, code === "not_configured" ? "The model provider turned the site's API key down." : `The model provider answered ${res.status}.`);
   }

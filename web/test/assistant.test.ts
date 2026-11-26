@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, TOOLS } from "../src/assistant/agents.ts";
-import { DEFAULT_MODEL, handleAssistant, modelRequest, NVIDIA_URL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
+import { DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
 import { ask, citations, clean } from "../src/assistant/run.ts";
 import { idsIn, runTool } from "../src/assistant/tools.ts";
 import { incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
@@ -210,4 +210,23 @@ test("the server hides the provider's errors and limits each visitor", async () 
   let status = 200;
   for (let i = 0; i < 70 && status === 200; i++) status = (await handleAssistant(post({ step: "route", question: "Hi" }, headers), { key: "k", fetch: ok, now: () => 1_000 })).status;
   assert.equal(status, 429);
+});
+
+test("a retired model falls back once to the current one, then says the model is gone", async () => {
+  const calls: string[] = [];
+  const gone = (fallbackStatus: number) =>
+    (async (_url: string, init: RequestInit) => {
+      const model = JSON.parse(String(init.body)).model as string;
+      calls.push(model);
+      if (model === DEFAULT_MODEL) return new Response("{}", { status: 410 });
+      return new Response(JSON.stringify({ choices: [{ message: { content: "availability" } }] }), { status: fallbackStatus });
+    }) as unknown as typeof fetch;
+  const ok = await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: gone(200) });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(calls, [DEFAULT_MODEL, FALLBACK_MODEL]);
+  calls.length = 0;
+  const bad = await handleAssistant(post({ step: "route", question: "Lines?" }), { key: "k", fetch: gone(410) });
+  assert.equal(bad.status, 502);
+  assert.equal((await bad.json()).code, "model_unavailable");
+  assert.deepEqual(calls, [DEFAULT_MODEL, FALLBACK_MODEL]);
 });
