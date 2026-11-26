@@ -23,39 +23,10 @@ Each source publishes what it saw as OISS records, so any consumer, from a store
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph sources["Store-intelligence sources (simulated in the demo)"]
-        direction LR
-        shelf["Shelf vendors<br/>Simbe, Focal, VusionGroup"]
-        lp["Loss prevention<br/>Everseen and others"]
-        metro["NVIDIA Metropolis apps<br/>Store Pulse, VSS"]
-        retail["Retailer systems<br/>Planogram, POS, ESL"]
-    end
-    adapters["Adapters and validator<br/>Map each vendor export to the OISS JSON Schemas"]
-    stream[["OISS record stream<br/>CloudEvents over MQTT or HTTP, GS1 identifiers, one store layout"]]
-    subgraph storage["Storage"]
-        direction LR
-        store[("OISS store<br/>DuckDB for current state, Parquet for history")]
-        evidence[("Evidence store<br/>Clips and images with retention and access roles")]
-    end
-    api["Query API and MCP server<br/>Out-of-stocks, zone status, open incidents, create task"]
-    subgraph assistant["Store Operations Assistant"]
-        direction LR
-        a1["Availability"]
-        a2["Price and label"]
-        a3["Front end"]
-        a4["Loss prevention"]
-        a5["Store insights"]
-    end
-    actions["Actions in the store<br/>Tasks to associates, shelf tag price fixes, lane openings, alerts with evidence"]
-
-    sources --> adapters --> stream
-    stream --> store
-    stream --> evidence
-    storage --> api --> assistant --> actions
-    actions -. "Task records, verified by the next shelf check" .-> stream
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img alt="OISS architecture: store-intelligence sources feed adapters and a validator into one OISS record stream, which fills the OISS store and the evidence store; a query API and MCP server serve the Store Operations Assistant's five agents, whose actions reach the store and come back as Task records." src="docs/images/architecture-light.svg" width="100%">
+</picture>
 
 Data moves top to bottom, in five layers:
 
