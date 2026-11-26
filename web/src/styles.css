@@ -9,6 +9,8 @@
   --accent: #4f7f00;
   --zone: #2f6fdb;
   --in: #3f9142;
+  /* In-stock facings are the normal case, so they stay quiet and gaps stand out. */
+  --facing-in: #b7c6ae;
   --low: #d79a1c;
   --out: #d1453b;
   --unknown: #8a8f86;
@@ -18,47 +20,27 @@
   --robot: #0f7f80;
   --flag: #c2185b;
   --task: #b35c00;
+  --on-accent: #ffffff;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #121411;
-    --panel: #1b1e19;
-    --text: #e8ebe4;
-    --muted: #a2a99d;
-    --line: #30352d;
-    --floor: #171a15;
-    --fixture: #3a4036;
-    --accent: #8fd11c;
-    --zone: #5b93ff;
-    --in: #4fae53;
-    --low: #e7ad33;
-    --out: #f0625a;
-    --unknown: #7d8379;
-    --none: #2b3028;
-    --shopper: #8fb4ff;
-  --incident: #b78cff;
-  --robot: #3cc8c4;
-  --flag: #ff6fa8;
-  --task: #ff9d3d;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #121411;
-  --panel: #1b1e19;
-  --text: #e8ebe4;
-  --muted: #a2a99d;
-  --line: #30352d;
-  --floor: #171a15;
-  --fixture: #3a4036;
-  --accent: #8fd11c;
-  --zone: #5b93ff;
-  --in: #4fae53;
+/* Dark is the default, like the rest of the site. data-theme="light" (More > Light theme) is for screenshots. */
+:root:not([data-theme="light"]) {
+  --bg: #0d0d0d;
+  --panel: #1a1a1a;
+  --text: #eeeeee;
+  --muted: #a7a7a7;
+  --line: #333333;
+  --floor: #141414;
+  --fixture: #3b3b3b;
+  --accent: #76b900;
+  --on-accent: #000000;
+  --zone: #5ab4dc;
+  --in: #8fd11c;
+  --facing-in: #4d5748;
   --low: #e7ad33;
   --out: #f0625a;
-  --unknown: #7d8379;
-  --none: #2b3028;
+  --unknown: #7f7f7f;
+  --none: #262626;
   --shopper: #8fb4ff;
   --incident: #b78cff;
   --robot: #3cc8c4;
@@ -176,8 +158,8 @@ h1 {
   stroke-width: 0.18;
 }
 .s-in_stock {
-  fill: var(--in);
-  background: var(--in);
+  fill: var(--facing-in);
+  background: var(--facing-in);
 }
 .s-low_stock {
   fill: var(--low);
@@ -243,24 +225,29 @@ h1 {
 .camera {
   cursor: pointer;
 }
+/* Cameras are context, not data: a faint outline for each view and a small gray mark, so they never read as shoppers. */
 .camera .fov {
   fill: var(--zone);
-  fill-opacity: 0.08;
-  stroke: var(--zone);
-  stroke-opacity: 0.35;
-  stroke-width: 0.06;
+  fill-opacity: 0;
+  stroke: var(--unknown);
+  stroke-opacity: 0.45;
+  stroke-width: 0.05;
+  stroke-dasharray: 0.25 0.2;
 }
-.camera circle {
-  fill: var(--panel);
-  stroke: var(--zone);
-  stroke-width: 0.16;
+.camera .cam-mark {
+  fill: var(--unknown);
 }
-.camera.shelf-camera .fov {
-  fill-opacity: 0.16;
+.camera:hover .fov {
+  stroke-opacity: 0.8;
 }
 .camera.selected .fov {
-  fill-opacity: 0.25;
+  fill-opacity: 0.14;
+  stroke: var(--zone);
   stroke-opacity: 0.9;
+  stroke-dasharray: none;
+}
+.camera.selected .cam-mark {
+  fill: var(--zone);
 }
 
 .plan-wrap {
@@ -390,6 +377,10 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.tl-head .tl-title {
+  color: var(--text);
+  font-weight: 600;
 }
 .timeline svg {
   display: block;
@@ -1365,7 +1356,7 @@ ol.chat .answer {
 .ask-button {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .ask-button[aria-pressed="true"] {
@@ -1453,7 +1444,7 @@ ol.chat .answer {
   line-height: 1;
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 10px;
 }
 .timebar .play:hover {
@@ -1561,6 +1552,27 @@ ol.chat .answer {
 .summary .kpis span {
   font-size: 11.5px;
   line-height: 1.25;
+}
+/* The two shelf figures executives ask about first lead the card; the rest sit under plain group names. */
+.summary .kpis.headline b {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.summary .kpis.headline .bad b {
+  color: var(--out);
+}
+.summary .kpis.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.summary .kpi-group {
+  margin: 10px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .summary .note {
   margin-top: 8px;
@@ -1713,6 +1725,22 @@ ol.chat .answer {
   .key {
     max-width: calc(100% - 12px);
   }
+  /* On a phone the map's buttons and key sit in their own strips above and below the plan, not over it. */
+  .stage .plan-wrap {
+    padding: 44px 0 36px;
+  }
+  .map-controls {
+    top: 4px;
+    left: 4px;
+  }
+  .zoom {
+    top: 4px;
+    right: 4px;
+  }
+  .key {
+    left: 4px;
+    bottom: 4px;
+  }
 }
 
 /* ---- First-visit tour ----
@@ -1787,7 +1815,7 @@ ol.chat .answer {
 .tour-card button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .tour-skip {

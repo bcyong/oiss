@@ -4,6 +4,12 @@ import type { Camera, Point, ShelfStatus } from "./oiss.ts";
 
 const pts = (ps: Point[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
 
+/** Area names on the floor all start with a capital, like "Produce" and "Breakfast and coffee". */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Front-end zones hold checkout lanes and their incident markers, so their names sit just above the zone. */
+const NAME_ABOVE = new Set(["front_end", "self_checkout"]);
+
 function centroid(ps: Point[]): Point {
   const x = ps.reduce((s, p) => s + p.x, 0) / ps.length;
   const y = ps.reduce((s, p) => s + p.y, 0) / ps.length;
@@ -53,14 +59,15 @@ const Labels = memo(function Labels({ day }: { day: IndexedDay }) {
                   {num?.replace("Aisle ", "")}
                 </text>
                 <text className="label" x={c.x} y={c.y} textAnchor="middle" dominantBaseline="middle" transform={`rotate(-90 ${c.x} ${c.y})`}>
-                  {rest.join(", ")}
+                  {cap(rest.join(", "))}
                 </text>
               </g>
             );
           }
-          const name = z.name.split(", ")[0];
+          const name = cap(z.name.split(", ")[0] ?? "");
+          const y = NAME_ABOVE.has(z.kind) ? Math.min(...z.polygon.map((p) => p.y)) - 0.45 : c.y;
           return (
-            <text key={z.id} className="label" x={c.x} y={c.y} textAnchor="middle" dominantBaseline="middle">
+            <text key={z.id} className="label" x={c.x} y={y} textAnchor="middle" dominantBaseline="middle">
               {name}
             </text>
           );
@@ -104,7 +111,7 @@ const Cameras = memo(function Cameras({ day, selected, onSelect }: { day: Indexe
       {day.layout.cameras.map((c) => (
         <g key={c.id} className={`camera${selected === c.id ? " selected" : ""}${c.id.startsWith("shelf-") ? " shelf-camera" : ""}`} onClick={() => onSelect({ kind: "camera", id: c.id })}>
           <path className="fov" d={wedge(c)} />
-          <circle cx={c.position.x} cy={c.position.y} r={0.45} />
+          <rect className="cam-mark" x={c.position.x - 0.32} y={c.position.y - 0.32} width={0.64} height={0.64} rx={0.12} />
         </g>
       ))}
     </g>
@@ -297,18 +304,6 @@ export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queue
           </g>
         )}
         {showCameras && <Cameras day={day} selected={sel?.kind === "camera" ? sel.id : null} onSelect={onSelect} />}
-        <Labels day={day} />
-        <g className="queues" aria-hidden="true">
-          {queueZones.map((z) => {
-            const c = centroid(z.polygon);
-            const n = queues.get(z.id) ?? 0;
-            return (
-              <text key={z.id} className={`queue${n >= 4 ? " long" : ""}`} x={c.x} y={Math.max(...z.polygon.map((p) => p.y)) - 0.6} textAnchor="middle">
-                {n} in line
-              </text>
-            );
-          })}
-        </g>
         {robot && (
           <g className={`robot${sel?.kind === "robot" ? " selected" : ""}`}>
             {robot.route.map((piece, i) => (
@@ -349,6 +344,19 @@ export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queue
           {shoppers.map((p) => (
             <circle key={p.path} className={sel?.kind === "shopper" && sel.path === p.path ? "selected" : undefined} cx={p.x} cy={p.y} r={0.38} onClick={() => onSelect({ kind: "shopper", path: p.path })} />
           ))}
+        </g>
+        {/* Names and line counts go on top, with a halo, so shoppers and cones never hide them. */}
+        <Labels day={day} />
+        <g className="queues" aria-hidden="true">
+          {queueZones.map((z) => {
+            const c = centroid(z.polygon);
+            const n = queues.get(z.id) ?? 0;
+            return (
+              <text key={z.id} className={`queue${n >= 4 ? " long" : ""}`} x={c.x} y={Math.max(...z.polygon.map((p) => p.y)) - 0.6} textAnchor="middle">
+                {n} in line
+              </text>
+            );
+          })}
         </g>
       </svg>
       <div className="map-controls">

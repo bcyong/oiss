@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { applyTheme, storedTheme, type Theme } from "./theme.ts";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, tasksAt, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
 import { assigneeName, checkoutName, duration, TASK_KIND, TASK_OUTCOME, TASK_STATE, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
@@ -111,6 +112,17 @@ export interface AppStart {
   off?: string[];
 }
 
+
+const NUMBER_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+
+/** The story panel's lead line, counting only the moments shown, so Live never says four when one has happened. */
+function storyNote(n: number, live: boolean): string {
+  if (!n) return live ? "The moments a store team would act on show up here as the day reaches them." : "Moments from this store day that a store team would act on, each found in the day's OISS records.";
+  const count = NUMBER_WORDS[n] ?? String(n);
+  const noun = n === 1 ? "moment" : "moments";
+  return `${count} ${noun} ${live ? "so far today" : "from this store day"} that a store team would act on, each found in the day's OISS records. Tap one to jump there.`;
+}
+
 export function App({ start }: { start?: AppStart } = {}) {
   /** The whole day, every feed on. */
   const [base, setDay] = useState<IndexedDay | null>(start?.day ?? null);
@@ -127,6 +139,13 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
+  const [theme, setTheme] = useState<Theme>(() => (typeof document === "undefined" ? "dark" : storedTheme()));
+  const switchTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
+    setMoreOpen(false);
+  };
   const [panel, setPanel] = useState<Panel | null>(start?.panel ?? null);
   /** The view to go back to after inspecting a record from it. */
   const [back, setBack] = useState<Panel | null>(null);
@@ -752,6 +771,9 @@ export function App({ start }: { start?: AppStart } = {}) {
                 <button type="button" role="menuitem" onClick={startTour}>
                   Take the tour
                 </button>
+                <button type="button" role="menuitem" onClick={switchTheme}>
+                  {theme === "dark" ? "Light theme, for screenshots" : "Dark theme"}
+                </button>
                 <hr />
                 {MORE_PANELS.map((x) => (
                   <button key={x} type="button" role="menuitem" aria-current={panel === x ? "true" : undefined} onClick={() => openPanel(x)}>
@@ -763,7 +785,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                 <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); runNewDay(); }} disabled={busy}>
                   {busy ? "Simulating…" : "Simulate another day"}
                 </button>
-                <p className="menu-note">Seed {day.files.seed}{day.files.origin === "golden" ? ", the sample day" : day.files.simulatedInMs ? `, simulated in ${(day.files.simulatedInMs / 1000).toFixed(1)} s` : ""}</p>
+                <p className="menu-note">{day.files.origin === "golden" ? "Showing the sample store day." : day.files.simulatedInMs ? `Showing a new store day, simulated in your browser in ${(day.files.simulatedInMs / 1000).toFixed(1)} seconds.` : "Showing a new simulated store day."}</p>
               </div>
             )}
           </div>
@@ -863,23 +885,29 @@ export function App({ start }: { start?: AppStart } = {}) {
         <aside className="side">
           <section className="card summary">
                 <h2>At {clock(t)}</h2>
-                <div className="kpis">
+                <div className="kpis headline">
                   <div>
                     <b>{known ? pct((counts.in_stock + counts.low_stock) / known) : "–"}</b>
                     <span>On-shelf availability, of facings observed</span>
                   </div>
-                  <div>
+                  <div className={counts.out_of_stock > 0 ? "bad" : undefined}>
                     <b>{counts.out_of_stock}</b>
                     <span>Facings out of stock</span>
                   </div>
+                </div>
+                <h3 className="kpi-group">Shelves</h3>
+                <div className="kpis">
                   <div>
                     <b>{flagged.filter(Boolean).length}</b>
                     <span>Facings flagged: misplaced items or wrong tags</span>
                   </div>
                   <div>
-                    <b>{sco?.queueLength ?? "–"}</b>
-                    <span>In line at self-checkout</span>
+                    <b>{robot ? "Scanning" : nextRun ? clock(nextRun.start) : "Done"}</b>
+                    <span>{robot ? `Robot, ${robot.stop - robot.run.first + 1} of ${robot.run.last - robot.run.first + 1} bay positions` : nextRun ? "Robot's next scan run" : "Robot's scan runs for today"}</span>
                   </div>
+                </div>
+                <h3 className="kpi-group">Front end</h3>
+                <div className="kpis three">
                   <div>
                     <b>{shoppers.length}</b>
                     <span>Shoppers in the store</span>
@@ -891,20 +919,20 @@ export function App({ start }: { start?: AppStart } = {}) {
                     <span>Staffed lanes open</span>
                   </div>
                   <div>
-                    <b>{front?.queueLength ?? "–"}</b>
-                    <span>In line at staffed lanes</span>
-                  </div>
-                  <div>
                     <b>{duration(front?.avgWaitSeconds)}</b>
                     <span>Average wait, staffed</span>
                   </div>
                   <div>
-                    <b>{forReview}</b>
-                    <span>Checkout incidents waiting for review</span>
+                    <b>{front?.queueLength ?? "–"}</b>
+                    <span>In line, staffed lanes</span>
                   </div>
                   <div>
-                    <b>{robot ? "Scanning" : nextRun ? clock(nextRun.start) : "Done"}</b>
-                    <span>{robot ? `Robot, ${robot.stop - robot.run.first + 1} of ${robot.run.last - robot.run.first + 1} bay positions` : nextRun ? "Robot's next scan run" : "Robot's scan runs for today"}</span>
+                    <b>{sco?.queueLength ?? "–"}</b>
+                    <span>In line, self-checkout</span>
+                  </div>
+                  <div>
+                    <b>{forReview}</b>
+                    <span>Incidents to review</span>
                   </div>
                 </div>
                 <p className="note">{known} of {day.facings.length} facings observed so far. Front-end figures are from the last 15-minute ZoneMetric.</p>
@@ -1016,7 +1044,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                 {panel === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} onApprove={approve} />}
                 {panel === "story" && (
                   <>
-                <p className="note top">Four moments from this store day that a store team would act on, each found in the day's OISS records. Tap one to jump there.</p>
+                <p className="note top">{storyNote(storyBeatsSoFar.length, live)}</p>
                 {storyBeatsSoFar.length ? (
                   <ol className="beats">
                     {storyBeatsSoFar.map((b, i) => (
