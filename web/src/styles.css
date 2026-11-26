@@ -9,6 +9,8 @@
   --accent: #4f7f00;
   --zone: #2f6fdb;
   --in: #3f9142;
+  /* In-stock facings are the normal case, so they stay quiet and gaps stand out. */
+  --facing-in: #b7c6ae;
   --low: #d79a1c;
   --out: #d1453b;
   --unknown: #8a8f86;
@@ -32,6 +34,7 @@
     --accent: #8fd11c;
     --zone: #5b93ff;
     --in: #4fae53;
+  --facing-in: #4b5a45;
     --low: #e7ad33;
     --out: #f0625a;
     --unknown: #7d8379;
@@ -55,6 +58,7 @@
   --accent: #8fd11c;
   --zone: #5b93ff;
   --in: #4fae53;
+  --facing-in: #4b5a45;
   --low: #e7ad33;
   --out: #f0625a;
   --unknown: #7d8379;
@@ -176,8 +180,8 @@ h1 {
   stroke-width: 0.18;
 }
 .s-in_stock {
-  fill: var(--in);
-  background: var(--in);
+  fill: var(--facing-in);
+  background: var(--facing-in);
 }
 .s-low_stock {
   fill: var(--low);
@@ -243,24 +247,29 @@ h1 {
 .camera {
   cursor: pointer;
 }
+/* Cameras are context, not data: a faint outline for each view and a small gray mark, so they never read as shoppers. */
 .camera .fov {
   fill: var(--zone);
-  fill-opacity: 0.08;
-  stroke: var(--zone);
-  stroke-opacity: 0.35;
-  stroke-width: 0.06;
+  fill-opacity: 0;
+  stroke: var(--unknown);
+  stroke-opacity: 0.45;
+  stroke-width: 0.05;
+  stroke-dasharray: 0.25 0.2;
 }
-.camera circle {
-  fill: var(--panel);
-  stroke: var(--zone);
-  stroke-width: 0.16;
+.camera .cam-mark {
+  fill: var(--unknown);
 }
-.camera.shelf-camera .fov {
-  fill-opacity: 0.16;
+.camera:hover .fov {
+  stroke-opacity: 0.8;
 }
 .camera.selected .fov {
-  fill-opacity: 0.25;
+  fill-opacity: 0.14;
+  stroke: var(--zone);
   stroke-opacity: 0.9;
+  stroke-dasharray: none;
+}
+.camera.selected .cam-mark {
+  fill: var(--zone);
 }
 
 .plan-wrap {
@@ -390,6 +399,10 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.tl-head .tl-title {
+  color: var(--text);
+  font-weight: 600;
 }
 .timeline svg {
   display: block;
@@ -1529,6 +1542,27 @@ ol.chat .answer {
   font-size: 11.5px;
   line-height: 1.25;
 }
+/* The two shelf figures executives ask about first lead the card; the rest sit under plain group names. */
+.summary .kpis.headline b {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.summary .kpis.headline .bad b {
+  color: var(--out);
+}
+.summary .kpis.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.summary .kpi-group {
+  margin: 10px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .summary .note {
   margin-top: 8px;
   font-size: 11.5px;
@@ -1679,6 +1713,22 @@ ol.chat .answer {
   }
   .key {
     max-width: calc(100% - 12px);
+  }
+  /* On a phone the map's buttons and key sit in their own strips above and below the plan, not over it. */
+  .stage .plan-wrap {
+    padding: 44px 0 36px;
+  }
+  .map-controls {
+    top: 4px;
+    left: 4px;
+  }
+  .zoom {
+    top: 4px;
+    right: 4px;
+  }
+  .key {
+    left: 4px;
+    bottom: 4px;
   }
 }
 
