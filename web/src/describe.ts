@@ -9,6 +9,21 @@ export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
   none: "Not yet observed",
 };
 
+/** Shelf observation flags, in the words a store team uses. */
+export const FLAG_LABEL: Record<string, string> = {
+  misplaced_item: "Misplaced item",
+  price_mismatch: "Price mismatch",
+};
+export const flagName = (f: string) => FLAG_LABEL[f] ?? humanize(f);
+
+/** What a flagged shelf observation found, in a sentence fragment, such as "the tag says $3.49 and the price file $3.99". */
+export function flagDetail(day: IndexedDay, d: ShelfObservationData): string {
+  const parts: string[] = [];
+  if (d.flags?.includes("misplaced_item")) parts.push(`${(d.observedGtin && day.items.get(d.observedGtin)?.name) || "another item"} is on the facing`);
+  if (d.flags?.includes("price_mismatch")) parts.push(`the shelf tag says ${money(d.tagPrice)} and the price file ${money(d.systemPrice)}`);
+  return parts.join(", and ");
+}
+
 export const PRIVACY: Record<string, { label: string; meaning: string }> = {
   operational: { label: "Operational", meaning: "Nothing about people. For store teams and agents." },
   aggregate: { label: "Aggregate", meaning: "Counts and averages over people, never individuals." },
@@ -31,6 +46,12 @@ export const typeName = (type: string) => type.replace(/^oiss\./, "");
 
 export const pct = (v: number) => `${Math.round(v * 100)}%`;
 export const money = (m?: { amount: number; currency: string }) => (m ? m.amount.toLocaleString("en-US", { style: "currency", currency: m.currency }) : "");
+// How long something took, rounded for a person: "45 s", "73 min", "2 h 5 min".
+export const elapsed = (s: number) => {
+  if (s < 60) return `${Math.round(s)} s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`;
+};
 export const duration = (s?: number) => (s === undefined ? "–" : s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, "0")} s`);
 export const humanize = (v: string) => v.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 
@@ -80,7 +101,8 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
   switch (r.type) {
     case "oiss.ShelfObservation": {
       const d = (r as OissRecord<ShelfObservationData>).data;
-      return `${itemNameAt(day, d.location.facing)}: ${STATUS_LABEL[d.status].toLowerCase()}`;
+      const flags = d.flags?.length ? `, ${d.flags.map((f) => flagName(f).toLowerCase()).join(", ")}` : "";
+      return `${itemNameAt(day, d.location.facing)}: ${STATUS_LABEL[d.status].toLowerCase()}${flags}`;
     }
     case "oiss.ZoneMetric": {
       const d = (r as OissRecord<ZoneMetricData>).data;

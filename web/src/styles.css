@@ -16,6 +16,7 @@
   --shopper: #2251a8;
   --incident: #8a3ffc;
   --robot: #0f7f80;
+  --flag: #c2185b;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -37,6 +38,7 @@
     --shopper: #8fb4ff;
   --incident: #b78cff;
   --robot: #3cc8c4;
+  --flag: #ff6fa8;
     color-scheme: dark;
   }
 }
@@ -58,6 +60,7 @@
   --shopper: #8fb4ff;
   --incident: #b78cff;
   --robot: #3cc8c4;
+  --flag: #ff6fa8;
   color-scheme: dark;
 }
 
@@ -179,6 +182,10 @@ h1 {
   stroke: var(--floor);
   stroke-width: 0.03;
   cursor: pointer;
+}
+.facing.flagged {
+  stroke: var(--flag);
+  stroke-width: 0.2;
 }
 .facing.selected {
   stroke: var(--text);
@@ -960,4 +967,57 @@ code {
 }
 .vendor-raw .note {
   margin-bottom: 8px;
+}
+.flag-swatch {
+  background: var(--none);
+  outline: 2px solid var(--flag);
+  outline-offset: -2px;
+}
+.day-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.live-pill {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--panel);
+  background: var(--out);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.live-pill.fast {
+  background: var(--muted);
+}
+.target {
+  margin: 10px 0 8px;
+  font-size: 13px;
+}
+.inject {
+  display: grid;
+  gap: 6px;
+}
+.inject button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+}
+.inject button span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.seen {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.seen-caught {
+  color: var(--in);
+}
+.seen-cleared {
+  color: var(--low);
 }

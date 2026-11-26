@@ -5,6 +5,7 @@
  */
 import { buildCatalog, type Catalog, type Item, sizePlanogram } from "./catalog.ts";
 import { Scheduler } from "./events.ts";
+import { activeFaults, type Injection, planFaults, type ShelfFault } from "./faults.ts";
 import { type Point, dist } from "./geometry.ts";
 import { ALLEY_NORTH_Y, type Department, type Lane, route, routeLength, type Slot, type StoreLayoutModel, buildLayout } from "./layout.ts";
 import { Rng } from "./rng.ts";
@@ -18,6 +19,8 @@ export interface DayConfig {
   shoppers?: number;
   /** Times of the store's own shelf recovery rounds, seconds since midnight. */
   recoveryRounds?: number[];
+  /** Faults to add to the day, on top of the ones that come at set rates. */
+  injections?: Injection[];
 }
 
 export type Mission = "quick_trip" | "fill_in" | "stock_up";
@@ -79,6 +82,8 @@ export interface DayStats {
   maxStaffedWaiting: number;
   facingsOutOfStockAtClose: number;
   recoveryUnits: number;
+  /** Units that disappeared from shelves without a sale, behind phantom inventory. */
+  phantomUnits: number;
 }
 
 export interface Ground {
@@ -97,6 +102,10 @@ export interface Ground {
   serviceStarts: ServiceStart[];
   transactions: Transaction[];
   stats: DayStats;
+  /** Misplaced items, wrong shelf prices and phantom inventory, in start order, injected ones last. */
+  faults: ShelfFault[];
+  /** Faults active at a facing at time t. */
+  faultsAt(facing: string, t: number): ShelfFault[];
   /** Units on the shelf at facing f at time t. */
   unitsAt(facing: string, t: number): number;
 }
@@ -125,7 +134,7 @@ const QUEUE_STEP = 0.8;
 const DEFAULT_ROUNDS = [hours(11), hours(15), hours(19)];
 
 export function simulateDay(input: DayConfig): Ground {
-  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, ...input };
+  const config: Required<DayConfig> = { shoppers: 1600, recoveryRounds: DEFAULT_ROUNDS, injections: [], ...input };
   const root = new Rng(config.seed);
   const layout = buildLayout();
   const clock = storeClock(config.date, layout.store.timezone);
@@ -177,6 +186,21 @@ export function simulateDay(input: DayConfig): Ground {
       });
       const span = hours(1, 15);
       low.forEach((s, i) => sched.at(start + (span * (i + 1)) / (low.length + 1), () => recover(s.id)));
+    });
+  }
+
+  // ---- shelf faults ----
+  const faults = planFaults({ seed: config.seed, catalog, open: OPEN, lastEntry: LAST_ENTRY, hourly: HOURLY, recoveryRounds: config.recoveryRounds, injections: config.injections });
+  const faultsByFacing = new Map<string, ShelfFault[]>();
+  for (const f of faults) faultsByFacing.set(f.facing, [...(faultsByFacing.get(f.facing) ?? []), f]);
+  let phantomUnits = 0;
+  for (const f of faults) {
+    if (f.kind !== "phantom_inventory") continue;
+    // The units vanish without a sale and the backroom has none, though the store's system still counts them.
+    sched.at(f.start, () => {
+      phantomUnits += units.get(f.facing)!;
+      backroom.set(f.facing, 0);
+      setUnits(f.facing, 0);
     });
   }
 
@@ -487,9 +511,10 @@ export function simulateDay(input: DayConfig): Ground {
     maxStaffedWaiting: Math.max(0, ...frontEnd.map((f) => f.staffedWaiting)),
     facingsOutOfStockAtClose: catalog.planogram.filter((p) => unitsAt(p.facing, CLOSE) === 0).length,
     recoveryUnits,
+    phantomUnits,
   };
 
-  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, frontEnd, serviceStarts, transactions: transactions.sort((a, b) => a.end - b.end || a.shopper - b.shopper), stats, unitsAt };
+  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, frontEnd, serviceStarts, transactions: transactions.sort((a, b) => a.end - b.end || a.shopper - b.shopper), stats, faults, faultsAt: (facing, t) => activeFaults(faultsByFacing, facing, t), unitsAt };
 }
 
 export { routeLength };

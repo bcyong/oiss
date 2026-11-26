@@ -6,14 +6,17 @@
  * Sources in the demo store (all synthetic):
  * - Demo Grocery space planning (the retailer's own system): the StoreLayout and planogram, once before opening.
  * - Mock vendor A, a shelf-scanning robot: every facing it can reach, every two hours from 8 AM to 8 PM.
- * - Store shelf cameras (in-house): aisle 3 and the dairy wall every 5 minutes, reporting changes.
+ *   It reads shelf tag prices and flags misplaced items and price mismatches.
+ * - Store shelf cameras (in-house): aisle 3 and the dairy wall every 5 minutes, reporting changes,
+ *   misplaced items included. They can't read shelf tags.
  * - Mock vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
  * - Mock vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
  *
- * Shelf images back every low-stock and out-of-stock read from the robot and the shelf cameras, as
+ * Shelf images back every low-stock, out-of-stock and flagged read from the robot and the shelf cameras, as
  * Evidence records cropped to the shelf. The demo has no real frames yet, so each Evidence record
  * points to an image that does not exist, and the demo app draws a labeled placeholder instead.
  */
+import type { ShelfFault } from "./faults.ts";
 import type { Ground, TrackPoint } from "./model.ts";
 import { inPolygon, round } from "./geometry.ts";
 import { byTime, idMaker, type OissRecord, type Provenance, record } from "./records.ts";
@@ -53,6 +56,16 @@ const OCCUPANCY_TICK = 10;
 const usd = (amount: number) => ({ amount, currency: "USD" });
 
 type Status = "in_stock" | "low_stock" | "out_of_stock" | "unknown";
+
+/** What a source saw beyond fill level: an item that doesn't belong, and the shelf tag price. */
+interface Findings {
+  observedGtin?: string;
+  flags: string[];
+  tagPrice?: number;
+}
+
+/** How likely each source is to spot a misplaced item on one look. */
+const SPOT_MISPLACED = { robot: 0.9, shelfCams: 0.85 };
 
 function statusOf(fill: number): Status {
   if (fill <= 0.025) return "out_of_stock";
@@ -118,14 +131,15 @@ export function observeDay(g: Ground): ObservedDay {
     const fixture = fixtureById.get(slot.fixture)!;
     return { zone: fixture.zone, fixture: fixture.id, shelf: slot.shelf, facing, ...(camera ? { camera } : {}) };
   };
-  const shelfRecord = (facing: string, t: number, windowSeconds: number, read: { status: Status; fill?: number; confidence: number }, source: string, provenance: Provenance, camera?: string, withPrice = false) => {
+  const shelfRecord = (facing: string, t: number, windowSeconds: number, read: { status: Status; fill?: number; confidence: number }, source: string, provenance: Provenance, camera?: string, withPrice = false, found: Findings = { flags: [] }) => {
     const pos = catalog.byFacing.get(facing)!;
     const seen = read.status !== "unknown" && read.status !== "out_of_stock";
     const price = itemPrice(pos.gtin);
     const window = { start: clock.iso(t - windowSeconds), end: clock.iso(t) };
-    // A shelf image backs every low-stock and out-of-stock read.
+    const observedGtin = found.observedGtin ?? (seen ? pos.gtin : undefined);
+    // A shelf image backs every low-stock, out-of-stock and flagged read.
     const refs: string[] = [];
-    if (read.status === "low_stock" || read.status === "out_of_stock") {
+    if (read.status === "low_stock" || read.status === "out_of_stock" || found.flags.length > 0) {
       const id = evId();
       refs.push(id);
       evidence.push(
@@ -161,10 +175,11 @@ export function observeDay(g: Ground): ObservedDay {
         window,
         location: location(facing, camera),
         status: read.status,
-        ...(seen ? { observedGtin: pos.gtin } : {}),
+        ...(found.flags.length ? { flags: found.flags } : {}),
+        ...(observedGtin ? { observedGtin } : {}),
         planogramGtin: pos.gtin,
         ...(read.fill !== undefined ? { fillLevel: read.fill } : {}),
-        ...(withPrice && read.status !== "unknown" ? { tagPrice: usd(price), systemPrice: usd(price) } : {}),
+        ...(withPrice && read.status !== "unknown" ? { tagPrice: usd(found.tagPrice ?? price), systemPrice: usd(price) } : {}),
         confidence: read.confidence,
         ...(refs.length ? { evidence: refs } : {}),
       },
@@ -180,6 +195,21 @@ export function observeDay(g: Ground): ObservedDay {
       robotPositions.push({ fixture: f.id, sequence: seq, facings });
     }
   }
+  // Fault draws use their own streams, so a fault changes nothing else the sources report.
+  const robotFaultRng = rng.fork("robot-faults");
+  const robotFindings = (faults: ShelfFault[]): Findings => {
+    const found: Findings = { flags: [] };
+    for (const f of faults) {
+      if (f.kind === "misplaced_item" && robotFaultRng.chance(SPOT_MISPLACED.robot)) {
+        found.observedGtin = f.gtin;
+        found.flags.push("misplaced_item");
+      } else if (f.kind === "price_mismatch") {
+        found.tagPrice = f.tagPrice;
+        found.flags.push("price_mismatch");
+      }
+    }
+    return found;
+  };
   for (const start of ROBOT_RUNS) {
     robotPositions.forEach((pos, i) => {
       const t = start + i * ROBOT_SECONDS_PER_POSITION;
@@ -192,7 +222,8 @@ export function observeDay(g: Ground): ObservedDay {
         }
         const fill = readFill(g.unitsAt(facing, t), capacity, cooler ? 0.08 : 0.05, robotRng);
         const confidence = round(robotRng.uniform(cooler ? 0.78 : 0.86, cooler ? 0.92 : 0.97));
-        shelfObservations.push(shelfRecord(facing, t, 4, { status: statusOf(fill), fill, confidence }, `urn:oiss:${store}:mock-vendor-a:robot-1`, PROV.robot, undefined, true));
+        const found = robotFindings(g.faultsAt(facing, t));
+        shelfObservations.push(shelfRecord(facing, t, 4, { status: statusOf(fill), fill, confidence }, `urn:oiss:${store}:mock-vendor-a:robot-1`, PROV.robot, undefined, true, found));
       }
     });
   }
@@ -209,28 +240,38 @@ export function observeDay(g: Ground): ObservedDay {
       if (nearest.id === cam.id) watched.push({ facing: slot.id, camera: cam.id });
     }
   }
-  const reported = new Map<string, Status>();
-  const pending = new Map<string, Status>();
+  const camFaultRng = rng.fork("shelf-cam-faults");
+  const reported = new Map<string, string>();
+  const pending = new Map<string, string>();
   for (let t = g.open; t <= g.close; t += SHELF_CAM_INTERVAL) {
     for (const { facing, camera } of watched) {
       const fill = readFill(g.unitsAt(facing, t), catalog.byFacing.get(facing)!.capacity, 0.04, camRng);
       const status = statusOf(fill);
+      const found: Findings = { flags: [] };
+      for (const f of g.faultsAt(facing, t)) {
+        if (f.kind === "misplaced_item" && camFaultRng.chance(SPOT_MISPLACED.shelfCams)) {
+          found.observedGtin = f.gtin;
+          found.flags.push("misplaced_item");
+        }
+      }
+      // What the camera reports on: the status, and any item that doesn't belong.
+      const key = `${status}|${found.observedGtin ?? ""}`;
       const last = reported.get(facing);
       const first = last === undefined;
-      // Report on the first look, then only when a new status holds for two looks in a row.
-      if (first || (status !== last && pending.get(facing) === status)) {
-        reported.set(facing, status);
+      // Report on the first look, then only when a change holds for two looks in a row.
+      if (first || (key !== last && pending.get(facing) === key)) {
+        reported.set(facing, key);
         pending.delete(facing);
-        shelfObservations.push(shelfRecord(facing, t, 10, { status, fill, confidence: round(camRng.uniform(0.9, 0.98)) }, `urn:oiss:${store}:store-vision:${camera}`, PROV.shelfCams, camera));
-      } else if (status !== last) {
-        pending.set(facing, status);
+        shelfObservations.push(shelfRecord(facing, t, 10, { status, fill, confidence: round(camRng.uniform(0.9, 0.98)) }, `urn:oiss:${store}:store-vision:${camera}`, PROV.shelfCams, camera, false, found));
+      } else if (key !== last) {
+        pending.set(facing, key);
       } else {
         pending.delete(facing);
       }
     }
   }
-  shelfObservations.sort(byTime);
-  evidence.sort(byTime);
+  // Number records in time order, so that a change late in the day never renumbers a record sent earlier.
+  renumberShelfRecords(shelfObservations, evidence, date);
 
   // ---- ZoneMetric ----
   const zones = layout.zones.filter((z) => z.public);
@@ -330,26 +371,28 @@ export function observeDay(g: Ground): ObservedDay {
   const pathRng = rng.fork("tracker");
   const shopperPaths: OissRecord[] = [];
   const usedIds = new Set<string>();
-  const newPathId = () => {
+  const newPathId = (r: Rng) => {
     let id: string;
-    do id = `path-${pathRng.hex(8)}`;
+    do id = `path-${r.hex(8)}`;
     while (usedIds.has(id));
     usedIds.add(id);
     return id;
   };
   for (const track of g.tracks) {
+    // Each shopper's noise has its own stream, so a change to one visit leaves every other path as it was.
+    const trackRng = pathRng.fork(`shopper-${track.shopper}`);
     for (let s0 = track.arrival; s0 < track.exit; s0 += PATH_ROTATION) {
       const s1 = Math.min(track.exit, s0 + PATH_ROTATION);
       const pts = segment(track.points, s0, s1);
       const out: { t: string; x: number; y: number }[] = [];
       for (const p of pts) {
-        const q = { t: clock.iso(p.t), x: round(p.x + pathRng.normal(0, 0.15)), y: round(p.y + pathRng.normal(0, 0.15)) };
+        const q = { t: clock.iso(p.t), x: round(p.x + trackRng.normal(0, 0.15)), y: round(p.y + trackRng.normal(0, 0.15)) };
         const prev = out[out.length - 1];
         if (prev && prev.t === q.t) continue;
         out.push(q);
       }
       if (out.length < 2) continue;
-      const pathId = newPathId();
+      const pathId = newPathId(trackRng);
       shopperPaths.push(
         record("ShopperPath", {
           id: spId(),
@@ -364,15 +407,51 @@ export function observeDay(g: Ground): ObservedDay {
             objectClass: "Human",
             idValidUntil: clock.iso(Math.min(s0 + PATH_ROTATION, 86_399)),
             points: out,
-            confidence: round(pathRng.uniform(0.75, 0.9)),
+            confidence: round(trackRng.uniform(0.75, 0.9)),
           },
         }),
       );
     }
   }
-  shopperPaths.sort(byTime);
+  renumberByTime(shopperPaths, idMaker("sp", date));
 
   return { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence };
+}
+
+/** Sort records by time, keeping the order they were made in for equal times, and give them ids in that order. */
+function renumberByTime(records: OissRecord[], nextId: () => string): Map<string, string> {
+  const made = new Map(records.map((r, i) => [r, i]));
+  records.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : made.get(a)! - made.get(b)!));
+  const renamed = new Map<string, string>();
+  for (const r of records) {
+    const id = nextId();
+    renamed.set(r.id, id);
+    r.id = id;
+  }
+  return renamed;
+}
+
+/** Renumber shelf observations by time, and their evidence in the order the observations cite it. */
+function renumberShelfRecords(observations: OissRecord[], evidence: OissRecord[], date: string): void {
+  renumberByTime(observations, idMaker("so", date));
+  const evId = idMaker("ev", date);
+  const renamed = new Map<string, string>();
+  for (const r of observations) {
+    const data = r.data as { evidence?: string[] };
+    if (data.evidence) data.evidence = data.evidence.map((old) => {
+      const id = evId();
+      renamed.set(old, id);
+      return id;
+    });
+  }
+  for (const e of evidence) {
+    const id = renamed.get(e.id);
+    if (!id) throw new Error(`evidence ${e.id} backs no observation`);
+    e.id = id;
+    e.subject = id;
+    (e.data as { uri: string }).uri = `evidence/${date}/${id}.jpg`;
+  }
+  evidence.sort(byTime);
 }
 
 /** Midnight at the store a number of days after the store date, with the offset in force on that date. */

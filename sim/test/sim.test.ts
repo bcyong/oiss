@@ -91,12 +91,12 @@ test("records in each file are in time order", () => {
   }
 });
 
-test("a shelf image backs every low-stock and out-of-stock read, and nothing else", () => {
+test("a shelf image backs every low-stock, out-of-stock and flagged read, and nothing else", () => {
   const evidence = new Map(day.records.evidence.filter((r) => !r.id.startsWith("ev-lp-")).map((r) => [r.id, r]));
   const used = new Set<string>();
   for (const r of day.records.shelfObservations) {
-    const d = r.data as { status: string; evidence?: string[]; location: { facing: string } };
-    const backed = d.status === "low_stock" || d.status === "out_of_stock";
+    const d = r.data as { status: string; flags?: string[]; evidence?: string[]; location: { facing: string } };
+    const backed = d.status === "low_stock" || d.status === "out_of_stock" || (d.flags?.length ?? 0) > 0;
     assert.equal(d.evidence?.length ?? 0, backed ? 1 : 0, r.id);
     for (const id of d.evidence ?? []) {
       const ev = evidence.get(id);
@@ -135,4 +135,44 @@ test("every checkout is a transaction with what the shopper bought", () => {
   const bought = day.ground.tracks.reduce((a, t) => a + t.unitsBought, 0);
   const paid = day.ground.transactions.reduce((a, t) => a + t.lines.reduce((b, l) => b + l.qty, 0), 0);
   assert.equal(paid, bought);
+});
+
+test("shelf faults come at set rates and the robot flags misplaced items and price mismatches", () => {
+  const faults = day.ground.faults;
+  assert.ok(faults.some((f) => f.kind === "misplaced_item"));
+  assert.ok(faults.some((f) => f.kind === "price_mismatch"));
+  const flagged = day.records.shelfObservations.filter((r) => (r.data as { flags?: string[] }).flags);
+  for (const r of flagged) {
+    const d = r.data as { flags: string[]; observedGtin?: string; planogramGtin: string; tagPrice?: { amount: number }; systemPrice?: { amount: number }; evidence?: string[] };
+    if (d.flags.includes("misplaced_item")) assert.notEqual(d.observedGtin, d.planogramGtin);
+    if (d.flags.includes("price_mismatch")) assert.notEqual(d.tagPrice!.amount, d.systemPrice!.amount);
+    assert.ok(d.evidence?.length, "a shelf image backs every flagged read");
+  }
+  // A misplaced item the robot passed while it was there is flagged most of the time.
+  const misplacedFlags = flagged.filter((r) => (r.data as { flags: string[] }).flags.includes("misplaced_item"));
+  assert.ok(misplacedFlags.length > 0);
+});
+
+test("an injected fault changes nothing sent before it, and the robot finds it on its next run", () => {
+  const T = 12 * 3600 + 20 * 60;
+  const facings = day.ground.catalog.planogram.map((p) => p.facing);
+  const injections = [
+    { kind: "phantom_inventory" as const, facing: facings[40]!, t: T },
+    { kind: "misplaced_item" as const, facing: facings[300]!, t: T },
+    { kind: "price_mismatch" as const, facing: facings[600]!, t: T },
+  ];
+  const changed = runDay({ seed: 7, date: "2026-11-17", injections });
+  const cutoff = day.ground.clock.iso(T);
+  for (const kind of ["shelfObservations", "zoneMetrics", "shopperPaths", "evidence", "incidents"] as const) {
+    const before = (rs: { time: string }[]) => JSON.stringify(rs.filter((r) => r.time <= cutoff));
+    assert.equal(before(changed.records[kind]), before(day.records[kind]), `${kind} sent by ${cutoff} are unchanged`);
+  }
+  assert.equal(changed.summary.shelfFaults.injected, 3);
+
+  const robotAfter = (facing: string) =>
+    changed.records.shelfObservations.find((r) => r.source.endsWith(":robot-1") && r.time > cutoff && (r.data as { location: { facing: string } }).location.facing === facing)!.data as { status: string; flags?: string[] };
+  assert.equal(robotAfter(injections[0]!.facing).status, "out_of_stock");
+  assert.ok(robotAfter(injections[2]!.facing).flags?.includes("price_mismatch"));
+  // Phantom inventory: no recovery round can refill the facing.
+  assert.equal(changed.ground.unitsAt(injections[0]!.facing, 22 * 3600), 0);
 });

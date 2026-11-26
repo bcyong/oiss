@@ -69,13 +69,13 @@ const Labels = memo(function Labels({ day }: { day: IndexedDay }) {
   );
 });
 
-const Facings = memo(function Facings({ day, statuses, selected, onSelect }: { day: IndexedDay; statuses: (ShelfStatus | "none")[]; selected: number | null; onSelect: (s: Selection) => void }) {
+const Facings = memo(function Facings({ day, statuses, flagged, selected, onSelect }: { day: IndexedDay; statuses: (ShelfStatus | "none")[]; flagged: boolean[]; selected: number | null; onSelect: (s: Selection) => void }) {
   return (
     <g>
       {day.facings.map((v, i) => (
         <rect
           key={v.facing.id}
-          className={`facing s-${statuses[i]}${selected === i ? " selected" : ""}`}
+          className={`facing s-${statuses[i]}${flagged[i] ? " flagged" : ""}${selected === i ? " selected" : ""}`}
           x={v.rect.x}
           y={v.rect.y}
           width={v.rect.w}
@@ -124,6 +124,8 @@ const ZOOM_STEP = 1.5;
 interface Props {
   day: IndexedDay;
   statuses: (ShelfStatus | "none")[];
+  /** Whether each facing's latest observation is flagged, such as a misplaced item or a wrong shelf tag. */
+  flagged: boolean[];
   zoneDensity: Map<string, number>;
   shoppers: ShopperDot[];
   queues: Map<string, number>;
@@ -137,7 +139,7 @@ interface Props {
 
 const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
 
-export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, selection, onSelect }: Props) {
+export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, selection, onSelect }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -279,7 +281,7 @@ export function FloorPlan({ day, statuses, zoneDensity, shoppers, queues, showCa
               />
             ))}
         </g>
-        <Facings day={day} statuses={statuses} selected={sel?.kind === "facing" ? sel.index : null} onSelect={onSelect} />
+        <Facings day={day} statuses={statuses} flagged={flagged} selected={sel?.kind === "facing" ? sel.index : null} onSelect={onSelect} />
         {showCameras && <Cameras day={day} selected={sel?.kind === "camera" ? sel.id : null} onSelect={onSelect} />}
         <Labels day={day} />
         <g className="queues" aria-hidden="true">

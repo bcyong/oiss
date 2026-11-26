@@ -1,6 +1,7 @@
 import { simulateDay, type DayConfig, type DayStats, type Ground } from "./model.ts";
 import { adaptLpAlerts, demo001Config } from "../../adapters/src/mock-lp-alerts.ts";
 import { type LossPreventionDay, lossPreventionDay, type MockLpAlert } from "./lossPrevention.ts";
+import { FAULT_KINDS, type FaultKind } from "./faults.ts";
 import { observeDay, type ObservedDay } from "./observe.ts";
 import { byTime, type OissRecord, SIM_VERSION } from "./records.ts";
 
@@ -28,7 +29,7 @@ export interface SimulatedDay {
   /** Vendor alert id -> the OISS Incident id the adapter made from it. */
   incidentFor: Record<string, string>;
   itemMaster: { store: string; note: string; generator: string; items: ItemMasterEntry[] };
-  summary: { store: string; date: string; seed: number; generator: string; stats: DayStats; lossPrevention: LossPreventionDay["scorecard"] };
+  summary: { store: string; date: string; seed: number; generator: string; stats: DayStats; shelfFaults: Record<FaultKind, number> & { injected: number }; lossPrevention: LossPreventionDay["scorecard"] };
 }
 
 export function runDay(config: DayConfig): SimulatedDay {
@@ -64,6 +65,14 @@ export function runDay(config: DayConfig): SimulatedDay {
         promo: i.promo,
       })),
     },
-    summary: { store, date: ground.config.date, seed: ground.config.seed, generator, stats: ground.stats, lossPrevention: lp.scorecard },
+    summary: {
+      store,
+      date: ground.config.date,
+      seed: ground.config.seed,
+      generator,
+      stats: ground.stats,
+      shelfFaults: { ...(Object.fromEntries(FAULT_KINDS.map((k) => [k, ground.faults.filter((f) => f.kind === k).length])) as Record<FaultKind, number>), injected: ground.faults.filter((f) => f.injected).length },
+      lossPrevention: lp.scorecard,
+    },
   };
 }

@@ -458,3 +458,64 @@ export function arrivedCount(day: IndexedDay, t: number): number {
 export function secondsOf(day: IndexedDay, iso: string): number {
   return (Date.parse(iso) - day.midnightMs) / 1000;
 }
+
+/** Whether each facing's latest observation at time t carries a flag, such as a misplaced item or a wrong shelf tag. */
+export function flagsAt(day: IndexedDay, t: number): boolean[] {
+  return day.facings.map((v) => {
+    const i = lastAtOrBefore(v.times, t);
+    return i >= 0 && (v.obs[i]!.data.flags?.length ?? 0) > 0;
+  });
+}
+
+/** The store's date and seconds since its midnight, right now. */
+export function storeNow(timezone: string, now = new Date()): { date: string; t: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, t: Number(get("hour")) * 3600 + Number(get("minute")) * 60 + Number(get("second")) };
+}
+
+/** The date after a store date. */
+export function nextDate(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The seed for a store's live day: the same for everyone watching that store on that date. */
+export function liveSeed(store: string, date: string): number {
+  let h = 0x811c9dc5;
+  for (const c of `${store}|${date}`) {
+    h ^= c.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % 1_000_000_000;
+}
+
+export type FaultSeen =
+  | { kind: "ahead" }
+  | { kind: "caught"; record: OissRecord<ShelfObservationData>; at: number }
+  | { kind: "cleared"; at: number }
+  | { kind: "waiting" };
+
+/**
+ * Whether any record has reported an injected fault by time t: the first observation of its facing
+ * after the fault began that flags it (a misplaced item or a wrong tag) or finds the shelf empty
+ * (phantom inventory). A go-back an associate cleared before any scan saw it was never caught.
+ */
+export function faultSeen(day: IndexedDay, fault: { kind: string; facing: string; start: number; end: number | null }, t: number): FaultSeen {
+  if (t < fault.start) return { kind: "ahead" };
+  const index = day.facingById.get(fault.facing);
+  const v = index === undefined ? undefined : day.facings[index];
+  if (v) {
+    for (let i = 0; i < v.times.length; i++) {
+      const at = v.times[i]!;
+      if (at <= fault.start) continue;
+      if (at > t || (fault.end !== null && at > fault.end)) break;
+      const d = v.obs[i]!.data;
+      const hit = fault.kind === "phantom_inventory" ? d.status === "out_of_stock" : d.flags?.includes(fault.kind);
+      if (hit) return { kind: "caught", record: v.obs[i]!, at };
+    }
+  }
+  if (fault.end !== null && fault.end <= t) return { kind: "cleared", at: fault.end };
+  return { kind: "waiting" };
+}

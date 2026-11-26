@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { IndexedDay } from "./day.ts";
-import { checkoutName, duration, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
+import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
 import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
 
@@ -82,7 +82,9 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
           {d.flags?.length ? (
             <>
               <dt>Flags</dt>
-              <dd>{d.flags.map(humanize).join(", ")}</dd>
+              <dd>
+                {d.flags.map(flagName).join(", ")}: {flagDetail(day, d)}
+              </dd>
             </>
           ) : null}
           <dt>Where</dt>
