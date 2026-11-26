@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { vendorOf } from "./vendors.ts";
 import type { IndexedDay } from "./day.ts";
-import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
+import { assigneeName, checkoutName, duration, summarize, TASK_KIND, TASK_STATE, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
 import { VENDOR_NAME, type VendorRaw, vendorRawFor } from "./vendorRaw.ts";
-import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, TaskData, ZoneMetricData } from "./oiss.ts";
 
 /** Lists longer than this are cut in the JSON view, so a StoreLayout or a long path stays readable. */
 const LIST_LIMIT = 12;
@@ -83,7 +83,7 @@ function VendorRawView({ day, record, raw }: { day: IndexedDay; record: AnyRecor
   );
 }
 
-function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void }) {
+function Details({ day, record, onInspect, t }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; t?: number }) {
   switch (record.type) {
     case "oiss.ShelfObservation": {
       const d = (record as OissRecord<ShelfObservationData>).data;
@@ -228,6 +228,81 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
         </>
       );
     }
+    case "oiss.Task": {
+      const d = (record as OissRecord<TaskData>).data;
+      const view = day.taskBySubject.get(record.subject);
+      // Only the status changes made by the playback time, so the inspector doesn't show the future.
+      const history = view ? view.versions.filter((v, i) => v.id === record.id || t === undefined || view.times[i]! <= t) : [];
+      const where = d.location.facing ? `${itemNameAt(day, d.location.facing)}, ${zoneName(day, d.location.zone)}` : d.location.fixture ? `${checkoutName(d.location.fixture)}, ${zoneName(day, d.location.zone)}` : zoneName(day, d.location.zone);
+      const link = (id: string) => {
+        const r = day.byId.get(id);
+        return r ? (
+          <button type="button" className="link" onClick={() => onInspect(id)}>
+            {summarize(day, r)}
+          </button>
+        ) : (
+          <span className="mono small">{id}</span>
+        );
+      };
+      return (
+        <>
+          <dt>Task</dt>
+          <dd>{d.title}</dd>
+          <dt>Kind</dt>
+          <dd>{TASK_KIND[d.kind] ?? humanize(d.kind)}</dd>
+          <dt>Status</dt>
+          <dd>{TASK_STATE[d.state] ?? humanize(d.state)}</dd>
+          <dt>Where</dt>
+          <dd>{where}</dd>
+          {d.assignedTo && (
+            <>
+              <dt>Assigned to</dt>
+              <dd>{assigneeName(d.assignedTo)}</dd>
+            </>
+          )}
+          <dt>Raised by</dt>
+          <dd>{assigneeName(d.createdBy)}</dd>
+          {d.basedOn?.length ? (
+            <>
+              <dt>Raised on</dt>
+              <dd>
+                {d.basedOn.map((id) => (
+                  <div key={id}>{link(id)}</div>
+                ))}
+              </dd>
+            </>
+          ) : null}
+          {d.verification && (
+            <>
+              <dt>Check</dt>
+              <dd>{d.verification.verifiedBy ? <>Confirmed by {link(d.verification.verifiedBy)}</> : d.verification.required ? "Closes only when a later record shows the fix" : "No check needed"}</dd>
+            </>
+          )}
+          {history.length > 1 && (
+            <>
+              <dt>History</dt>
+              <dd>
+                <ol className="task-history">
+                  {history.map((v) => (
+                    <li key={v.id}>
+                      {v.id === record.id ? (
+                        <strong>
+                          {timeOf(day, v)} {TASK_STATE[v.data.state]}
+                        </strong>
+                      ) : (
+                        <button type="button" className="link" onClick={() => onInspect(v.id)}>
+                          {timeOf(day, v)} {TASK_STATE[v.data.state]}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </dd>
+            </>
+          )}
+        </>
+      );
+    }
     case "oiss.StoreLayout": {
       const d = (record as OissRecord<StoreLayoutData>).data;
       return (
@@ -250,7 +325,7 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
   }
 }
 
-export function Inspector({ day, record, onInspect, onClose, following }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; onClose?: () => void; following: boolean }) {
+export function Inspector({ day, record, onInspect, onClose, following, t }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; onClose?: () => void; following: boolean; /** The playback time, so a task's history stops there. */ t?: number }) {
   const [tab, setTab] = useState<"summary" | "json">("summary");
   const [copied, setCopied] = useState(false);
   const privacy = PRIVACY[record.oissprivacy];
@@ -309,7 +384,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
           <dl>
             <dt>Time</dt>
             <dd>{timeOf(day, record)}</dd>
-            <Details day={day} record={record} onInspect={onInspect} />
+            <Details day={day} record={record} onInspect={onInspect} t={t} />
             {provenance && <ProvenanceRows p={provenance} />}
             <dt>Source</dt>
             <dd className="mono small">{record.source}</dd>

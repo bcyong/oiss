@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
-import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
-import { checkoutName, duration, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, tasksAt, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
+import { assigneeName, checkoutName, duration, TASK_KIND, TASK_STATE, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { storyBeats, type Beat } from "./story.ts";
 import { VENDORS } from "./vendors.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
-import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus } from "./oiss.ts";
+import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus, TaskData, TaskState } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
 
 const SPEEDS = [
@@ -18,12 +18,17 @@ const SPEEDS = [
   { label: "15 min/s", value: 900 },
 ];
 
-const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperPath", "oiss.Evidence", "oiss.Incident"] as const;
+const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperPath", "oiss.Evidence", "oiss.Incident", "oiss.Task"] as const;
 
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "story" | "now" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
+export type Tab = "story" | "now" | "tasks" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
+
+/** A task still waiting on the store team. */
+const OPEN_STATES: TaskState[] = ["open", "assigned", "in_progress"];
+const isOpenTask = (r: OissRecord<TaskData>) => OPEN_STATES.includes(r.data.state);
+type TaskFilter = "open" | "closed" | "all";
 
 /** The faults a visitor can inject, in a store team's words. */
 const FAULTS: { kind: FaultKind; button: string; what: string }[] = [
@@ -46,17 +51,26 @@ function disagreementText(day: IndexedDay, d: Disagreement): string {
 
 const capital = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
+/** Where a task stands, such as "Assigned to the Dairy team" or "Verified by a later shelf scan". */
+function taskStateText(r: OissRecord<TaskData>): string {
+  const d = r.data;
+  if (d.state === "assigned" || d.state === "in_progress") return `${TASK_STATE[d.state]}${d.assignedTo ? `, ${assigneeName(d.assignedTo)}` : ""}`;
+  if (d.state === "verified") return "Verified by a later record";
+  if (d.state === "done") return d.verification?.required ? "Done, waiting for a later record to confirm it" : "Done";
+  return TASK_STATE[d.state];
+}
+
 const DISAGREEMENT_KIND: Record<Disagreement["kind"], string> = { availability: "Availability", misplaced_item: "Misplaced item", price: "Shelf price" };
 
 /** The thing on the floor plan that a record is about, so picking a record also picks it on the map. */
 function selectionFor(day: IndexedDay, r: AnyRecord): Selection | null {
   const loc = (r.data as { location?: { facing?: string; zone?: string; fixture?: string } }).location;
-  if (loc?.fixture && day.incidentsByFixture.has(loc.fixture) && (r.type === "oiss.Incident" || r.type === "oiss.Evidence")) return { kind: "checkout", id: loc.fixture };
+  if (loc?.fixture && !loc.facing && day.incidentsByFixture.has(loc.fixture) && (r.type === "oiss.Incident" || r.type === "oiss.Evidence" || r.type === "oiss.Task")) return { kind: "checkout", id: loc.fixture };
   if (loc?.facing) {
     const index = day.facingById.get(loc.facing);
     if (index !== undefined) return { kind: "facing", index };
   }
-  if (r.type === "oiss.ZoneMetric" && loc?.zone) return { kind: "zone", id: loc.zone };
+  if ((r.type === "oiss.ZoneMetric" || r.type === "oiss.Task") && loc?.zone) return { kind: "zone", id: loc.zone };
   if (r.type === "oiss.ShopperPath") {
     const path = day.paths.findIndex((p) => p.record.id === r.id);
     if (path >= 0) return { kind: "shopper", path };
@@ -94,6 +108,7 @@ export function App({ start }: { start?: AppStart } = {}) {
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
   const [tab, setTab] = useState<Tab>(start?.tab ?? "story");
   const [streamType, setStreamType] = useState<string>("");
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>("open");
   /** Running continuously: the day rolls over to the next one at close. Starts on the store's own clock. */
   const [live, setLive] = useState(false);
 
@@ -248,6 +263,25 @@ export function App({ start }: { start?: AppStart } = {}) {
   const forReview = incidentsUpTo(day.incidents, t).filter((r) => r.data.status === "open" || r.data.status === "under_review").length;
   const nextRun = day.robot.runs.find((r) => r.start > t);
   const disputes = groupDisagreements(disagreementsUpTo(day, t));
+  const taskList = tasksAt(day, t);
+  const openTasks = taskList.filter((x) => isOpenTask(x.latest));
+  const taskCounts = { open: openTasks.length, done: 0, verified: 0, cancelled: 0 };
+  for (const x of taskList) {
+    const st = x.latest.data.state;
+    if (st === "done" || st === "verified" || st === "cancelled") taskCounts[st]++;
+  }
+  const shownTasks = taskList.filter((x) => (taskFilter === "all" ? true : taskFilter === "open" ? isOpenTask(x.latest) : !isOpenTask(x.latest)));
+  const taskMarks = tab === "tasks" ? [...new Set(openTasks.map((x) => day.facingById.get(x.latest.data.location.facing ?? "")).filter((i): i is number => i !== undefined))] : undefined;
+  // Tasks about the thing picked on the floor plan, as they stood at t.
+  const selectionTasks = !selection
+    ? []
+    : taskList.filter(({ latest }) => {
+        const loc = latest.data.location;
+        if (selection.kind === "facing") return loc.facing === day.facings[selection.index]!.facing.id;
+        if (selection.kind === "checkout") return !loc.facing && loc.fixture === selection.id;
+        if (selection.kind === "zone") return !loc.facing && !loc.fixture && loc.zone === selection.id;
+        return false;
+      });
   const showBeat = (b: Beat) => {
     setPlaying(false);
     setLive(false);
@@ -556,7 +590,7 @@ export function App({ start }: { start?: AppStart } = {}) {
 
       <div className="layout">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} statuses={statuses} flagged={flagged} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} selection={selection} onSelect={select} />
+          <FloorPlan day={day} statuses={statuses} flagged={flagged} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} taskMarks={taskMarks} selection={selection} onSelect={select} />
           <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
@@ -584,6 +618,12 @@ export function App({ start }: { start?: AppStart } = {}) {
               <i className="swatch robot-swatch" />
               Robot and its route
             </span>
+            {taskMarks && (
+              <span>
+                <i className="swatch task-swatch" />
+                Open store task
+              </span>
+            )}
           </div>
           <Timeline day={day} t={t} onSeek={setT} />
           <div className="playback">
@@ -615,6 +655,25 @@ export function App({ start }: { start?: AppStart } = {}) {
                   ×
                 </button>
               </div>
+              {selectionTasks.length > 0 && (
+                <>
+                  <h3>Store tasks here</h3>
+                  <ul className="records">
+                    {selectionTasks.slice(0, 4).map(({ view, latest }) => (
+                      <li key={view.subject}>
+                        <button type="button" className={latest.id === shown?.id ? "current" : undefined} onClick={() => inspect(latest.id)}>
+                          <span className="time">{timeOf(day, view.versions[0]!)}</span>
+                          <span>
+                            {latest.data.title}
+                            <span className={`task-state state-${latest.data.state}`}>{taskStateText(latest)}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {selectionTasks.length > 4 && <p className="note">and {selectionTasks.length - 4} earlier</p>}
+                </>
+              )}
               {related.length > 1 && (
                 <>
                   <h3>Records so far today</h3>
@@ -636,7 +695,7 @@ export function App({ start }: { start?: AppStart } = {}) {
             !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper, the robot, a checkout incident or a camera to see the OISS records behind it, or pick a record from the stream.</p>
           )}
 
-          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} />}
+          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} t={t} />}
 
           <section className="card">
             <div className="tabs" role="tablist">
@@ -645,6 +704,9 @@ export function App({ start }: { start?: AppStart } = {}) {
               </button>
               <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
                 At {clock(t)}
+              </button>
+              <button type="button" role="tab" aria-selected={tab === "tasks"} onClick={() => setTab("tasks")}>
+                Tasks{openTasks.length ? ` (${openTasks.length})` : ""}
               </button>
               <button type="button" role="tab" aria-selected={tab === "faults"} onClick={() => setTab("faults")}>
                 Shelf faults
@@ -738,6 +800,51 @@ export function App({ start }: { start?: AppStart } = {}) {
                 <p className="note">
                   {known} of {day.facings.length} facings observed so far. Front-end figures are from the last 15-minute ZoneMetric.
                 </p>
+              </>
+            )}
+
+            {tab === "tasks" && (
+              <>
+                <p className="note top">
+                  The store's task management system raises a Task when the records call for work, assigns it to a team and closes it when a later record shows the fix, such as the next shelf scan. Every status change is its own OISS record, so any vendor or agent can follow the work. Open tasks are circled on the floor plan.
+                </p>
+                <div className="task-summary">
+                  <span>
+                    <b>{taskCounts.open}</b> open
+                  </span>
+                  <span>
+                    <b>{taskCounts.done}</b> done, waiting for a check
+                  </span>
+                  <span>
+                    <b>{taskCounts.verified}</b> verified
+                  </span>
+                  <span>
+                    <b>{taskCounts.cancelled}</b> cancelled
+                  </span>
+                </div>
+                <select className="filter" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value as TaskFilter)} aria-label="Which tasks">
+                  <option value="open">Open tasks</option>
+                  <option value="closed">Done, verified and cancelled</option>
+                  <option value="all">All tasks so far</option>
+                </select>
+                {shownTasks.length ? (
+                  <ul className="records">
+                    {shownTasks.slice(0, 60).map(({ view, latest, changed }) => (
+                      <li key={view.subject}>
+                        <button type="button" className={shown?.type === "oiss.Task" && shown.subject === view.subject ? "current" : undefined} onClick={() => inspect(latest.id)}>
+                          <span className="time">{clock(changed)}</span>
+                          <span>
+                            <span className="type">{TASK_KIND[latest.data.kind]}</span> {latest.data.title}
+                            <span className={`task-state state-${latest.data.state}`}>{taskStateText(latest)}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="note">{taskList.length ? "None of these yet." : off.size ? `No tasks by ${clock(t)} from the feeds that are on.` : `No tasks by ${clock(t)}.`}</p>
+                )}
+                {shownTasks.length > 60 && <p className="note">and {shownTasks.length - 60} more</p>}
               </>
             )}
 

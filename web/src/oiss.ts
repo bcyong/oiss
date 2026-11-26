@@ -154,6 +154,21 @@ export interface IncidentData {
   evidence?: string[];
 }
 
+export type TaskKind = "replenish" | "recover" | "fix_shelf_tag" | "go_back" | "open_lane" | "review_exception" | "cleanup" | "other";
+export type TaskState = "open" | "assigned" | "in_progress" | "done" | "verified" | "cancelled";
+export interface TaskData {
+  provenance: Provenance;
+  kind: TaskKind;
+  state: TaskState;
+  title: string;
+  createdBy: string;
+  assignedTo?: string;
+  due?: string;
+  location: { zone?: string; fixture?: string; shelf?: string; facing?: string };
+  basedOn?: string[];
+  verification?: { required: boolean; verifiedBy?: string };
+}
+
 /** The retailer's item master. Not an OISS record: OISS refers to items by GTIN. */
 export interface ItemMaster {
   store: string;
@@ -170,6 +185,8 @@ export interface DayRecords {
   evidence?: OissRecord<EvidenceData>[];
   /** Loss prevention incidents for review. Days written before M3 have none. */
   incidents?: OissRecord<IncidentData>[];
+  /** Store tasks and every status change to them. Days written before M4 have none. */
+  tasks?: OissRecord<TaskData>[];
 }
 
 export type AnyRecord =
@@ -178,4 +195,5 @@ export type AnyRecord =
   | OissRecord<ZoneMetricData>
   | OissRecord<ShopperPathData>
   | OissRecord<EvidenceData>
-  | OissRecord<IncidentData>;
+  | OissRecord<IncidentData>
+  | OissRecord<TaskData>;

@@ -13,6 +13,8 @@
  *   evidence.jsonl            Evidence records: shelf images behind low-stock and out-of-stock reads,
  *                             and checkout clips behind loss prevention alerts
  *   incidents.jsonl           Incident records: loss prevention alerts, through the mock-lp-alerts adapter
+ *   tasks.jsonl               Task records from the store's own task management: each task's status
+ *                             changes, raised from the records above and verified by later ones
  *   vendor/                   each mock vendor's own export, before its adapter (not OISS):
  *     mock-vendor-a-shelf-scans.ndjson  the shelf-scanning robot's missions, one per line
  *     mock-vendor-b-lp-alerts.ndjson    the loss prevention alerts
@@ -56,6 +58,7 @@ const files: Record<string, { text: string; records?: number }> = {
   "shopper-paths.jsonl": { text: jsonl(day.records.shopperPaths), records: day.records.shopperPaths.length },
   "evidence.jsonl": { text: jsonl(day.records.evidence), records: day.records.evidence.length },
   "incidents.jsonl": { text: jsonl(day.records.incidents), records: day.records.incidents.length },
+  "tasks.jsonl": { text: jsonl(day.records.tasks), records: day.records.tasks.length },
   "vendor/mock-vendor-a-shelf-scans.ndjson": { text: jsonl(day.vendorExports.mockShelfScans) },
   "vendor/mock-vendor-b-lp-alerts.ndjson": { text: jsonl(day.vendorExports.mockLpAlerts) },
   "vendor/mock-vendor-c-traffic.csv": { text: day.vendorExports.mockTrafficCsv },

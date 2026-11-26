@@ -1,5 +1,5 @@
 import { clockOf, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, type IndexedDay } from "./day.ts";
-import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, TaskData, TaskKind, TaskState, ZoneMetricData } from "./oiss.ts";
 
 export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
   in_stock: "In stock",
@@ -92,6 +92,35 @@ export const INCIDENT_STATUS: Record<string, string> = {
   dismissed: "Dismissed by a reviewer",
 };
 
+export const TASK_KIND: Record<TaskKind, string> = {
+  replenish: "Replenish",
+  recover: "Recovery",
+  fix_shelf_tag: "Fix a shelf tag",
+  go_back: "Go-back",
+  open_lane: "Open a lane",
+  review_exception: "Review an exception",
+  cleanup: "Cleanup",
+  other: "Other",
+};
+
+export const TASK_STATE: Record<TaskState, string> = {
+  open: "Open",
+  assigned: "Assigned",
+  in_progress: "In progress",
+  done: "Done",
+  verified: "Verified",
+  cancelled: "Cancelled",
+};
+
+/** Who a task is assigned to or raised by, such as "Dairy team" for team:dairy. */
+export function assigneeName(id: string | undefined): string {
+  if (!id) return "";
+  const team = /^team:(.+)$/.exec(id);
+  if (team) return `${humanize(team[1]!.replaceAll("-", " "))} team`;
+  if (id === "system:task-management") return "Task management";
+  return id;
+}
+
 export function zoneName(day: IndexedDay, id: string | undefined): string {
   return (id && day.zones.get(id)?.name) || id || "";
 }
@@ -124,6 +153,10 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
     case "oiss.Incident": {
       const d = (r as OissRecord<IncidentData>).data;
       return `Possible ${(INCIDENT_LABEL[d.incidentType] ?? humanize(d.incidentType)).toLowerCase()} at ${checkoutName(d.location.fixture)}, for review`;
+    }
+    case "oiss.Task": {
+      const d = (r as OissRecord<TaskData>).data;
+      return `${d.title}: ${TASK_STATE[d.state].toLowerCase()}${d.assignedTo && d.state === "assigned" ? `, ${assigneeName(d.assignedTo)}` : ""}`;
     }
     case "oiss.StoreLayout": {
       const d = (r as OissRecord<StoreLayoutData>).data;

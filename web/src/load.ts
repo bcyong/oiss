@@ -51,13 +51,14 @@ export async function loadGoldenDay(): Promise<DayFiles> {
   const index = (await (await get("index.json")).json()) as { days: { store: string; date: string; seed: number; path: string }[] };
   const day = index.days[0];
   if (!day) throw new Error("No days in data/index.json");
-  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, mockShelfScans, mockLpAlerts, mockTrafficCsv, mockEsl, itemMaster] = await Promise.all([
+  const [storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, tasks, mockShelfScans, mockLpAlerts, mockTrafficCsv, mockEsl, itemMaster] = await Promise.all([
     get(`${day.path}store-layout.json`).then((r) => r.json()),
     jsonl(`${day.path}shelf-observations.jsonl`),
     jsonl(`${day.path}zone-metrics.jsonl`),
     jsonl(`${day.path}shopper-paths.jsonl`),
     jsonl(`${day.path}evidence.jsonl`),
     jsonl(`${day.path}incidents.jsonl`),
+    jsonl(`${day.path}tasks.jsonl`),
     jsonl<MockShelfScanMission>(`${day.path}vendor/mock-vendor-a-shelf-scans.ndjson`),
     jsonl<MockLpAlert>(`${day.path}vendor/mock-vendor-b-lp-alerts.ndjson`),
     get(`${day.path}vendor/mock-vendor-c-traffic.csv`).then((r) => r.text()),
@@ -69,7 +70,7 @@ export async function loadGoldenDay(): Promise<DayFiles> {
     date: day.date,
     seed: day.seed,
     origin: "golden",
-    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents } as DayRecords,
+    records: { storeLayout, shelfObservations, zoneMetrics, shopperPaths, evidence, incidents, tasks } as DayRecords,
     itemMaster: itemMaster as ItemMaster,
     vendorFeeds: { mockShelfScans, mockLpAlerts, mockTrafficCsv, mockEsl },
   };

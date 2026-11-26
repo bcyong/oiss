@@ -7,6 +7,7 @@ import type { MockEslEvent } from "./esl.ts";
 import { FAULT_KINDS, type FaultKind } from "./faults.ts";
 import { observeDay, type ObservedDay } from "./observe.ts";
 import { byTime, type OissRecord, SIM_VERSION } from "./records.ts";
+import { storeTasks } from "./tasks.ts";
 
 export interface ItemMasterEntry {
   gtin: string;
@@ -26,7 +27,7 @@ export interface ItemMasterEntry {
  */
 export interface SimulatedDay {
   ground: Ground;
-  records: Omit<ObservedDay, "shelfScanMissions" | "trafficRows" | "eslEvents"> & { incidents: OissRecord[] };
+  records: Omit<ObservedDay, "shelfScanMissions" | "trafficRows" | "eslEvents"> & { incidents: OissRecord[]; tasks: OissRecord[] };
   /** Vendor exports in the vendors' own formats, before any adapter. */
   vendorExports: { mockLpAlerts: MockLpAlert[]; mockShelfScans: MockShelfScanMission[]; mockTrafficCsv: string; mockEsl: MockEslEvent[] };
   /** Vendor alert id -> the OISS Incident id the adapter made from it. */
@@ -46,7 +47,9 @@ export function runDay(config: DayConfig): SimulatedDay {
     ...observedRecords,
     evidence: [...observed.evidence, ...(adapted.evidence as unknown as OissRecord[])].sort(byTime),
     incidents: adapted.incidents as unknown as OissRecord[],
+    tasks: [] as OissRecord[],
   };
+  records.tasks = storeTasks(ground, records.shelfObservations, records.zoneMetrics, records.incidents);
   const store = ground.layout.store.id;
   const generator = `oiss-sim ${SIM_VERSION}`;
   return {

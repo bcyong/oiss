@@ -98,6 +98,8 @@ export interface Ground {
   tracks: ShopperTrack[];
   /** Per facing: [time, units on the shelf] at each change, in time order, starting at the overnight fill. */
   shelfHistory: Map<string, [number, number][]>;
+  /** Each facing an associate worked in a recovery round, in time order, and the units they filled from the backroom (0 when it had none). */
+  recoveryWork: { t: number; facing: string; units: number }[];
   frontEnd: FrontEndSnapshot[];
   serviceStarts: ServiceStart[];
   transactions: Transaction[];
@@ -166,10 +168,12 @@ export function simulateDay(input: DayConfig): Ground {
   };
 
   let recoveryUnits = 0;
+  const recoveryWork: Ground["recoveryWork"] = [];
   const recover = (facing: string) => {
     const cap = catalog.byFacing.get(facing)!.capacity;
     const have = units.get(facing)!;
-    const fill = Math.min(cap - have, backroom.get(facing)!);
+    const fill = Math.max(0, Math.min(cap - have, backroom.get(facing)!));
+    recoveryWork.push({ t: sched.now, facing, units: fill });
     if (fill <= 0) return;
     backroom.set(facing, backroom.get(facing)! - fill);
     recoveryUnits += fill;
@@ -514,7 +518,7 @@ export function simulateDay(input: DayConfig): Ground {
     phantomUnits,
   };
 
-  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, frontEnd, serviceStarts, transactions: transactions.sort((a, b) => a.end - b.end || a.shopper - b.shopper), stats, faults, faultsAt: (facing, t) => activeFaults(faultsByFacing, facing, t), unitsAt };
+  return { config, clock, layout, catalog, open: OPEN, close: CLOSE, end, tracks, shelfHistory, recoveryWork, frontEnd, serviceStarts, transactions: transactions.sort((a, b) => a.end - b.end || a.shopper - b.shopper), stats, faults, faultsAt: (facing, t) => activeFaults(faultsByFacing, facing, t), unitsAt };
 }
 
 export { routeLength };
