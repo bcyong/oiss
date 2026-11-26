@@ -10,14 +10,14 @@
       "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
     },
     "shelf-observations.jsonl": {
-      "records": 7493,
-      "bytes": 7051261,
-      "sha256": "deda9f20ce36287d4cd270c8761afecbb71e189193bd606eb4359cc3ac3e4560"
+      "records": 7612,
+      "bytes": 7543193,
+      "sha256": "b8ca7b758356bccfff42d2adf6e594a0f15c748cee957f166f49e5d18b62414b"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
-      "bytes": 810496,
-      "sha256": "742b86a109a9f64fe9ad21c9d191f6b7b977fda4ae01864b04e5db8404b4377c"
+      "bytes": 869520,
+      "sha256": "0dd633317fb011e2af03762b1f4251aba2c4bc18e69f8e823e77a76cfb7186b5"
     },
     "shopper-paths.jsonl": {
       "records": 2330,
@@ -26,17 +26,29 @@
     },
     "evidence.jsonl": {
       "records": 1039,
-      "bytes": 962509,
-      "sha256": "69a06448753746c85e27394ccfc4cb92660c6897dd81149624ab8bcb35d32dfd"
+      "bytes": 1007824,
+      "sha256": "c1d54a1bb47c6b2fe28456afe786a030ced030fa24288bb21ebb465e463df3a9"
     },
     "incidents.jsonl": {
       "records": 21,
       "bytes": 20674,
       "sha256": "74ead408de6804b978e5d006262f2419675af4c75c951d0cf2828fcc9034108f"
     },
+    "vendor/mock-vendor-a-shelf-scans.ndjson": {
+      "bytes": 1260777,
+      "sha256": "c7b5f2bb635b0c01acf4efaf9770062e2e1e2df38f0384bafd136108a39ae574"
+    },
     "vendor/mock-vendor-b-lp-alerts.ndjson": {
       "bytes": 7129,
       "sha256": "9035f1f0632c91c9a3990b3fea1458824b76e88bd41d3fc9809adfa281e7985c"
+    },
+    "vendor/mock-vendor-c-traffic.csv": {
+      "bytes": 52753,
+      "sha256": "2c3e5da438da04bc2ed04eec41c2d209c446327315780913dc978b75b89f874c"
+    },
+    "vendor/mock-vendor-d-esl.ndjson": {
+      "bytes": 26930,
+      "sha256": "92bf39e7139ff089816a51967e3745f9ec06d6d58a0770b64242f6be404deadc"
     },
     "item-master.json": {
       "bytes": 300731,

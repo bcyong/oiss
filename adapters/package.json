@@ -6,7 +6,11 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    "./mock-lp-alerts": "./src/mock-lp-alerts.ts"
+    "./common": "./src/common.ts",
+    "./mock-esl": "./src/mock-esl.ts",
+    "./mock-lp-alerts": "./src/mock-lp-alerts.ts",
+    "./mock-shelf-scan": "./src/mock-shelf-scan.ts",
+    "./mock-traffic-csv": "./src/mock-traffic-csv.ts"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

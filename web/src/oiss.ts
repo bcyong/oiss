@@ -91,7 +91,8 @@ export interface ShelfObservationData {
   provenance: Provenance;
   window: Window;
   location: { zone: string; fixture: string; shelf: string; facing: string; camera?: string };
-  status: ShelfStatus;
+  /** Missing on a price check from a source that can't see the shelf, such as a shelf label system. */
+  status?: ShelfStatus;
   observedGtin?: string;
   planogramGtin?: string;
   fillLevel?: number;

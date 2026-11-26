@@ -102,7 +102,8 @@ export function summarize(day: IndexedDay, r: AnyRecord): string {
     case "oiss.ShelfObservation": {
       const d = (r as OissRecord<ShelfObservationData>).data;
       const flags = d.flags?.length ? `, ${d.flags.map((f) => flagName(f).toLowerCase()).join(", ")}` : "";
-      return `${itemNameAt(day, d.location.facing)}: ${STATUS_LABEL[d.status].toLowerCase()}${flags}`;
+      const what = d.status ? STATUS_LABEL[d.status].toLowerCase() : `shelf label shows ${money(d.tagPrice)}`;
+      return `${itemNameAt(day, d.location.facing)}: ${what}${flags}`;
     }
     case "oiss.ZoneMetric": {
       const d = (r as OissRecord<ZoneMetricData>).data;

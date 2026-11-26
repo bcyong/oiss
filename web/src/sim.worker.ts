@@ -1,7 +1,7 @@
 import { runDay, type Injection } from "@oiss/sim";
 
 // Only the OISS records, the item master and the raw vendor feeds leave the worker: the page sees what any
-// OISS consumer would, plus what one vendor sent before the adapter, to show what an adapter does. The one
+// OISS consumer would, plus what each vendor sent before its adapter, to show what an adapter does. The one
 // exception is the faults the visitor injected, so the page can say whether any record has caught them.
 self.onmessage = (e: MessageEvent<{ seed: number; date: string; injections: Injection[] }>) => {
   try {
@@ -10,7 +10,7 @@ self.onmessage = (e: MessageEvent<{ seed: number; date: string; injections: Inje
     self.postMessage({
       records: day.records,
       itemMaster: day.itemMaster,
-      vendorFeeds: { mockLpAlerts: day.vendorExports.mockLpAlerts },
+      vendorFeeds: { mockShelfScans: day.vendorExports.mockShelfScans, mockLpAlerts: day.vendorExports.mockLpAlerts, mockTrafficCsv: day.vendorExports.mockTrafficCsv, mockEsl: day.vendorExports.mockEsl },
       injected: day.ground.faults.filter((f) => f.injected),
       ms: Math.round(performance.now() - t0),
     });

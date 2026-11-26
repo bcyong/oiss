@@ -16,13 +16,15 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 - Tap a facing, zone, shopper, camera, checkout incident marker or the robot to open the **record inspector** on its latest record at the playback time. It shows a plain summary, the raw JSON, provenance (system, vendor, model and adapter), the privacy class and a link to the schema in the spec browser. A record picked from the stream or from a link stays put while playback runs; close it to go back to following the selection.
 - A low-stock or out-of-stock observation links to its **Evidence**: a shelf image reference with its redaction, retention date and access roles. The synthetic store has no camera frames yet, so the preview is a drawn placeholder, labeled as one.
 - A checkout **Incident** shows the exception, lane, items, severity, status and confidence, its 20-second clip (a drawn placeholder) and, under **What Mock vendor B sent**, the vendor's raw alert before the adapter. The demo finds that alert by running the same adapter on the vendor's feed in the browser.
+- A record from the robot, the people counter or the shelf labels shows, under **What Mock vendor A sent** (or C or D), the vendor's own read, CSV row or label report before its adapter, and what the adapter changed. The demo finds it by place and time: one facing at one second, or one zone over one interval.
+- A shelf label price check carries a price and no on-shelf status, so the floor plan keeps coloring a facing by the latest record that does report one. A facing's card shows what its shelf label last reported.
 - The robot's route is drawn only from its ShelfObservation records: each bay column it photographs is a stop. No separate location feed is needed.
 - The **record stream** lists the latest records as they arrive, filterable by record type. Tap one to inspect it.
 - **Go live** simulates today's store day (the same for every visitor) and plays it in real time from the store's own clock. A live store doesn't stop at close: the next day starts at opening.
-- **Shelf faults** lets a visitor misplace an item, mistag a price or empty a facing without a sale (phantom inventory), on the facing they picked or a random one, at the playback time. The browser replays the day with the fault, keeping every record sent before it, and lists each fault with whether the robot or a shelf camera has caught it yet.
+- **Shelf faults** lets a visitor misplace an item, mistag a price or empty a facing without a sale (phantom inventory), on the facing they picked or a random one, at the playback time. The browser replays the day with the fault, keeping every record sent before it, and lists each fault with whether the robot, a shelf camera or the shelf labels have caught it yet.
 - **Simulate another day** runs the store simulator in the browser, in a web worker, with a new seed.
 
-The day is about 11,900 records and is indexed in memory in the browser, so the demo doesn't use DuckDB-WASM or Parquet. They arrive with the server and query API (M3 and M4), where weeks of history make them worth it.
+The day is about 12,000 records and is indexed in memory in the browser, so the demo doesn't use DuckDB-WASM or Parquet. They arrive with the server and query API (M3 and M4), where weeks of history make them worth it.
 
 ## Run it
 

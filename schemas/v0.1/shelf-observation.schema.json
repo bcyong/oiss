@@ -2,17 +2,32 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shelf-observation.schema.json",
   "title": "OISS v0.1 ShelfObservation data",
-  "description": "What a shelf scan or audit found at one facing: on-shelf availability, planogram compliance and price integrity. subject is the facing id.",
+  "description": "What a shelf scan, shelf camera, audit or shelf label system found at one facing: on-shelf availability, planogram compliance and price integrity. subject is the facing id. A record carries status, tagPrice or both: a shelf label system knows the price a label shows but can't see the shelf.",
   "type": "object",
   "allOf": [
     {
       "$ref": "defs.schema.json#/$defs/common"
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "status"
+          ]
+        },
+        {
+          "required": [
+            "tagPrice"
+          ]
+        }
+      ],
+      "description": "A record reports on-shelf availability, a shelf tag price, or both."
     }
   ],
   "properties": {
     "status": {
       "$ref": "vocab.schema.json#/$defs/shelfStatus",
-      "description": "On-shelf availability."
+      "description": "On-shelf availability. Left out by sources that can't see the shelf, such as a shelf label system reporting a price check."
     },
     "flags": {
       "type": "array",
@@ -45,7 +60,6 @@
     }
   },
   "required": [
-    "status",
     "location",
     "confidence",
     "window"

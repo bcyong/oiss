@@ -15,6 +15,7 @@ INVALID = sorted((ROOT / "examples" / "invalid").glob("*.json"))
 EXPECTED = {
     "store-layout-dangling-shelf.json": ("map-references", "A08-L"),
     "shelf-observation-bad-check-digit.json": ("schema", "gtin"),
+    "shelf-observation-no-status-or-price.json": ("schema", "not valid under any of the given schemas"),
     "zone-metric-window-reversed.json": ("window-order", "start is after end"),
     "shopper-path-face-field.json": ("schema", "faceEmbedding"),
     "incident-wrong-privacy.json": ("schema", "restricted"),
@@ -92,4 +93,4 @@ def test_timestamps_need_an_offset(validator):
 def test_cli_exit_codes(capsys):
     assert main([str(ROOT / "examples" / "valid"), "-q"]) == 0
     assert main([str(ROOT / "examples" / "invalid"), "-q"]) == 1
-    assert "0 of 7 records valid" in capsys.readouterr().out
+    assert "0 of 8 records valid" in capsys.readouterr().out

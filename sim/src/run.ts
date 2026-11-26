@@ -1,6 +1,9 @@
 import { simulateDay, type DayConfig, type DayStats, type Ground } from "./model.ts";
 import { adaptLpAlerts, demo001Config } from "../../adapters/src/mock-lp-alerts.ts";
 import { type LossPreventionDay, lossPreventionDay, type MockLpAlert } from "./lossPrevention.ts";
+import type { MockShelfScanMission } from "../../adapters/src/mock-shelf-scan.ts";
+import { toTrafficCsv } from "../../adapters/src/mock-traffic-csv.ts";
+import type { MockEslEvent } from "./esl.ts";
 import { FAULT_KINDS, type FaultKind } from "./faults.ts";
 import { observeDay, type ObservedDay } from "./observe.ts";
 import { byTime, type OissRecord, SIM_VERSION } from "./records.ts";
@@ -23,9 +26,9 @@ export interface ItemMasterEntry {
  */
 export interface SimulatedDay {
   ground: Ground;
-  records: ObservedDay & { incidents: OissRecord[] };
+  records: Omit<ObservedDay, "shelfScanMissions" | "trafficRows" | "eslEvents"> & { incidents: OissRecord[] };
   /** Vendor exports in the vendors' own formats, before any adapter. */
-  vendorExports: { mockLpAlerts: MockLpAlert[] };
+  vendorExports: { mockLpAlerts: MockLpAlert[]; mockShelfScans: MockShelfScanMission[]; mockTrafficCsv: string; mockEsl: MockEslEvent[] };
   /** Vendor alert id -> the OISS Incident id the adapter made from it. */
   incidentFor: Record<string, string>;
   itemMaster: { store: string; note: string; generator: string; items: ItemMasterEntry[] };
@@ -38,8 +41,9 @@ export function runDay(config: DayConfig): SimulatedDay {
   const lp = lossPreventionDay(ground);
   const adapted = adaptLpAlerts(lp.alerts, demo001Config());
   if (adapted.rejected.length) throw new Error(`the loss prevention adapter rejected ${adapted.rejected.length} alerts: ${adapted.rejected[0]!.reason}`);
+  const { shelfScanMissions: _missions, trafficRows: _rows, eslEvents: _labels, ...observedRecords } = observed;
   const records = {
-    ...observed,
+    ...observedRecords,
     evidence: [...observed.evidence, ...(adapted.evidence as unknown as OissRecord[])].sort(byTime),
     incidents: adapted.incidents as unknown as OissRecord[],
   };
@@ -48,7 +52,7 @@ export function runDay(config: DayConfig): SimulatedDay {
   return {
     ground,
     records,
-    vendorExports: { mockLpAlerts: lp.alerts },
+    vendorExports: { mockLpAlerts: lp.alerts, mockShelfScans: observed.shelfScanMissions, mockTrafficCsv: toTrafficCsv(observed.trafficRows), mockEsl: observed.eslEvents },
     incidentFor: adapted.incidentFor,
     itemMaster: {
       store,

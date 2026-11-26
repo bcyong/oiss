@@ -95,8 +95,9 @@ test("a shelf image backs every low-stock, out-of-stock and flagged read, and no
   const evidence = new Map(day.records.evidence.filter((r) => !r.id.startsWith("ev-lp-")).map((r) => [r.id, r]));
   const used = new Set<string>();
   for (const r of day.records.shelfObservations) {
-    const d = r.data as { status: string; flags?: string[]; evidence?: string[]; location: { facing: string } };
-    const backed = d.status === "low_stock" || d.status === "out_of_stock" || (d.flags?.length ?? 0) > 0;
+    const d = r.data as { status?: string; flags?: string[]; evidence?: string[]; location: { facing: string } };
+    // Shelf label price checks can't see the shelf, so no image backs them.
+    const backed = d.status !== undefined && (d.status === "low_stock" || d.status === "out_of_stock" || (d.flags?.length ?? 0) > 0);
     assert.equal(d.evidence?.length ?? 0, backed ? 1 : 0, r.id);
     for (const id of d.evidence ?? []) {
       const ev = evidence.get(id);
@@ -146,7 +147,7 @@ test("shelf faults come at set rates and the robot flags misplaced items and pri
     const d = r.data as { flags: string[]; observedGtin?: string; planogramGtin: string; tagPrice?: { amount: number }; systemPrice?: { amount: number }; evidence?: string[] };
     if (d.flags.includes("misplaced_item")) assert.notEqual(d.observedGtin, d.planogramGtin);
     if (d.flags.includes("price_mismatch")) assert.notEqual(d.tagPrice!.amount, d.systemPrice!.amount);
-    assert.ok(d.evidence?.length, "a shelf image backs every flagged read");
+    if (!r.source.endsWith(":esl")) assert.ok(d.evidence?.length, "a shelf image backs every flagged read from a source that sees the shelf");
   }
   // A misplaced item the robot passed while it was there is flagged most of the time.
   const misplacedFlags = flagged.filter((r) => (r.data as { flags: string[] }).flags.includes("misplaced_item"));
@@ -175,4 +176,26 @@ test("an injected fault changes nothing sent before it, and the robot finds it o
   assert.ok(robotAfter(injections[2]!.facing).flags?.includes("price_mismatch"));
   // Phantom inventory: no recovery round can refill the facing.
   assert.equal(changed.ground.unitsAt(injections[0]!.facing, 22 * 3600), 0);
+});
+
+test("shelf labels report the price mismatches they cause, and only those", () => {
+  const checks = day.records.shelfObservations.filter((r) => r.source.endsWith(":mock-vendor-d:esl"));
+  assert.ok(checks.length > 0);
+  for (const r of checks) assert.equal((r.data as { status?: string }).status, undefined);
+  const flaggedFacings = new Set(checks.filter((r) => (r.data as { flags?: string[] }).flags?.includes("price_mismatch")).map((r) => r.subject));
+  const mismatches = day.ground.faults.filter((f) => f.kind === "price_mismatch");
+  for (const f of mismatches) assert.equal(flaggedFacings.has(f.facing), f.cause === "label_not_updated", `${f.id} ${f.cause}`);
+  // The robot reads the tag itself, so it finds every one whatever its cause.
+  const robotFlagged = new Set(day.records.shelfObservations.filter((r) => r.source.endsWith(":robot-1") && (r.data as { flags?: string[] }).flags?.includes("price_mismatch")).map((r) => r.subject));
+  for (const f of mismatches) assert.ok(robotFlagged.has(f.facing), f.id);
+});
+
+test("each vendor's own export is what its adapter read", () => {
+  const { mockShelfScans, mockTrafficCsv, mockEsl } = day.vendorExports;
+  const reads = mockShelfScans.reduce((a, m) => a + m.captures.reduce((b, c) => b + c.shelves.length, 0), 0);
+  assert.equal(reads, day.records.shelfObservations.filter((r) => r.source.endsWith(":robot-1")).length);
+  assert.equal(mockTrafficCsv.trim().split("\n").length - 1, day.records.zoneMetrics.length);
+  assert.equal(mockEsl.length, day.records.shelfObservations.filter((r) => r.source.endsWith(":esl")).length);
+  for (const m of mockShelfScans) assert.equal(m.mock, true);
+  for (const e of mockEsl) assert.equal(e.mock, true);
 });

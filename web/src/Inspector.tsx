@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { IndexedDay } from "./day.ts";
 import { checkoutName, duration, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
+import { VENDOR_NAME, type VendorRaw, vendorRawFor } from "./vendorRaw.ts";
 import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, ZoneMetricData } from "./oiss.ts";
 
 /** Lists longer than this are cut in the JSON view, so a StoreLayout or a long path stays readable. */
@@ -55,6 +56,31 @@ function ProvenanceRows({ p }: { p: Provenance }) {
   );
 }
 
+/** What the vendor sent, before its adapter, and what the adapter did with it. */
+function VendorRawView({ day, record, raw }: { day: IndexedDay; record: AnyRecord; raw: VendorRaw }) {
+  let note: string;
+  let body: string;
+  if (raw.kind === "shelf-scan") {
+    const loc = (record.data as { location: { facing: string; fixture: string } }).location;
+    note = `The robot's own read, before the adapter. The retailer's mapping table turned section ${raw.capture.section}, position ${raw.capture.position}, shelf ${raw.read.shelf} of ${raw.levels} counted from the top into facing ${loc.facing}, the vendor's state ${raw.read.state} into an OISS status${raw.read.exceptions.length ? `, its exception codes ${raw.read.exceptions.join(" and ")} into flags` : ""}, EAN codes into GTINs and UTC time into store time. The adapter also checked that the item the robot expected is the one the planogram puts there.`;
+    body = JSON.stringify({ mission_id: raw.mission, ...raw.capture, shelves: [raw.read] }, null, 2);
+  } else if (raw.kind === "traffic") {
+    const zone = (record.data as { location: { zone: string } }).location.zone;
+    note = `The vendor's CSV row, before the adapter. Zone code ${raw.row.zone_code} became ${zoneName(day, zone)}, the wall-clock start ${raw.row.interval_start} became a window with the store's UTC offset, blank cells were left out, and an accuracy of ${raw.row.accuracy_pct}% became a confidence of ${pct((record.data as { confidence: number }).confidence)}.`;
+    body = `${raw.header}\n${raw.line}`;
+  } else {
+    note = `The shelf label system's report, before the adapter. The retailer's label-to-location table put label ${raw.event.label_id} on this facing, and the adapter checked that the label is linked to the item the planogram puts there. ${raw.event.event === "UPDATE_FAILED" ? `The label didn't take its new price on try ${raw.event.attempt}, so it still shows ${money({ amount: Number(raw.event.displayed_price), currency: "USD" })}.` : "The label confirmed its price."} A label can't see the shelf, so the record carries no on-shelf availability.`;
+    body = JSON.stringify(raw.event, null, 2);
+  }
+  return (
+    <details className="vendor-raw">
+      <summary>What {VENDOR_NAME[raw.kind]} sent</summary>
+      <p className="note">{note}</p>
+      <pre className="json">{body}</pre>
+    </details>
+  );
+}
+
 function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void }) {
   switch (record.type) {
     case "oiss.ShelfObservation": {
@@ -66,7 +92,7 @@ function Details({ day, record, onInspect }: { day: IndexedDay; record: AnyRecor
           <dd>{item}</dd>
           <dt>Shelf</dt>
           <dd>
-            {STATUS_LABEL[d.status]}
+            {d.status ? STATUS_LABEL[d.status] : "Not reported: a price check from a source that can't see the shelf"}
             {d.fillLevel !== undefined ? `, ${pct(d.fillLevel)} full` : ""}
           </dd>
           <dt>Confidence</dt>
@@ -232,6 +258,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
   const observation = asEvidence ? day.files.records.shelfObservations.find((o) => o.data.evidence?.includes(record.id)) : record.type === "oiss.ShelfObservation" ? (record as OissRecord<ShelfObservationData>) : undefined;
   const slug = SPEC_SLUG[record.type];
   const vendorAlert = record.type === "oiss.Incident" ? day.vendorAlertFor.get(record.id) : undefined;
+  const raw = vendorRawFor(day, record);
 
   const copy = () => {
     navigator.clipboard
@@ -305,6 +332,7 @@ export function Inspector({ day, record, onInspect, onClose, following }: { day:
               <pre className="json">{JSON.stringify(vendorAlert, null, 2)}</pre>
             </details>
           )}
+          {raw && <VendorRawView day={day} record={record} raw={raw} />}
           {evidenceIds.map((id) => {
             const ev = day.evidence.get(id);
             return ev ? <EvidencePreview key={id} day={day} evidence={ev} observation={observation} onInspect={onInspect} /> : null;
