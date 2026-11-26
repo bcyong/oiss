@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { clock, secondsOf, type IndexedDay } from "./day.ts";
 import { AGENTS, SAMPLE_QUESTIONS } from "./assistant/agents.ts";
 import { ask, AssistantError, httpStep, modelName, type Answer, type Step } from "./assistant/run.ts";
@@ -138,6 +138,11 @@ function modelsLine(a: Answer): string {
 
 export function AssistantPanel({ day, t, onInspect, entries, setEntries, onApprove, step = httpStep() }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; onApprove?: (p: Proposal) => Promise<Approval>; step?: Step }) {
   const [draft, setDraft] = useState("");
+  // Bring each new question to the top of the panel, so its answer appears where the eye already is.
+  const latest = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    latest.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [entries.length]);
   const busy = entries.some((e) => e.state === "asking" || (e.state === "answered" && Object.values(e.decisions ?? {}).some((d) => d.state === "approving")));
 
   const decide = (id: number, p: Proposal, d: ProposalState) => setEntries((es) => es.map((e) => (e.id === id && e.state === "answered" ? { ...e, decisions: { ...e.decisions, [proposalKey(p)]: d } } : e)));
@@ -169,9 +174,14 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
 
   return (
     <div className="assistant">
-      <p className="note top">
-        Ask the Store Operations Assistant about the store at {clock(t)}. A small, fast NVIDIA Nemotron model hands each question to one agent, which reads the day's OISS records as they stood at that time and cites the records it used; a larger Nemotron writes the answer, and a content safety model screens the question and the answer. Agents can propose shelf tasks, which the store's rules check and nothing raises until you approve. It never acts toward a shopper.
-      </p>
+      <details className="about">
+        <summary>How the assistant works</summary>
+        <p>
+          A small, fast NVIDIA Nemotron model hands each question to one agent, which reads the day's OISS records as they stood at the time shown and cites the records it used. A larger Nemotron writes the answer, and a content safety model screens the question and the answer.
+        </p>
+        <p>Agents can propose shelf tasks. The store's rules check each one, and nothing is raised until you approve it. The assistant never acts toward a shopper.</p>
+        <p>Each question is answered on its own. Pause playback to ask about one moment.</p>
+      </details>
       {!entries.length && (
         <div className="samples">
           {SAMPLE_QUESTIONS.map((q) => (
@@ -182,8 +192,8 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
         </div>
       )}
       <ol className="chat" aria-live="polite">
-        {entries.map((e) => (
-          <li key={e.id}>
+        {entries.map((e, i) => (
+          <li key={e.id} ref={i === entries.length - 1 ? latest : undefined}>
             <p className="question">
               {e.question} <span className="time">at {clock(e.t)}</span>
             </p>
@@ -210,11 +220,6 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
           </li>
         ))}
       </ol>
-      {entries.length > 0 && !busy && (
-        <button type="button" className="link" onClick={() => setEntries(() => [])}>
-          Clear the conversation
-        </button>
-      )}
       <form
         className="ask"
         onSubmit={(ev) => {
@@ -222,12 +227,16 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
           void submit(draft);
         }}
       >
-        <input value={draft} onChange={(ev) => setDraft(ev.target.value)} maxLength={500} placeholder="Ask about stock, shelf tags, lines or checkout exceptions" aria-label="Your question" disabled={busy} />
+        <input value={draft} onChange={(ev) => setDraft(ev.target.value)} maxLength={500} placeholder={`Ask about the store at ${clock(t)}`} aria-label="Your question" disabled={busy} />
         <button type="submit" disabled={busy || !draft.trim()}>
           Ask
         </button>
+        {entries.length > 0 && !busy && (
+          <button type="button" className="link clear" onClick={() => setEntries(() => [])}>
+            Clear
+          </button>
+        )}
       </form>
-      <p className="note">Each question is answered on its own, from the records up to the time shown. Pause playback to ask about one moment.</p>
     </div>
   );
 }
