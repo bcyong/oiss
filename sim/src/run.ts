@@ -68,7 +68,9 @@ export function runDay(config: DayConfig): SimulatedDay {
     incidents: adapted.incidents as unknown as OissRecord[],
     tasks: [] as OissRecord[],
   };
-  records.tasks = storeTasks(ground, records.shelfObservations, records.zoneMetrics, records.incidents);
+  // What the store's reviewer finds when they watch each incident's clip.
+  const reviewFinds = new Map(Object.entries(adapted.incidentFor).map(([alert, incident]) => [incident, lp.realByAlert[alert] ?? false]));
+  records.tasks = storeTasks(ground, records.shelfObservations, records.zoneMetrics, records.incidents, reviewFinds);
   const store = ground.layout.store.id;
   const generator = `oiss-sim ${SIM_VERSION}`;
   return {

@@ -144,6 +144,19 @@
         "cancelled"
       ]
     },
+    "taskOutcome": {
+      "description": "How a task was resolved. For a cancelled task, the reason: duplicate, resolved_elsewhere, no_backroom_stock or no_longer_needed. For a loss prevention review, the disposition: confirmed_loss, customer_paid or false_alarm.",
+      "enum": [
+        "duplicate",
+        "resolved_elsewhere",
+        "no_backroom_stock",
+        "no_longer_needed",
+        "confirmed_loss",
+        "customer_paid",
+        "false_alarm",
+        "other"
+      ]
+    },
     "redaction": {
       "enum": [
         "none",

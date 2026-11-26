@@ -167,7 +167,11 @@ export interface TaskData {
   location: { zone?: string; fixture?: string; shelf?: string; facing?: string };
   basedOn?: string[];
   verification?: { required: boolean; verifiedBy?: string };
+  /** How the task ended: why it was cancelled, or what a review found. */
+  resolution?: { outcome: TaskOutcome; note?: string; resolvedBy?: string; resolvedAt?: string };
 }
+
+export type TaskOutcome = "duplicate" | "resolved_elsewhere" | "no_backroom_stock" | "no_longer_needed" | "confirmed_loss" | "customer_paid" | "false_alarm" | "other";
 
 /** The retailer's item master. Not an OISS record: OISS refers to items by GTIN. */
 export interface ItemMaster {

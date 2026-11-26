@@ -21,6 +21,7 @@ EXPECTED = {
     "incident-wrong-privacy.json": ("schema", "restricted"),
     "evidence-no-retention.json": ("schema", "retainUntil"),
     "task-verified-without-proof.json": ("schema", "verifiedBy"),
+    "task-unknown-outcome.json": ("schema", "item_returned"),
 }
 
 RECORD_TYPES = {"StoreLayout", "ShelfObservation", "ZoneMetric", "ShopperPath", "Incident", "Evidence", "Task"}
@@ -93,4 +94,4 @@ def test_timestamps_need_an_offset(validator):
 def test_cli_exit_codes(capsys):
     assert main([str(ROOT / "examples" / "valid"), "-q"]) == 0
     assert main([str(ROOT / "examples" / "invalid"), "-q"]) == 1
-    assert "0 of 8 records valid" in capsys.readouterr().out
+    assert f"0 of {len(INVALID)} records valid" in capsys.readouterr().out

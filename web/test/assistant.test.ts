@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { AGENT_IDS, AGENTS, agentPrompt, LIMITS, parseRoute, routerPrompt, TOOLS } from "../src/assistant/agents.ts";
 import { DEFAULT_MODEL, FALLBACK_MODEL, handleAssistant, modelRequest, NVIDIA_URL, validate, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
-import { ask, citations, clean } from "../src/assistant/run.ts";
+import { ask, citations, clean, dropToolCitations } from "../src/assistant/run.ts";
 import { idsIn, runTool } from "../src/assistant/tools.ts";
 import { incidentsUpTo, indexDay, secondsOf, statusesAt, tasksAt } from "../src/day.ts";
 import type { DayFiles } from "../src/load.ts";
@@ -66,7 +66,7 @@ test("shelf tags fixed after the read that flagged them aren't counted as wrong 
   assert.equal(tool("price_and_label", "shelf_tag_issues", {}, 13 * 3600).counts.wrongOnShelf, 0);
 });
 
-test("shelf gaps say where replenishment stands, including tasks cancelled with no reason given", () => {
+test("shelf gaps say where replenishment stands, with the reason a cancelled task gives and who owns each gap", () => {
   const g = tool("availability", "shelf_gaps", { status: "both", limit: 100 }, 13 * 3600);
   assert.equal(Object.values(g.replenishment as Record<string, number>).reduce((a, b) => a + b, 0), g.total);
   assert.ok(g.replenishment.cancelled > 0, "the golden day has cancelled replenishment at 1 PM");
@@ -74,10 +74,17 @@ test("shelf gaps say where replenishment stands, including tasks cancelled with 
   for (const f of g.facings) {
     if (f.replenishment.startsWith("Replenishment task cancelled")) {
       assert.equal(f.replenishmentTask.state, "Cancelled");
-      assert.match(f.replenishment, /doesn't say why/);
+      assert.equal(f.replenishmentTask.outcome, "No backroom stock");
+      assert.match(f.replenishment, /No backroom stock\. The facing needs a store order\./);
     }
-    if (f.replenishment.startsWith("No replenishment task")) assert.equal(f.replenishmentTask, undefined);
+    if (f.replenishment.startsWith("No replenishment task")) {
+      assert.equal(f.replenishmentTask, undefined);
+      // A gap with no task names the team the store routes replenishment to for that department.
+      assert.match(f.routedTo, / team$/);
+    } else assert.equal(f.routedTo, undefined);
+    if (f.replenishmentTask?.state === "Assigned") assert.match(f.replenishmentTask.assignedTo, / team$/);
   }
+  assert.match(g.answer, /cancelled \(\d+ no backroom stock\)/);
 });
 
 test("checkout incidents give the store's own review status apart from the vendor's", () => {
@@ -89,10 +96,17 @@ test("checkout incidents give the store's own review status apart from the vendo
     const task = day.byId.get(i.reviewTask.id)!.data as { kind: string; state: string; basedOn: string[] };
     assert.equal(task.kind, "review_exception");
     assert.ok(task.basedOn.includes(i.id));
-    assert.match(i.review, /don't say what the reviewer found/);
+    // The reviewer's finding comes from the review task; the vendor's incident keeps the vendor's status.
+    const finding = (day.byId.get(i.reviewTask.id)!.data as { resolution?: { outcome: string } }).resolution;
+    assert.ok(finding, `${i.reviewTask.id} has no finding`);
+    assert.match(i.review, /^Reviewed at \d+:\d+ [AP]M\. Finding: (Confirmed loss|Customer paid|False alarm)\. /);
+    assert.equal(i.reviewTask.outcome, i.review.match(/Finding: ([^.]+)/)![1]);
   }
+  for (const i of c.incidents) if (i.review.startsWith("Not reviewed yet. No review task")) assert.match(i.review, /Asset protection team/);
+  assert.equal(Object.values(c.reviewFindings as Record<string, number>).reduce((a, b) => a + b, 0), c.reviews.reviewed);
   const s = tool("availability", "store_summary");
   assert.deepEqual(s.checkoutIncidentReviews, c.reviews);
+  assert.deepEqual(s.checkoutIncidentFindings, c.reviewFindings);
 });
 
 test("the front end gives the lane count and the rule for opening another lane", () => {
@@ -147,6 +161,8 @@ test("the router's reply picks the agent, and keywords pick one when it can't be
 
 test("answers keep only cited ids and drop shown reasoning", () => {
   assert.deepEqual(citations("Milk is out [so-20261117-000123] and [task-20261117-000004-v2, inc-20261117-000001]. See [ev-lp-20261117-000002]. Not [this]."), ["so-20261117-000123", "task-20261117-000004-v2", "inc-20261117-000001", "ev-lp-20261117-000002"]);
+  assert.equal(dropToolCitations("Two need review [checkout_incidents]. One is open [inc-20261117-000001; checkout_incidents]."), "Two need review. One is open [inc-20261117-000001].");
+  assert.equal(dropToolCitations("Out [so-20261117-000123]. See [the board](/demo/)."), "Out [so-20261117-000123]. See [the board](/demo/).");
   assert.equal(clean("<think>hmm</think>\nAnswer."), "Answer.");
 });
 

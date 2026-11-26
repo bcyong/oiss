@@ -18,6 +18,10 @@
  * one opens. A task that needs verification closes only when a later record shows the fix, and
  * names that record.
  *
+ * A task that ends without a fix, and an exception review, carry a resolution saying how it ended:
+ * a replenish task cancelled for no backroom stock, an open-lane task cancelled once the rush has
+ * passed, and the reviewer's finding on a checkout exception.
+ *
  * Each status change is a new Task record with the same subject (spec/record-types.md).
  */
 import type { Department } from "./layout.ts";
@@ -27,6 +31,7 @@ import { Rng } from "./rng.ts";
 
 export type TaskKind = "replenish" | "go_back" | "fix_shelf_tag" | "review_exception" | "open_lane";
 type TaskState = "open" | "assigned" | "in_progress" | "done" | "verified" | "cancelled";
+export type TaskOutcome = "duplicate" | "resolved_elsewhere" | "no_backroom_stock" | "no_longer_needed" | "confirmed_loss" | "customer_paid" | "false_alarm" | "other";
 
 const PROV: Provenance = { system: "Demo Grocery task management", synthetic: true };
 const CREATED_BY = "system:task-management";
@@ -50,10 +55,31 @@ const TEAM: Partial<Record<Department, string>> = {
   meat_and_seafood: "team:meat",
 };
 
+/**
+ * The store's task routing: the team its task system assigns each kind of task to. Shelf tasks go
+ * to the team for the item's department, shelf tags to price integrity, exception reviews to asset
+ * protection and lane openings to the front end.
+ */
+export function routeTask(kind: TaskKind, department?: string): string {
+  if (kind === "fix_shelf_tag") return "team:price-integrity";
+  if (kind === "review_exception") return "team:asset-protection";
+  if (kind === "open_lane") return "team:front-end";
+  return (department && TEAM[department as Department]) || "team:grocery";
+}
+
+/** Of the checkout exceptions the reviewer finds real, the share where the shopper paid once stopped at the lane. */
+const CUSTOMER_PAID_SHARE = 0.35;
+
+interface Resolution {
+  outcome: TaskOutcome;
+  note?: string;
+}
+
 interface Step {
   t: number;
   state: TaskState;
   verifiedBy?: string;
+  resolution?: Resolution;
 }
 
 interface Plan {
@@ -114,10 +140,7 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
   const sec = (iso: string) => (Date.parse(iso) - clock.epochMs(0)) / 1000;
   const fixtureDept = new Map(layout.fixtures.map((f) => [f.id, f.department]));
   const slotFixture = new Map(layout.slots.map((s) => [s.id, s.fixture]));
-  const teamFor = (facing: string) => {
-    const dept = fixtureDept.get(slotFixture.get(facing) ?? "");
-    return (dept && TEAM[dept]) || "team:grocery";
-  };
+  const teamFor = (kind: TaskKind, facing: string) => routeTask(kind, fixtureDept.get(slotFixture.get(facing) ?? ""));
   const itemAt = (facing: string) => {
     const pos = catalog.byFacing.get(facing);
     return pos ? catalog.byGtin.get(pos.gtin) : undefined;
@@ -152,7 +175,7 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
         ];
         let end = Infinity;
         if (cancelled !== undefined && cancelled < last) {
-          steps.push({ t: Math.max(cancelled, created + ASSIGN_DELAY + 1), state: "cancelled" });
+          steps.push({ t: Math.max(cancelled, created + ASSIGN_DELAY + 1), state: "cancelled", resolution: { outcome: "no_backroom_stock", note: "The facing needs a store order." } });
           // No backroom stock: only a store order fixes it, so the facing gets no more replenish tasks today.
           end = Infinity;
         } else if (done !== undefined && done < last) {
@@ -167,7 +190,7 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
         busyUntil[kind] = end;
         const [lo, hi] = WORK_MINUTES[kind];
         const workAt = Math.round(created + ASSIGN_DELAY + 60 * new Rng(g.config.seed).fork(`task-work:${kind}:${facing}:${created}`).uniform(lo, hi));
-        plans.push({ kind, facing, workAt, title, location: facingLocation(r.data.location), assignedTo: kind === "fix_shelf_tag" ? "team:price-integrity" : teamFor(facing), basedOn: [r.id], verify: true, steps });
+        plans.push({ kind, facing, workAt, title, location: facingLocation(r.data.location), assignedTo: teamFor(kind, facing), basedOn: [r.id], verify: true, steps });
       };
       const next = (after: number, ok: (o: Obs) => boolean) => {
         const hit = list.find((o) => o.t > after && ok(o.r));
@@ -196,7 +219,11 @@ function shelfPlans(g: Ground, shelfObservations: OissRecord[]): Plan[] {
   return plans;
 }
 
-export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetrics: OissRecord[], incidents: OissRecord[]): OissRecord[] {
+/**
+ * reviewFinds says, for each Incident id, whether the exception really happened, which is what a
+ * reviewer watching the clip finds. Without it, every review is resolved as a false alarm.
+ */
+export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetrics: OissRecord[], incidents: OissRecord[], reviewFinds: ReadonlyMap<string, boolean> = new Map()): OissRecord[] {
   const { clock, layout } = g;
   const store = layout.store.id;
   const last = 86_399;
@@ -213,10 +240,18 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
       { t: created, state: "open" },
       { t: created + ASSIGN_DELAY, state: "assigned" },
     ];
-    if (done > created + ASSIGN_DELAY) steps.push({ t: done, state: "done" });
+    if (done > created + ASSIGN_DELAY) {
+      const real = reviewFinds.get(r.id) ?? false;
+      const resolution: Resolution = !real
+        ? { outcome: "false_alarm", note: "The clip shows every item paid for." }
+        : rng.chance(CUSTOMER_PAID_SHARE)
+          ? { outcome: "customer_paid", note: "The shopper paid for the item at the lane." }
+          : { outcome: "confirmed_loss", note: "The clip shows the item left unpaid." };
+      steps.push({ t: done, state: "done", resolution });
+    }
     const what = EXCEPTION[r.data.incidentType] ?? r.data.incidentType.replaceAll("_", " ");
     const lane = laneName(r.data.location.fixture ?? "");
-    plans.push({ kind: "review_exception", title: `Review a possible ${what} at ${lane}`, location: { ...r.data.location }, assignedTo: "team:asset-protection", basedOn: [r.id], verify: false, steps });
+    plans.push({ kind: "review_exception", title: `Review a possible ${what} at ${lane}`, location: { ...r.data.location }, assignedTo: routeTask("review_exception"), basedOn: [r.id], verify: false, steps });
   }
 
   // ---- the front end ----
@@ -240,10 +275,10 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
       if (check) steps.push({ t: Math.max(check.t + RAISE_DELAY, doneAt + 1), state: "verified", verifiedBy: check.r.id });
       laneBusyUntil = check ? check.t : Infinity;
     } else {
-      steps.push({ t: Math.min(last, created + OPEN_LANE_TIMEOUT), state: "cancelled" });
+      steps.push({ t: Math.min(last, created + OPEN_LANE_TIMEOUT), state: "cancelled", resolution: { outcome: "no_longer_needed", note: "No lane opened before the rush passed." } });
       laneBusyUntil = created + OPEN_LANE_TIMEOUT;
     }
-    plans.push({ kind: "open_lane", title: "Open another staffed lane", location: { zone: "front-end" }, assignedTo: "team:front-end", basedOn: [r.id], verify: true, steps });
+    plans.push({ kind: "open_lane", title: "Open another staffed lane", location: { zone: "front-end" }, assignedTo: routeTask("open_lane"), basedOn: [r.id], verify: true, steps });
   }
 
   // Number tasks by when they were raised, so a change late in the day leaves earlier ids as they were.
@@ -272,6 +307,7 @@ export function storeTasks(g: Ground, shelfObservations: OissRecord[], zoneMetri
             ...(s.state === "open" ? {} : { assignedTo: p.assignedTo }),
             basedOn: p.basedOn,
             verification: s.verifiedBy ? { required: p.verify, verifiedBy: s.verifiedBy } : { required: p.verify },
+            ...(s.resolution ? { resolution: { ...s.resolution, resolvedBy: p.assignedTo, resolvedAt: clock.iso(s.t) } } : {}),
           },
         }),
       );

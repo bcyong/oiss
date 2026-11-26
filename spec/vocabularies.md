@@ -41,6 +41,8 @@ Types: `replenish`, `recover`, `fix_shelf_tag`, `go_back`, `open_lane`, `review_
 
 Status: `open` → `assigned` → `in_progress` → `done` → `verified`, with `cancelled` possible at any point. A task that needs verification closes only at `verified`.
 
+Resolution outcomes: `duplicate`, `resolved_elsewhere`, `no_backroom_stock`, `no_longer_needed` for a cancelled task; `confirmed_loss`, `customer_paid`, `false_alarm` for a loss prevention review; and `other`.
+
 ## Evidence redaction
 
 `none`, `people_blurred`, `people_masked`, `cropped_to_shelf`.

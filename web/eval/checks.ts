@@ -1,12 +1,13 @@
 /**
  * Checks on one assistant answer against the tool results it was written from. They catch the ways an
  * answer misleads a manager: a citation the tools didn't return, a number or time that isn't in the
- * records, a cause the records don't give, or a team name nobody returned. They are deliberately plain
+ * records, a cause the records don't give, a team name or a role nobody returned, or something in
+ * citation brackets that isn't a record id. They are deliberately plain
  * text checks, so a failure points at the exact words to look at.
  */
 
 export interface Finding {
-  check: "citation" | "number" | "cause" | "name";
+  check: "citation" | "number" | "cause" | "name" | "role";
   detail: string;
 }
 
@@ -33,6 +34,8 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
   const seconds = [...known].filter((n) => /^\d+$/.test(n)).map(Number);
   const text = answer
     .replace(RECORD_ID, " ")
+    // "3 min 19 s" spells out 199 seconds, which the tools may well have given.
+    .replace(/\b(\d+) ?min(?:utes?)? (\d+) ?s(?:ec(?:onds?)?)?\b/gi, (whole, m: string, sec: string) => (known.has(String(Number(m) * 60 + Number(sec))) ? " " : whole))
     .replace(/^\s*\d+[.)]\s+/gm, " ")
     .replaceAll(",", "");
   const out: string[] = [];
@@ -42,6 +45,8 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
     if (known.has(n) || known.has(bare) || known.has(String(Number(bare)))) continue;
     // "about 3 minutes" from avgWaitSeconds 180, or "1 minute" from 56 seconds.
     if (/^\d+(\.\d+)?$/.test(bare) && seconds.some((s) => Math.abs(s / 60 - Number(bare)) < 0.75)) continue;
+    // "180 s" from a rule the tools gave as 3 minutes.
+    if (/^\d+$/.test(bare) && Number(bare) % 60 === 0 && known.has(String(Number(bare) / 60))) continue;
     out.push(n);
   }
   return [...new Set(out)];
@@ -55,7 +60,13 @@ const NOT_A_CAUSE = /likely lost sales|most likely to lose sales/gi;
 export function statedCauses(answer: string, toolText: string): string[] {
   const tools = toolText.toLowerCase();
   const out: string[] = [];
-  for (const m of answer.replace(NOT_A_CAUSE, " ").matchAll(CAUSE)) if (!tools.includes(m[0].toLowerCase())) out.push(m[0].toLowerCase());
+  for (const m of answer.replace(NOT_A_CAUSE, " ").matchAll(CAUSE)) {
+    if (tools.includes(m[0].toLowerCase())) continue;
+    // "cancelled due to no backroom stock" gives the cause a record gave, which is fine.
+    const after = answer.slice(m.index! + m[0].length).toLowerCase().match(/^\s+([a-z'-]+(?: [a-z'-]+){0,2})/);
+    if (after && after[1]!.split(" ").length >= 2 && tools.includes(after[1]!)) continue;
+    out.push(m[0].toLowerCase());
+  }
   return [...new Set(out)];
 }
 
@@ -73,6 +84,34 @@ export function unknownTeams(answer: string, toolText: string): string[] {
   return [...new Set(out)];
 }
 
+/** Words for a person, role or system an answer might add that the records never named. */
+const ROLE = /\b(managers?|supervisors?|directors?|coordinators?|portals?|vendors?|dashboards?|hotlines?)\b|\b(?:the|a|your|shift|team|department|front[- ]end|store|aisle|night|pricing|stocking|LP|AP) (leads?)\b/gi;
+
+/** The text of the tool results without their JSON keys, so a key such as vendorStatus doesn't count as naming a vendor. */
+const valuesOf = (toolText: string) => toolText.replace(/"[A-Za-z_]+"\s*:/g, " ").replaceAll("_", " ").toLowerCase();
+
+/** Role words in the answer, such as "front-end lead" or "the vendor's portal", that neither the tool results nor the question used. */
+export function unknownRoles(answer: string, toolText: string, question = ""): string[] {
+  const known = `${valuesOf(toolText)} ${question.toLowerCase()}`;
+  const out: string[] = [];
+  for (const m of answer.matchAll(ROLE)) {
+    const word = (m[1] ?? m[2]!).toLowerCase();
+    const stem = word.replace(/s$/, "");
+    if (new RegExp(`\\b${stem}s?\\b`).test(known)) continue;
+    out.push(word);
+  }
+  return [...new Set(out)];
+}
+
+const CITED_ID = /^[a-z]{2,4}(?:-[a-z]{2,4})?-\d{8}-\d{6}(?:-v\d+)?$/;
+
+/** Things in citation brackets that aren't record ids, such as [checkout_incidents]. Markdown links are left alone. */
+export function nonRecordCitations(answer: string): string[] {
+  const out: string[] = [];
+  for (const m of answer.matchAll(/\[([^\]\n]+)\](?!\()/g)) for (const part of m[1]!.split(/[,;]/).map((p) => p.trim())) if (part && !CITED_ID.test(part)) out.push(`[${part}]`);
+  return [...new Set(out)];
+}
+
 /** Every finding for one answer. */
 export function checkAnswer(a: { text: string; unverified: string[] }, toolText: string, question = ""): Finding[] {
   return [
@@ -80,5 +119,7 @@ export function checkAnswer(a: { text: string; unverified: string[] }, toolText:
     ...unsupportedNumbers(a.text, toolText, question).map((n) => ({ check: "number" as const, detail: `says ${n}, which isn't in the tool results` })),
     ...statedCauses(a.text, toolText).map((w) => ({ check: "cause" as const, detail: `gives a cause ("${w}") the records don't` })),
     ...unknownTeams(a.text, toolText).map((t) => ({ check: "name" as const, detail: `names "${t}", which no tool returned` })),
+    ...unknownRoles(a.text, toolText, question).map((w) => ({ check: "role" as const, detail: `mentions a ${w.replace(/s$/, "")}, which no tool returned` })),
+    ...nonRecordCitations(a.text).map((c) => ({ check: "citation" as const, detail: `cites ${c}, which isn't a record id` })),
   ];
 }
