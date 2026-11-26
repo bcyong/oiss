@@ -1,6 +1,6 @@
 import { incidentsUpTo, lastAtOrBefore, latestObservation, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, taskAt, tasksAt, zoneMetricAt, clock, secondsOf, type FacingView, type IndexedDay, type TaskView } from "../day.ts";
-import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, observer, STATUS_LABEL, TASK_KIND, TASK_STATE, zoneName } from "../describe.ts";
-import { OPEN_LANE_WAIT_SECONDS } from "@oiss/sim";
+import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, observer, STATUS_LABEL, TASK_KIND, TASK_OUTCOME, TASK_STATE, zoneName } from "../describe.ts";
+import { OPEN_LANE_WAIT_SECONDS, routeTask } from "@oiss/sim";
 import type { AnyRecord, IncidentData, OissRecord, ShelfObservationData, TaskData } from "../oiss.ts";
 import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
 
@@ -13,6 +13,10 @@ import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
  * the model only puts it into words. So where a status depends on comparing two records' times (a fix
  * marked done after a shelf read flagged it), the tool compares them and says so, and the model is
  * never left to infer it.
+ *
+ * Owners come from the records too. A row about a task names the team it is assigned to, and a row
+ * with no task yet names the team the store's task system routes that kind of work to (routedTo), so
+ * the model can say who would act or find out without making up a role.
  */
 
 export type ToolArgs = Record<string, unknown>;
@@ -28,6 +32,18 @@ const OPEN_STATES = new Set(["open", "assigned", "in_progress"]);
 const DONE_STATES = new Set(["done", "verified"]);
 const NO_REASON = "The record doesn't say why.";
 
+/** The team the store's task system routes a kind of work to, by name. */
+const routedTo = (kind: TaskData["kind"], department?: string) => assigneeName(routeTask(kind as Parameters<typeof routeTask>[0], department));
+
+/** How a task ended, from its resolution: "No backroom stock. The facing needs a store order." */
+function outcomeText(d: TaskData): string | undefined {
+  const r = d.resolution;
+  return r && `${TASK_OUTCOME[r.outcome]}.${r.note ? ` ${r.note}` : ""}`;
+}
+
+/** Why a cancelled task was cancelled, from its resolution, or that the record doesn't say. */
+const cancelReason = (d: TaskData) => outcomeText(d) ?? NO_REASON;
+
 function itemOf(day: IndexedDay, v: FacingView) {
   const it = day.items.get(v.facing.gtin);
   return { item: it?.name ?? v.facing.gtin, gtin: v.facing.gtin, department: it?.department, promo: it?.promo || undefined, priceAtRegister: it ? money(it.price) : undefined };
@@ -41,16 +57,28 @@ function where(day: IndexedDay, v: FacingView) {
 function taskLine(day: IndexedDay, view: TaskView, t: number) {
   const r = taskAt(view, t);
   if (!r) return undefined;
+  const res = r.data.resolution;
+  const assignedTo = assigneeName(r.data.assignedTo) || undefined;
   return {
     id: r.id,
     kind: TASK_KIND[r.data.kind],
     state: TASK_STATE[r.data.state],
     title: r.data.title,
-    assignedTo: assigneeName(r.data.assignedTo) || undefined,
+    assignedTo,
+    routedTo: assignedTo ? undefined : routedTo(r.data.kind, departmentAt(day, r.data.location.facing)),
     raised: clock(view.times[0]!),
     changed: clock(changedAt(view, t)),
     confirmedBy: r.data.verification?.verifiedBy,
+    outcome: res && TASK_OUTCOME[res.outcome],
+    outcomeNote: res?.note,
+    resolvedBy: res?.resolvedBy && assigneeName(res.resolvedBy),
   };
+}
+
+/** The department of the item on a facing. */
+function departmentAt(day: IndexedDay, facing?: string): string | undefined {
+  const v = facing === undefined ? undefined : day.facings.find((f) => f.facing.id === facing);
+  return v && day.items.get(v.facing.gtin)?.department;
 }
 
 /** "assigned to Grocery team", or the state on its own. */
@@ -59,7 +87,7 @@ const stateWithTeam = (state: TaskData["state"], team?: string) => (state === "a
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** A task in a row about something else: just enough to cite it and say where it stands. */
-const taskRef = (t?: ReturnType<typeof taskLine>) => t && { id: t.id, state: t.state, assignedTo: t.assignedTo, changed: t.changed };
+const taskRef = (t?: ReturnType<typeof taskLine>) => t && { id: t.id, state: t.state, assignedTo: t.assignedTo, routedTo: t.routedTo, changed: t.changed, outcome: t.outcome };
 
 const changedAt = (view: TaskView, t: number) => view.times[lastAtOrBefore(view.times, t)]!;
 
@@ -86,7 +114,7 @@ function replenishment(day: IndexedDay, v: FacingView, t: number, gapStart: numb
   const task = taskLine(day, view, t);
   const at = changedAt(view, t);
   if (OPEN_STATES.has(r.data.state)) return { bucket: "taskOpen", status: `Replenishment task ${stateWithTeam(r.data.state, task?.assignedTo)}.`, task };
-  if (r.data.state === "cancelled") return { bucket: "cancelled", status: `Replenishment task cancelled at ${clock(at)}. ${NO_REASON}`, task };
+  if (r.data.state === "cancelled") return { bucket: "cancelled", status: `Replenishment task cancelled at ${clock(at)}. ${cancelReason(r.data)}`, task };
   if (lastRead > at) return { bucket: "doneNotConfirmed", status: `Replenishment task marked done at ${clock(at)}, but a later shelf read still shows it ${status.toLowerCase()}.`, task };
   return { bucket: "doneNotConfirmed", status: `Replenishment task marked done at ${clock(at)}; no shelf read since to confirm it.`, task };
 }
@@ -123,15 +151,25 @@ function storeSummary(day: IndexedDay, t: number): ToolResult {
   const confirmed: Record<string, number> = {};
   const done: Record<string, number> = {};
   const cancelled: Record<string, number> = {};
+  const cancelledWhy: Record<string, number> = {};
   for (const { latest } of tasksAt(day, t)) {
     const st = latest.data.state;
     const bucket = OPEN_STATES.has(st) ? open : st === "verified" ? confirmed : st === "cancelled" ? cancelled : latest.data.verification?.required ? doneNotConfirmed : done;
     const k = TASK_KIND[latest.data.kind];
     bucket[k] = (bucket[k] ?? 0) + 1;
+    if (st === "cancelled") {
+      const why = latest.data.resolution ? TASK_OUTCOME[latest.data.resolution.outcome] : "Reason not given";
+      cancelledWhy[why] = (cancelledWhy[why] ?? 0) + 1;
+    }
   }
   const incidents = incidentsUpTo(day.incidents, t);
   const reviews = { notReviewed: 0, reviewed: 0, reviewCancelled: 0 };
-  for (const r of incidents) reviews[reviewOf(day, r, t).bucket]++;
+  const reviewFindings: Record<string, number> = {};
+  for (const r of incidents) {
+    const review = reviewOf(day, r, t);
+    reviews[review.bucket]++;
+    if (review.finding) reviewFindings[review.finding] = (reviewFindings[review.finding] ?? 0) + 1;
+  }
   const front = zoneMetricAt(day, "front-end", t);
   const sco = zoneMetricAt(day, "self-checkout", t);
   const lane = (r: typeof front, of: number) => r && { id: r.id, interval: intervalOf(day, r), inLine: r.data.metrics.queueLength, avgWaitSeconds: r.data.metrics.avgWaitSeconds, openLanes: r.data.metrics.openLanes, of };
@@ -146,11 +184,13 @@ function storeSummary(day: IndexedDay, t: number): ToolResult {
     confirmedByKind: confirmed,
     doneNoConfirmationNeededByKind: done,
     cancelledByKind: cancelled,
+    cancelledByReason: cancelledWhy,
     checkoutIncidents: incidents.length,
     checkoutIncidentReviews: reviews,
+    checkoutIncidentFindings: reviewFindings,
     staffedLanes: lane(front, staffedLaneCount(day)),
     selfCheckout: lane(sco, selfCheckoutCount(day)),
-    note: "Shelf counts are from each facing's latest shelf read at this time. A task marked done is confirmed only when a later record shows the fix; some kinds, such as exception reviews, need no confirmation. Cancelled tasks' records don't say why.",
+    note: "Shelf counts are from each facing's latest shelf read at this time. A task marked done is confirmed only when a later record shows the fix; some kinds, such as exception reviews, need no confirmation. cancelledByReason gives the reason each cancelled task's record names. checkoutIncidentFindings are the reviewers' findings.",
   };
 }
 
@@ -180,10 +220,15 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
   }
   rows.sort((a, b) => b.score - a.score);
   const counts: Record<ReplenishBucket, number> = { noTask: 0, taskOpen: 0, doneNotConfirmed: 0, cancelled: 0 };
+  const cancelledWhy = new Map<string, number>();
   const facings = rows.map(({ v, obs, at, from, gap }) => {
     const status = STATUS_LABEL[obs.data.status!];
     const rep = replenishment(day, v, t, gap, at, status);
     counts[rep.bucket]++;
+    if (rep.bucket === "cancelled") {
+      const why = rep.task?.outcome ?? "Reason not given";
+      cancelledWhy.set(why, (cancelledWhy.get(why) ?? 0) + 1);
+    }
     return {
       ...itemOf(day, v),
       ...where(day, v),
@@ -196,6 +241,7 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
       zoneTrafficLast15Min: traffic.get(v.zone),
       replenishment: rep.status,
       replenishmentTask: taskRef(rep.task),
+      routedTo: rep.task ? undefined : routedTo("replenish", day.items.get(v.facing.gtin)?.department),
     };
   });
   const what = want === "both" ? "out of stock or low" : STATUS_LABEL[want as "out_of_stock"].toLowerCase();
@@ -204,7 +250,7 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
     counts.noTask && `${counts.noTask} with no replenishment task since it was last in stock.`,
     counts.taskOpen && `${counts.taskOpen} with a replenishment task open.`,
     counts.doneNotConfirmed && `${counts.doneNotConfirmed} with replenishment marked done but not confirmed by a shelf read.`,
-    counts.cancelled && `${counts.cancelled} whose replenishment task was cancelled; the records don't say why, so ask the team that had it before raising another.`,
+    counts.cancelled && `${counts.cancelled} whose replenishment task was cancelled${cancelledWhy.size ? ` (${[...cancelledWhy].map(([k, n]) => `${n} ${k.toLowerCase()}`).join(", ")})` : ""}.`,
   ].filter(Boolean).join(" ");
   return {
     answer,
@@ -212,7 +258,7 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
     total: rows.length,
     replenishment: counts,
     facings: facings.slice(0, n),
-    note: "since: when the facing's current status began. notInStockSince: when it was last in stock. replenishment counts cover every facing listed in total, not only the rows shown.",
+    note: "since: when the facing's current status began. notInStockSince: when it was last in stock. replenishment counts cover every facing listed in total, not only the rows shown. replenishmentTask.assignedTo is the team that has the task; routedTo, on a row with no task, is the team the store's task system routes replenishment to for that department.",
   };
 }
 
@@ -280,7 +326,7 @@ function storeTasks(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
     total: list.length,
     byState,
     tasks: list.slice(0, n).map(({ view, latest }) => ({ ...taskLine(day, view, t)!, location: taskWhere(day, latest), basedOn: latest.data.basedOn })),
-    note: "Done means an associate marked the task done. Verified means a later record confirmed the fix; confirmedBy names it. A cancelled task's record doesn't say why it was cancelled.",
+    note: "Done means an associate marked the task done. Verified means a later record confirmed the fix; confirmedBy names it. outcome is how the task ended: the reason a cancelled task was cancelled, or a review's finding. assignedTo is the team that has the task; an unassigned task gives routedTo, the team the store routes that kind of task to.",
   };
 }
 
@@ -313,7 +359,7 @@ function tagStatus(day: IndexedDay, v: FacingView, t: number): { bucket: TagBuck
     bucket = "flaggedAgainAfterFix";
     status = `Flagged again at ${clock(flaggedAt)}, after a fix marked done at ${clock(at)}.`;
   } else if (r && OPEN_STATES.has(r.data.state)) status = `Wrong on the shelf. Fix task ${TASK_STATE[r.data.state].toLowerCase()}.`;
-  else if (r && at !== undefined) status = `Wrong on the shelf. Fix task cancelled at ${clock(at)}. ${NO_REASON}`;
+  else if (r && at !== undefined) status = `Wrong on the shelf. Fix task cancelled at ${clock(at)}. ${cancelReason(r.data)}`;
   else status = "Wrong on the shelf. No fix task yet.";
   const register = day.items.get(v.facing.gtin)?.price;
   const tag = robotWrong ? robot!.r.data.tagPrice : label?.r.data.tagPrice;
@@ -332,6 +378,7 @@ function tagStatus(day: IndexedDay, v: FacingView, t: number): { bucket: TagBuck
       shelfLabel: label && { record: label.r.id, at: clock(label.at), shows: money(label.r.data.tagPrice), flagged: labelWrong },
       robotAndLabelsDisagree: robotTag !== undefined && labelShows !== undefined && robotTag !== labelShows,
       fixTask: taskRef(view && taskLine(day, view, t)),
+      routedTo: view ? undefined : routedTo("fix_shelf_tag"),
     },
   };
 }
@@ -356,7 +403,7 @@ function shelfTagIssues(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
     answer: parts.join(" "),
     counts: { ...counts, fixesConfirmedToday: confirmedToday },
     tags: rows.slice(0, n).map((r) => r.row),
-    note: "wrongOnShelf: the latest read shows a price other than the register price and no fix has been marked done since. fixedWaitingForRead: an associate marked the fix done after the read that flagged it, and no read has confirmed it yet. fixesConfirmedToday: fixes a later robot read confirmed. The records don't say why a tag was wrong.",
+    note: "wrongOnShelf: the latest read shows a price other than the register price and no fix has been marked done since. fixedWaitingForRead: an associate marked the fix done after the read that flagged it, and no read has confirmed it yet. fixesConfirmedToday: fixes a later robot read confirmed. A tag with no fix task gives routedTo, the team the store routes shelf tag fixes to. The records don't say why a tag was wrong.",
   };
 }
 
@@ -380,7 +427,7 @@ function frontEndStatus(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
     .map(({ view, latest }) => {
       const at = clock(changedAt(view, t));
       const st = latest.data.state;
-      const status = OPEN_STATES.has(st) ? `${TASK_STATE[st]}: no lane opened yet.` : st === "verified" ? `Done, confirmed at ${at} by a front-end reading with another lane open.` : st === "done" ? `Marked done at ${at}; not yet confirmed by a front-end reading.` : `Cancelled at ${at}. ${NO_REASON}`;
+      const status = OPEN_STATES.has(st) ? `${TASK_STATE[st]}: no lane opened yet.` : st === "verified" ? `Done, confirmed at ${at} by a front-end reading with another lane open.` : st === "done" ? `Marked done at ${at}; not yet confirmed by a front-end reading.` : `Cancelled at ${at}. ${cancelReason(latest.data)}`;
       return { ...taskLine(day, view, t)!, status };
     });
   const m = latest?.data.metrics;
@@ -399,6 +446,7 @@ function frontEndStatus(day: IndexedDay, t: number, args: ToolArgs): ToolResult 
     staffedLanes: series("front-end"),
     selfCheckout: series("self-checkout"),
     openLaneTasks: laneTasks,
+    routedTo: meets && !openTask ? routedTo("open_lane") : undefined,
   };
 }
 
@@ -417,15 +465,16 @@ function zoneTraffic(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
 type ReviewBucket = "notReviewed" | "reviewed" | "reviewCancelled";
 
 /** Where the store's review of a checkout exception stands, from its review task. The vendor's incident record keeps the vendor's own status. */
-function reviewOf(day: IndexedDay, inc: OissRecord<IncidentData>, t: number): { bucket: ReviewBucket; status: string; task?: ReturnType<typeof taskLine> } {
+function reviewOf(day: IndexedDay, inc: OissRecord<IncidentData>, t: number): { bucket: ReviewBucket; status: string; finding?: string; task?: ReturnType<typeof taskLine> } {
   const view = day.tasks.find((v) => v.versions[0]!.data.kind === "review_exception" && v.versions[0]!.data.basedOn?.includes(inc.id));
   const r = view && taskAt(view, t);
-  if (!view || !r) return { bucket: "notReviewed", status: "Not reviewed yet. No review task yet." };
+  if (!view || !r) return { bucket: "notReviewed", status: `Not reviewed yet. No review task yet; the store routes exception reviews to the ${routedTo("review_exception")}.` };
   const task = taskLine(day, view, t);
   const at = clock(changedAt(view, t));
   if (OPEN_STATES.has(r.data.state)) return { bucket: "notReviewed", status: `Not reviewed yet. Review task ${stateWithTeam(r.data.state, task?.assignedTo)}.`, task };
-  if (r.data.state === "cancelled") return { bucket: "reviewCancelled", status: `Review task cancelled at ${at}. ${NO_REASON}`, task };
-  return { bucket: "reviewed", status: `Reviewed: the review task was marked done at ${at}. The records don't say what the reviewer found.`, task };
+  if (r.data.state === "cancelled") return { bucket: "reviewCancelled", status: `Review task cancelled at ${at}. ${cancelReason(r.data)}`, task };
+  const finding = outcomeText(r.data);
+  return { bucket: "reviewed", finding: task?.outcome, status: finding ? `Reviewed at ${at}. Finding: ${finding}` : `Reviewed: the review task was marked done at ${at}. The records don't say what the reviewer found.`, task };
 }
 
 function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
@@ -436,18 +485,21 @@ function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResu
     .map((r) => ({ r, review: reviewOf(day, r, t) }))
     .reverse();
   const reviews: Record<ReviewBucket, number> = { notReviewed: 0, reviewed: 0, reviewCancelled: 0 };
+  const findings: Record<string, number> = {};
   const byType: Record<string, number> = {};
   for (const { r, review } of list) {
     reviews[review.bucket]++;
+    if (review.finding) findings[review.finding] = (findings[review.finding] ?? 0) + 1;
     const type = INCIDENT_LABEL[r.data.incidentType] ?? r.data.incidentType;
     byType[type] = (byType[type] ?? 0) + 1;
   }
   // Those still waiting for a person come first.
   list.sort((a, b) => (a.review.bucket === "notReviewed" ? 0 : 1) - (b.review.bucket === "notReviewed" ? 0 : 1));
   return {
-    answer: `${plural(list.length, "checkout exception", "checkout exceptions")} so far: ${reviews.notReviewed} not reviewed yet, ${reviews.reviewed} reviewed${reviews.reviewCancelled ? `, ${reviews.reviewCancelled} with the review cancelled` : ""}.`,
+    answer: `${plural(list.length, "checkout exception", "checkout exceptions")} so far: ${reviews.notReviewed} not reviewed yet, ${reviews.reviewed} reviewed${Object.keys(findings).length ? ` (${Object.entries(findings).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(", ")})` : ""}${reviews.reviewCancelled ? `, ${reviews.reviewCancelled} with the review cancelled` : ""}.`,
     total: list.length,
     reviews,
+    reviewFindings: findings,
     byType,
     incidents: list.slice(0, n).map(({ r, review }) => ({
       id: r.id,
@@ -463,7 +515,7 @@ function checkoutIncidents(day: IndexedDay, t: number, args: ToolArgs): ToolResu
       evidence: r.data.evidence?.map((id) => ({ id, retainUntil: day.evidence.get(id)?.data.retainUntil?.slice(0, 10) })),
       reviewTask: taskRef(review.task),
     })),
-    note: "review is where the store's own review stands, from its review task. vendorStatus is the vendor's status on its incident record, which the store's review doesn't update. Every incident is a possible exception for a person to review, not a finding about anyone.",
+    note: "review is where the store's own review stands, and the reviewer's finding, from its review task. vendorStatus is the vendor's status on its incident record, which the store's review doesn't update. Every incident is a possible exception for a person to review; only the reviewer's finding says what happened.",
   };
 }
 

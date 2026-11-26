@@ -8,4 +8,4 @@ export { Rng } from "./rng.ts";
 export * from "./records.ts";
 export { lossPreventionDay, checkoutExceptions, type CheckoutException, type MockLpAlert } from "./lossPrevention.ts";
 export { FAULT_KINDS, FAULT_RATES, type FaultKind, type Injection, type ShelfFault } from "./faults.ts";
-export { OPEN_LANE_WAIT_SECONDS } from "./tasks.ts";
+export { OPEN_LANE_WAIT_SECONDS, routeTask, type TaskKind, type TaskOutcome } from "./tasks.ts";

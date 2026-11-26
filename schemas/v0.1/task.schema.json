@@ -54,6 +54,32 @@
         "required"
       ],
       "additionalProperties": false
+    },
+    "resolution": {
+      "type": "object",
+      "description": "How the task ended: why it was cancelled, or what a review found. Optional; the source's own records, such as an Incident, keep what the source sent.",
+      "properties": {
+        "outcome": {
+          "$ref": "vocab.schema.json#/$defs/taskOutcome"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "resolvedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The associate, team or system that resolved it."
+        },
+        "resolvedAt": {
+          "$ref": "defs.schema.json#/$defs/timestamp"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

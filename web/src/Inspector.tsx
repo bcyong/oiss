@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { vendorOf } from "./vendors.ts";
 import type { IndexedDay } from "./day.ts";
-import { assigneeName, checkoutName, duration, summarize, TASK_KIND, TASK_STATE, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
+import { assigneeName, checkoutName, duration, summarize, TASK_KIND, TASK_OUTCOME, TASK_STATE, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
 import { VENDOR_NAME, type VendorRaw, vendorRawFor } from "./vendorRaw.ts";
 import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, TaskData, ZoneMetricData } from "./oiss.ts";
@@ -276,6 +276,16 @@ function Details({ day, record, onInspect, t }: { day: IndexedDay; record: AnyRe
             <>
               <dt>Check</dt>
               <dd>{d.verification.verifiedBy ? <>Confirmed by {link(d.verification.verifiedBy)}</> : d.verification.required ? "Closes only when a later record shows the fix" : "No check needed"}</dd>
+            </>
+          )}
+          {d.resolution && (
+            <>
+              <dt>{d.kind === "review_exception" ? "Finding" : "Outcome"}</dt>
+              <dd>
+                {TASK_OUTCOME[d.resolution.outcome]}
+                {d.resolution.note ? `. ${d.resolution.note}` : ""}
+                {d.resolution.resolvedBy ? <div className="muted">{assigneeName(d.resolution.resolvedBy)}</div> : null}
+              </dd>
             </>
           )}
           {history.length > 1 && (

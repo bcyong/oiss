@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaultKind, Injection } from "@oiss/sim";
 import { arrivedCount, clock, clockOf, disagreementsUpTo, faultSeen, groupDisagreements, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, flagsAt, incidentsUpTo, indexDay, latestObservation, latestRecord, liveSeed, nextDate, recentRecords, robotAt, shoppersAt, statusesAt, storeNow, tasksAt, zoneMetricAt, type Disagreement, type IndexedDay } from "./day.ts";
-import { assigneeName, checkoutName, duration, TASK_KIND, TASK_STATE, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
+import { assigneeName, checkoutName, duration, TASK_KIND, TASK_OUTCOME, TASK_STATE, observer, elapsed, flagDetail, flagName, humanize, itemNameAt, money, pct, STATUS_LABEL, summarize, timeOf, typeName, zoneName } from "./describe.ts";
 import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { storyBeats, type Beat } from "./story.ts";
@@ -57,7 +57,9 @@ function taskStateText(r: OissRecord<TaskData>): string {
   const d = r.data;
   if (d.state === "assigned" || d.state === "in_progress") return `${TASK_STATE[d.state]}${d.assignedTo ? `, ${assigneeName(d.assignedTo)}` : ""}`;
   if (d.state === "verified") return "Verified by a later record";
+  if (d.state === "done" && d.resolution) return `Done: ${TASK_OUTCOME[d.resolution.outcome].toLowerCase()}`;
   if (d.state === "done") return d.verification?.required ? "Done, waiting for a later record to confirm it" : "Done";
+  if (d.state === "cancelled" && d.resolution) return `Cancelled: ${TASK_OUTCOME[d.resolution.outcome].toLowerCase()}`;
   return TASK_STATE[d.state];
 }
 

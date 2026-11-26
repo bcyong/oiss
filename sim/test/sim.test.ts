@@ -289,3 +289,28 @@ test("associates work the shelf tasks assigned to them, and that work is what cl
   const idle = simulateDay({ seed: 7, date: "2026-11-17" });
   assert.ok(ground.stats.missedDollars < idle.stats.missedDollars, `${ground.stats.missedDollars} < ${idle.stats.missedDollars}`);
 });
+
+test("a cancelled task says why, and an exception review says what the reviewer found", () => {
+  type T = { kind: string; state: string; assignedTo?: string; basedOn?: string[]; resolution?: { outcome: string; resolvedBy?: string; resolvedAt?: string } };
+  const alertFor = new Map(Object.entries(day.incidentFor).map(([alert, incident]) => [incident, alert]));
+  const outcomes = new Set<string>();
+  for (const r of day.records.tasks) {
+    const d = r.data as unknown as T;
+    if (d.state === "cancelled") {
+      assert.ok(d.resolution, `${r.id} is cancelled with no reason`);
+      assert.equal(d.resolution.outcome, d.kind === "replenish" ? "no_backroom_stock" : "no_longer_needed", r.id);
+    }
+    if (d.kind === "review_exception" && d.state === "done") {
+      assert.ok(d.resolution && ["confirmed_loss", "customer_paid", "false_alarm"].includes(d.resolution.outcome), `${r.id} has no review finding`);
+      assert.ok(alertFor.has(d.basedOn![0]!), `${r.id} reviews an incident the vendor didn't send`);
+      outcomes.add(d.resolution.outcome);
+    }
+    if (d.resolution) {
+      assert.equal(d.resolution.resolvedBy, d.assignedTo, r.id);
+      assert.equal(d.resolution.resolvedAt, r.time, r.id);
+    }
+    if (d.state !== "cancelled" && !(d.kind === "review_exception" && d.state === "done")) assert.equal(d.resolution, undefined, r.id);
+  }
+  // A day this long has both real exceptions and false alerts among those reviewed.
+  assert.ok(outcomes.has("false_alarm") && (outcomes.has("confirmed_loss") || outcomes.has("customer_paid")), [...outcomes].join(", "));
+});

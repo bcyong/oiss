@@ -1,0 +1,38 @@
+{
+  "specversion": "1.0",
+  "id": "task-0002-v3",
+  "source": "urn:oiss:demo-001:task-management",
+  "type": "oiss.Task",
+  "time": "2026-11-25T14:32:00-08:00",
+  "subject": "task-0002",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/task.schema.json",
+  "datacontenttype": "application/json",
+  "oissversion": "0.1",
+  "oissstore": "demo-001",
+  "oissprivacy": "operational",
+  "data": {
+    "provenance": {
+      "system": "Demo Grocery task management",
+      "synthetic": true
+    },
+    "location": {
+      "zone": "front-end",
+      "fixture": "lane-03"
+    },
+    "kind": "review_exception",
+    "state": "done",
+    "title": "Review a possible non-scan at Lane 3",
+    "createdBy": "system:task-management",
+    "assignedTo": "team:asset-protection",
+    "basedOn": [
+      "inc-0001"
+    ],
+    "verification": {
+      "required": false
+    },
+    "resolution": {
+      "outcome": "item_returned",
+      "note": "x"
+    }
+  }
+}

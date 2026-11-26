@@ -36,8 +36,8 @@
     },
     "tasks.jsonl": {
       "records": 778,
-      "bytes": 602023,
-      "sha256": "6c31bb805ec9cd5730ae08fc547391f2ca34879534898a596fcf0c83a013f483"
+      "bytes": 616661,
+      "sha256": "d17b9c8f2ecee523eaae21f55036d97ce525bbebd778cbe3739204a45dd73ff5"
     },
     "vendor/mock-vendor-a-shelf-scans.ndjson": {
       "bytes": 1258828,

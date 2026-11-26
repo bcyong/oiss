@@ -66,7 +66,7 @@ test("shelf tags fixed after the read that flagged them aren't counted as wrong 
   assert.equal(tool("price_and_label", "shelf_tag_issues", {}, 13 * 3600).counts.wrongOnShelf, 0);
 });
 
-test("shelf gaps say where replenishment stands, including tasks cancelled with no reason given", () => {
+test("shelf gaps say where replenishment stands, with the reason a cancelled task gives and who owns each gap", () => {
   const g = tool("availability", "shelf_gaps", { status: "both", limit: 100 }, 13 * 3600);
   assert.equal(Object.values(g.replenishment as Record<string, number>).reduce((a, b) => a + b, 0), g.total);
   assert.ok(g.replenishment.cancelled > 0, "the golden day has cancelled replenishment at 1 PM");
@@ -74,10 +74,17 @@ test("shelf gaps say where replenishment stands, including tasks cancelled with 
   for (const f of g.facings) {
     if (f.replenishment.startsWith("Replenishment task cancelled")) {
       assert.equal(f.replenishmentTask.state, "Cancelled");
-      assert.match(f.replenishment, /doesn't say why/);
+      assert.equal(f.replenishmentTask.outcome, "No backroom stock");
+      assert.match(f.replenishment, /No backroom stock\. The facing needs a store order\./);
     }
-    if (f.replenishment.startsWith("No replenishment task")) assert.equal(f.replenishmentTask, undefined);
+    if (f.replenishment.startsWith("No replenishment task")) {
+      assert.equal(f.replenishmentTask, undefined);
+      // A gap with no task names the team the store routes replenishment to for that department.
+      assert.match(f.routedTo, / team$/);
+    } else assert.equal(f.routedTo, undefined);
+    if (f.replenishmentTask?.state === "Assigned") assert.match(f.replenishmentTask.assignedTo, / team$/);
   }
+  assert.match(g.answer, /cancelled \(\d+ no backroom stock\)/);
 });
 
 test("checkout incidents give the store's own review status apart from the vendor's", () => {
@@ -89,10 +96,17 @@ test("checkout incidents give the store's own review status apart from the vendo
     const task = day.byId.get(i.reviewTask.id)!.data as { kind: string; state: string; basedOn: string[] };
     assert.equal(task.kind, "review_exception");
     assert.ok(task.basedOn.includes(i.id));
-    assert.match(i.review, /don't say what the reviewer found/);
+    // The reviewer's finding comes from the review task; the vendor's incident keeps the vendor's status.
+    const finding = (day.byId.get(i.reviewTask.id)!.data as { resolution?: { outcome: string } }).resolution;
+    assert.ok(finding, `${i.reviewTask.id} has no finding`);
+    assert.match(i.review, /^Reviewed at \d+:\d+ [AP]M\. Finding: (Confirmed loss|Customer paid|False alarm)\. /);
+    assert.equal(i.reviewTask.outcome, i.review.match(/Finding: ([^.]+)/)![1]);
   }
+  for (const i of c.incidents) if (i.review.startsWith("Not reviewed yet. No review task")) assert.match(i.review, /Asset protection team/);
+  assert.equal(Object.values(c.reviewFindings as Record<string, number>).reduce((a, b) => a + b, 0), c.reviews.reviewed);
   const s = tool("availability", "store_summary");
   assert.deepEqual(s.checkoutIncidentReviews, c.reviews);
+  assert.deepEqual(s.checkoutIncidentFindings, c.reviewFindings);
 });
 
 test("the front end gives the lane count and the rule for opening another lane", () => {

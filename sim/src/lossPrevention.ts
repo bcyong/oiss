@@ -111,6 +111,8 @@ function cameraOf(ground: Ground, lane: string): string {
 export interface LossPreventionDay {
   exceptions: CheckoutException[];
   alerts: MockLpAlert[];
+  /** For each alert id, whether the exception really happened: what a person reviewing the clip would find. */
+  realByAlert: Record<string, boolean>;
   /** How the vendor did against ground truth. Not something a real store gets to see. */
   scorecard: { exceptions: number; valueNotPaid: number; alerts: number; trueAlerts: number; falseAlerts: number; missed: number };
 }
@@ -157,13 +159,16 @@ export function lossPreventionDay(ground: Ground): LossPreventionDay {
 
   raw.sort((a, b) => a.alert_ts - b.alert_ts);
   const day = ground.config.date.replaceAll("-", "");
-  const alerts = raw.map(({ truth: _truth, ...a }, i) => {
+  const realByAlert: Record<string, boolean> = {};
+  const alerts = raw.map(({ truth, ...a }, i) => {
     const alert_id = `MVB-${day}-${String(i + 1).padStart(5, "0")}`;
+    realByAlert[alert_id] = truth;
     return { alert_id, ...a, clip: { ...a.clip, uri: `clips/${alert_id}.mp4` } };
   });
   return {
     exceptions,
     alerts,
+    realByAlert,
     scorecard: {
       exceptions: exceptions.length,
       valueNotPaid: round2(exceptions.reduce((a, e) => a + e.value, 0)),

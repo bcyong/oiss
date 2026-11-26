@@ -1,5 +1,5 @@
 import { clockOf, LABEL_SOURCE_SUFFIX, ROBOT_SOURCE_SUFFIX, type IndexedDay } from "./day.ts";
-import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, TaskData, TaskKind, TaskState, ZoneMetricData } from "./oiss.ts";
+import type { AnyRecord, EvidenceData, IncidentData, OissRecord, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, TaskData, TaskKind, TaskOutcome, TaskState, ZoneMetricData } from "./oiss.ts";
 
 export const STATUS_LABEL: Record<ShelfStatus | "none", string> = {
   in_stock: "In stock",
@@ -110,6 +110,18 @@ export const TASK_STATE: Record<TaskState, string> = {
   done: "Done",
   verified: "Verified",
   cancelled: "Cancelled",
+};
+
+/** How a task ended: the reason it was cancelled, or the loss prevention disposition of a review. */
+export const TASK_OUTCOME: Record<TaskOutcome, string> = {
+  duplicate: "Duplicate",
+  resolved_elsewhere: "Resolved elsewhere",
+  no_backroom_stock: "No backroom stock",
+  no_longer_needed: "No longer needed",
+  confirmed_loss: "Confirmed loss",
+  customer_paid: "Customer paid",
+  false_alarm: "False alarm",
+  other: "Other",
 };
 
 /** Who a task is assigned to or raised by, such as "Dairy team" for team:dairy. */
