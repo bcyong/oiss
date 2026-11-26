@@ -10,6 +10,9 @@ export { tourSeen } from "./tourSteps.ts";
 export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose: () => void; onStory: () => void; onMore: (open: boolean) => void; steps?: TourStep[] }) {
   const [i, setI] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
+  // A part can mount a frame or two late (the More menu opens when its step starts), so wait for it before showing
+  // anything. Only if it never turns up does the card fall back to the middle of the screen.
+  const [gaveUp, setGaveUp] = useState(false);
   const [cardSize, setCardSize] = useState({ w: CARD_W, h: 220 });
   const [view, setView] = useState({ w: window.innerWidth, h: window.innerHeight });
   const card = useRef<HTMLDivElement>(null);
@@ -29,13 +32,27 @@ export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose
     onMore(!!step.opensMore);
   }, [step.opensMore, onMore]);
 
-  // Bring the part into view, then ring it. On phones the page scrolls, so wait for the scroll to settle.
+  // Bring the part into view, then ring it. On phones the page scrolls, so measure again once the scroll settles.
   useLayoutEffect(() => {
-    const el = document.querySelector(step.target);
-    if (el && window.innerWidth <= 960) el.scrollIntoView({ block: "center" });
-    measure();
-    const t = setTimeout(measure, 350);
-    return () => clearTimeout(t);
+    setBox(null);
+    setGaveUp(false);
+    let frame = 0;
+    let raf = 0;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const find = () => {
+      const el = document.querySelector(step.target);
+      if (el) {
+        if (window.innerWidth <= 960) el.scrollIntoView({ block: "center" });
+        measure();
+        t = setTimeout(measure, 350);
+      } else if (++frame < 30) raf = requestAnimationFrame(find);
+      else setGaveUp(true);
+    };
+    find();
+    return () => {
+      cancelAnimationFrame(raf);
+      if (t) clearTimeout(t);
+    };
   }, [step.target, measure]);
 
   useEffect(() => {
@@ -73,12 +90,15 @@ export function Tour({ onClose, onStory, onMore, steps = TOUR_STEPS }: { onClose
 
   const pad = 6;
   const ring: CSSProperties | undefined = box ? { top: box.top - pad, left: box.left - pad, width: box.width + 2 * pad, height: box.height + 2 * pad } : undefined;
-  const cardStyle = box ? place(box, cardSize, view.w, view.h) : { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
+  const waiting = !box && !gaveUp;
+  const cardStyle: CSSProperties = box
+    ? place(box, cardSize, view.w, view.h)
+    : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", visibility: waiting ? "hidden" : undefined };
 
   return (
     <div className="tour">
       <div className="tour-block" onClick={(e) => e.stopPropagation()} />
-      {ring ? <div key={`ring-${i}`} className="tour-ring" style={ring} /> : <div key="dim" className="tour-dim" />}
+      {ring ? <div key={`ring-${i}`} className="tour-ring" style={ring} /> : !waiting && <div key="dim" className="tour-dim" />}
       <div ref={card} className="tour-card" style={cardStyle} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text" tabIndex={-1}>
         <p className="tour-count">
           {i + 1} of {steps.length}
