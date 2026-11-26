@@ -7,10 +7,10 @@ import { inline, renderMarkdown, slug, tocHtml } from "../site/markdown.ts";
 
 const repo = resolve(import.meta.dirname, "../..");
 
-test("the header has RFC and Demo on the left and GitHub on the right, all on the site", () => {
+test("the header has RFC, Schemas and Demo on the left and GitHub on the right, all on the site", () => {
   const html = siteHeader("/demo/index.html", "#root");
   const nav = /<nav aria-label="Main">([\s\S]*?)<\/nav>/.exec(html)![1]!;
-  assert.deepEqual([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["RFC", "Demo"]);
+  assert.deepEqual([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["RFC", "Schemas", "Demo"]);
   assert.match(html.split("</nav>")[1]!, /class="topbar-gh" href="\/github\/"[^>]*>GitHub</);
   for (const [, href] of html.matchAll(/href="([^"]+)"/g)) assert.match(href!, /^[/#]/, `${href} leaves the site`);
   assert.match(html, /href="\/demo\/" aria-current="page"/);
@@ -23,7 +23,7 @@ test("each page knows which header link is its own", () => {
   assert.equal(pageOf("/github/"), "github");
   assert.match(siteHeader("/rfc/index.html"), /href="\/rfc\/" aria-current="page"/);
   assert.match(siteHeader("/github/index.html"), /href="\/github\/" aria-current="page"/);
-  assert.doesNotMatch(siteHeader("/spec/index.html"), /aria-current/);
+  assert.match(siteHeader("/spec/index.html"), /href="\/spec\/" aria-current="page"/);
 });
 
 test("the footer links stay on the site", () => {

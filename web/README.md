@@ -1,6 +1,6 @@
 # Web app
 
-The public site, deployed to Netlify from this repository (see [deploy-netlify.md](../docs/deploy-netlify.md)). Every page shares one header, with RFC and Demo on the left and GitHub on the right, and no header link leaves the site. The header and footer live in [`site/layout.ts`](site/layout.ts), and a Vite plugin, [`site/plugin.ts`](site/plugin.ts), puts them into each page at build time.
+The public site, deployed to Netlify from this repository (see [deploy-netlify.md](../docs/deploy-netlify.md)). Every page shares one header, with RFC, Schemas and Demo on the left and GitHub on the right, and no header link leaves the site. The header and footer live in [`site/layout.ts`](site/layout.ts), and a Vite plugin, [`site/plugin.ts`](site/plugin.ts), puts them into each page at build time.
 
 - **`/`**: the OISS landing page, laid out like a blueprint card: overview, architecture diagram, key features, record types, what adoption takes, software used, ethical considerations and license. Plain HTML and CSS in [`index.html`](index.html) and [`src/landing.css`](src/landing.css).
 - **`/demo/`**: the demo store, built with React and SVG. It reads only OISS records and the retailer's item master, the same way any OISS consumer would.

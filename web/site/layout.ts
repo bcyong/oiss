@@ -6,6 +6,7 @@
 
 export const NAV = [
   { href: "/rfc/", label: "RFC", page: "rfc" },
+  { href: "/spec/", label: "Schemas", page: "spec" },
   { href: "/demo/", label: "Demo", page: "demo" },
 ] as const;
 export const GITHUB = { href: "/github/", label: "GitHub", page: "github" } as const;
@@ -21,7 +22,7 @@ const current = (page: string, here: string) => (page === here ? ' aria-current=
 const LOGO =
   '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1.5" /><rect class="cut" x="4" y="6" width="2" height="5" /><rect class="cut" x="7" y="6" width="2" height="5" /><rect class="cut" x="10" y="6" width="2" height="5" /></svg>';
 
-/** The site header: the OISS mark, RFC and Demo on the left, GitHub on the right. */
+/** The site header: the OISS mark, RFC, Schemas and Demo on the left, GitHub on the right. */
 export function siteHeader(path: string, skipTo = "#main-content"): string {
   const here = pageOf(path);
   return [
