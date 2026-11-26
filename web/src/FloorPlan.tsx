@@ -1,4 +1,4 @@
-import { memo, useCallback, type CSSProperties, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { IndexedDay, RobotAt, ShopperDot } from "./day.ts";
 import type { Camera, Point, ShelfStatus } from "./oiss.ts";
 
@@ -137,11 +137,13 @@ interface Props {
   taskMarks?: number[];
   selection: Selection | null;
   onSelect: (s: Selection | null) => void;
+  /** Overlays drawn over the map, like the key. */
+  children?: ReactNode;
 }
 
 const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(" ");
 
-export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, taskMarks, selection, onSelect }: Props) {
+export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queues, showCameras, onToggleCameras, incidents, robot, taskMarks, selection, onSelect, children }: Props) {
   const { width, depth } = day.layout.store.floor;
   const full = useMemo(() => ({ x: -1, y: -1, w: width + 2, h: depth + 2 }), [width, depth]);
   const home: View = useMemo(() => ({ k: 1, cx: full.x + full.w / 2, cy: full.y + full.h / 2 }), [full]);
@@ -231,7 +233,9 @@ export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queue
       svg.setPointerCapture(e.pointerId);
     }
     if (gesture.current.moved && view.k > 1) {
-      const scale = w / svg.getBoundingClientRect().width;
+      // The plan keeps its shape inside its box, so the drawn plan may be narrower or shorter than the box.
+      const box = svg.getBoundingClientRect();
+      const scale = Math.max(w / box.width, h / box.height);
       const dx = (e.clientX - prev.x) * scale;
       const dy = (e.clientY - prev.y) * scale;
       setView((v) => clamp({ ...v, cx: v.cx - dx, cy: v.cy - dy }));
@@ -370,6 +374,7 @@ export function FloorPlan({ day, statuses, flagged, zoneDensity, shoppers, queue
         </button>
       </div>
       {view.k > 1 && <span className="zoom-level">{Math.round(view.k * 100)}%</span>}
+      {children}
     </div>
   );
 }

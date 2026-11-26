@@ -24,7 +24,22 @@ const STREAM_TYPES = ["oiss.ShelfObservation", "oiss.ZoneMetric", "oiss.ShopperP
 /** An incident marker stays bright for this long after the alert arrives. */
 const RECENT_INCIDENT = 15 * 60;
 
-export type Tab = "story" | "assistant" | "now" | "tasks" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
+/** What the drawer over the right column shows. Floor plan, time bar, summary and tasks stay on screen underneath it. */
+export type Panel = "detail" | "assistant" | "story" | "faults" | "disagreements" | "stream" | "sources" | "vendors";
+
+const PANEL_TITLE: Record<Panel, string> = {
+  detail: "Details",
+  assistant: "Ask the store",
+  story: "The day's story",
+  faults: "Shelf faults",
+  disagreements: "Vendor disagreements",
+  stream: "Record stream",
+  sources: "Sources",
+  vendors: "Vendors",
+};
+
+/** Secondary views, reached from the header's More menu. */
+const MORE_PANELS: Panel[] = ["story", "disagreements", "faults", "stream", "sources", "vendors"];
 
 /** A task still waiting on the store team. */
 const OPEN_STATES: TaskState[] = ["open", "assigned", "in_progress"];
@@ -87,7 +102,7 @@ export interface AppStart {
   t?: number;
   selection?: Selection;
   pinned?: string;
-  tab?: Tab;
+  panel?: Panel;
   showCameras?: boolean;
   /** Source systems switched off. */
   off?: string[];
@@ -109,7 +124,14 @@ export function App({ start }: { start?: AppStart } = {}) {
   /** A record the visitor picked. Without one, the inspector follows the selection's latest record. */
   const [pinned, setPinned] = useState<string | null>(start?.pinned ?? null);
   const [showCameras, setShowCameras] = useState(start?.showCameras ?? true);
-  const [tab, setTab] = useState<Tab>(start?.tab ?? "story");
+  const [panel, setPanel] = useState<Panel | null>(start?.panel ?? null);
+  /** The view to go back to after inspecting a record from it. */
+  const [back, setBack] = useState<Panel | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const [keyOpen, setKeyOpen] = useState(() => typeof window === "undefined" || !window.matchMedia?.("(max-width: 960px)").matches);
+  /** The store's clock now, for Live: the slider stops here. */
+  const [nowClock, setNowClock] = useState<number | null>(null);
   const [streamType, setStreamType] = useState<string>("");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("open");
   /** The conversation with the Store Operations Assistant, kept while the visitor switches tabs. A new day starts a new one. */
@@ -125,6 +147,29 @@ export function App({ start }: { start?: AppStart } = {}) {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [moreOpen]);
+
+  // Live: keep the store's clock, so the slider can't run past now.
+  useEffect(() => {
+    if (!live || !base) return;
+    const tick = () => setNowClock(storeNow(base.layout.store.timezone).t);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [live, base]);
+
   // Playback: advance the store clock with the animation frame.
   const last = useRef<number | null>(null);
   useEffect(() => {
@@ -134,7 +179,8 @@ export function App({ start }: { start?: AppStart } = {}) {
       const dt = last.current === null ? 0 : (now - last.current) / 1000;
       last.current = now;
       setT((prev) => {
-        const next = prev + dt * speed;
+        let next = prev + dt * speed;
+        if (live && nowClock !== null && next > nowClock && nowClock < day.close) next = Math.max(prev, nowClock);
         if (next >= day.close) {
           if (!live) setPlaying(false);
           return day.close;
@@ -148,7 +194,7 @@ export function App({ start }: { start?: AppStart } = {}) {
       cancelAnimationFrame(raf);
       last.current = null;
     };
-  }, [playing, speed, day, live]);
+  }, [playing, speed, day, live, nowClock]);
 
   // A live store doesn't stop at close: the next day starts at opening.
   useEffect(() => {
@@ -247,17 +293,50 @@ export function App({ start }: { start?: AppStart } = {}) {
   if (error) return <main className="message">{error}</main>;
   if (!day) return <main className="message">Loading the store day…</main>;
 
+  const openPanel = (p: Panel) => {
+    setMoreOpen(false);
+    setBack(null);
+    if (p !== "detail") {
+      setSelection(null);
+      setPinned(null);
+    }
+    setPanel((cur) => (cur === p && p !== "detail" ? null : p));
+  };
+  const closePanel = () => {
+    setPanel(null);
+    setBack(null);
+    setSelection(null);
+    setPinned(null);
+  };
+  // Picking something on the floor plan shows its details, except while choosing a facing for a shelf fault.
   const select = (s: Selection | null) => {
     setSelection(s);
     setPinned(null);
+    if (panel === "faults") return;
+    if (s) {
+      if (panel !== "detail") setBack(null);
+      setPanel("detail");
+    } else if (panel === "detail") {
+      setPanel(null);
+      setBack(null);
+    }
   };
+  // Opening a record from another view keeps a way back to it.
   const inspect = (id: string) => {
     const r = day.byId.get(id);
     if (!r) return;
     setPinned(id);
     const s = selectionFor(day, r);
-    if (s) setSelection(s);
+    setSelection(s);
+    if (panel && panel !== "detail") setBack(panel);
+    setPanel("detail");
   };
+  const nowT = Math.min(Math.max(nowClock ?? t, day.open), day.close);
+  const seek = (x: number) => {
+    setT(live ? Math.min(x, nowT) : x);
+  };
+  const dayName = new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  const storyBeatsSoFar = live ? beats.filter((b) => b.t <= nowT) : beats;
 
   const counts = { in_stock: 0, low_stock: 0, out_of_stock: 0, unknown: 0, none: 0 };
   for (const s of statuses) counts[s]++;
@@ -277,7 +356,7 @@ export function App({ start }: { start?: AppStart } = {}) {
     if (st === "done" || st === "verified" || st === "cancelled") taskCounts[st]++;
   }
   const shownTasks = taskList.filter((x) => (taskFilter === "all" ? true : taskFilter === "open" ? isOpenTask(x.latest) : !isOpenTask(x.latest)));
-  const taskMarks = tab === "tasks" ? [...new Set(openTasks.map((x) => day.facingById.get(x.latest.data.location.facing ?? "")).filter((i): i is number => i !== undefined))] : undefined;
+  const taskMarks = [...new Set(openTasks.map((x) => day.facingById.get(x.latest.data.location.facing ?? "")).filter((i): i is number => i !== undefined))];
   // Tasks about the thing picked on the floor plan, as they stood at t.
   const selectionTasks = !selection
     ? []
@@ -288,12 +367,14 @@ export function App({ start }: { start?: AppStart } = {}) {
         if (selection.kind === "zone") return !loc.facing && !loc.fixture && loc.zone === selection.id;
         return false;
       });
+  // A story moment: stop at it and show its record, with a way back to the story.
   const showBeat = (b: Beat) => {
     setPlaying(false);
-    setLive(false);
     setT(b.t);
     setSelection(b.selection);
     setPinned(b.record.id);
+    setBack("story");
+    setPanel("detail");
   };
 
   // Each source system is one feed the visitor can switch off. The store layout is the frame every
@@ -330,8 +411,28 @@ export function App({ start }: { start?: AppStart } = {}) {
       .finally(() => setBusy(false));
   };
 
+  // Sample day: back to the fixed day everyone sees, at 9:00 AM.
+  const goSample = () => {
+    if (!live && day.files.origin === "golden") return;
+    setBusy(true);
+    setPlaying(false);
+    loadGoldenDay()
+      .then((files) => {
+        setLive(false);
+        setSelection(null);
+        setPinned(null);
+        if (panel === "detail") setPanel(null);
+        setDay(indexDay(files));
+        setT(9 * 3600);
+        setSpeed(300);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+
   // Live: today's store day, the same for everyone watching, from the store's clock now.
   const goLive = () => {
+    if (live) return;
     const now = storeNow(day.layout.store.timezone);
     setBusy(true);
     setPlaying(false);
@@ -340,6 +441,8 @@ export function App({ start }: { start?: AppStart } = {}) {
         const next = indexDay(files);
         setSelection(null);
         setPinned(null);
+        if (panel === "detail") setPanel(null);
+        setNowClock(now.t);
         setDay(next);
         setT(Math.min(Math.max(now.t, next.open), next.close));
         setSpeed(1);
@@ -565,36 +668,67 @@ export function App({ start }: { start?: AppStart } = {}) {
 
   const stream = recentRecords(day, t, 14, streamType || undefined);
 
+  const newest = recentRecords(day, t, 1)[0];
+  const panelTitle = panel === "detail" ? "Details" : panel ? PANEL_TITLE[panel] : "";
+
   return (
     <div className="app">
-      <header>
-        <div>
+      <header className="demo-head">
+        <div className="title">
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
-            A synthetic grocery day{live ? " running live" : ""}, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, {live ? "simulated" : "replayed"} only from{" "}
-            <a href="/spec/">OISS</a> records sent by Vendor A's shelf-scanning robot, in-house shelf cameras, Vendor B's checkout loss prevention, Vendor C's people counting and Vendor D's electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
+            {live
+              ? "Today's store day, simulated live in your browser on the store's own clock"
+              : day.files.origin === "golden"
+                ? `A sample grocery day, ${dayName}`
+                : `Another simulated grocery day, ${dayName}`}
+            {injectedCount}, told only through <a href="/spec/">OISS</a> records from four vendors. Tap anything on the map to see the records behind it.
           </p>
         </div>
-        <div className="day-source">
-          <span>
-            {live ? "Today, live" : day.files.origin === "golden" ? "Golden day" : `Simulated in your browser in ${((day.files.simulatedInMs ?? 0) / 1000).toFixed(1)} s`}, seed {day.files.seed}
-            {injectedCount}
-          </span>
-          <div className="day-buttons">
-            <button type="button" onClick={goLive} disabled={busy || live}>
-              {live ? "Live" : "Go live"}
+        <div className="head-controls">
+          <div className="mode" role="group" aria-label="Which store day">
+            <button type="button" aria-pressed={!live} onClick={goSample} disabled={busy}>
+              Sample day
             </button>
-            <button type="button" onClick={runNewDay} disabled={busy}>
-              {busy ? "Simulating…" : "Simulate another day"}
+            <button type="button" aria-pressed={live} onClick={goLive} disabled={busy}>
+              Live
             </button>
           </div>
+          <div className="more" ref={moreRef}>
+            <button type="button" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+              More
+            </button>
+            {moreOpen && (
+              <div className="menu" role="menu">
+                {MORE_PANELS.map((x) => (
+                  <button key={x} type="button" role="menuitem" aria-current={panel === x ? "true" : undefined} onClick={() => openPanel(x)}>
+                    {PANEL_TITLE[x]}
+                    {x === "disagreements" && disputes.length ? ` (${disputes.length})` : ""}
+                  </button>
+                ))}
+                <hr />
+                <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); runNewDay(); }} disabled={busy}>
+                  {busy ? "Simulating…" : "Simulate another day"}
+                </button>
+                <p className="menu-note">Seed {day.files.seed}{day.files.origin === "golden" ? ", the sample day" : day.files.simulatedInMs ? `, simulated in ${(day.files.simulatedInMs / 1000).toFixed(1)} s` : ""}</p>
+              </div>
+            )}
+          </div>
+          <button type="button" className="ask-button" aria-pressed={panel === "assistant"} onClick={() => openPanel("assistant")}>
+            Ask the store
+          </button>
         </div>
       </header>
 
-      <div className="layout">
+      <div className="stage">
         <section className="map" aria-label="Store floor plan">
-          <FloorPlan day={day} statuses={statuses} flagged={flagged} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} taskMarks={taskMarks} selection={selection} onSelect={select} />
-          <div className="legend">
+          <FloorPlan day={day} statuses={statuses} flagged={flagged} zoneDensity={zoneDensity} shoppers={shoppers} queues={queues} showCameras={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} incidents={incidentMarks} robot={robot} taskMarks={taskMarks} selection={selection} onSelect={select}>
+            <div className={`key${keyOpen ? " open" : ""}`}>
+              <button type="button" className="key-toggle" aria-expanded={keyOpen} onClick={() => setKeyOpen((o) => !o)}>
+                {keyOpen ? "Hide key" : "Key"}
+              </button>
+              {keyOpen && (
+                <div className="legend">
             {(["in_stock", "low_stock", "out_of_stock", "unknown", "none"] as const).map((s) => (
               <span key={s}>
                 <i className={`swatch s-${s}`} />
@@ -621,146 +755,61 @@ export function App({ start }: { start?: AppStart } = {}) {
               <i className="swatch robot-swatch" />
               Robot and its route
             </span>
-            {taskMarks && (
+            {taskMarks.length > 0 && (
               <span>
                 <i className="swatch task-swatch" />
                 Open store task
               </span>
             )}
           </div>
-          <Timeline day={day} t={t} onSeek={setT} />
+              )}
+            </div>
+          </FloorPlan>
+        </section>
+
+        <section className="timebar" aria-label="Time">
           <div className="playback">
             <button type="button" className="play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
               {playing ? "❚❚" : "▶"}
             </button>
             <span className="clock">{clock(t)}</span>
-            {live && <span className={`live-pill${speed === 1 ? "" : " fast"}`}>{speed === 1 ? "Live" : "Continuous"}</span>}
-            <input type="range" min={day.open} max={day.close} step={1} value={t} onChange={(e) => setT(Number(e.target.value))} aria-label="Time of day" />
-            <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Playback speed">
-              {SPEEDS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            {live ? (
+              t < nowT - 60 ? (
+                <button type="button" className="now-button" onClick={() => { setT(nowT); setPlaying(true); }}>
+                  Back to now
+                </button>
+              ) : (
+                <span className="live-pill">Live</span>
+              )
+            ) : (
+              <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Playback speed">
+                {SPEEDS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
-          <p className="note">
-            {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")} records have arrived by {clock(t)}. Pinch or hold ctrl or cmd and scroll to zoom, drag to move around, and press the corners button to see the whole store.
-          </p>
+          <Timeline day={day} t={t} onSeek={seek} limit={live ? nowT : undefined} />
+          <button type="button" className="ticker" onClick={() => openPanel("stream")} aria-label="Open the record stream">
+            <span className="ticker-label">Arriving as OISS</span>
+            {newest ? (
+              <span className="ticker-record" key={newest.id}>
+                <span className="time">{timeOf(day, newest)}</span> <span className="type">{typeName(newest.type)}</span> {summarize(day, newest)}
+              </span>
+            ) : (
+              <span className="ticker-record muted">No records yet</span>
+            )}
+            <span className="ticker-count">
+              {arrived.toLocaleString("en-US")} of {total.toLocaleString("en-US")}
+            </span>
+          </button>
         </section>
 
-        <aside>
-          {selectionCard ? (
-            <section className="card">
-              <div className="card-head">
-                <div>{selectionCard}</div>
-                <button type="button" className="close" onClick={() => select(null)} aria-label="Close">
-                  ×
-                </button>
-              </div>
-              {selectionTasks.length > 0 && (
-                <>
-                  <h3>Store tasks here</h3>
-                  <ul className="records">
-                    {selectionTasks.slice(0, 4).map(({ view, latest }) => (
-                      <li key={view.subject}>
-                        <button type="button" className={latest.id === shown?.id ? "current" : undefined} onClick={() => inspect(latest.id)}>
-                          <span className="time">{timeOf(day, view.versions[0]!)}</span>
-                          <span>
-                            {latest.data.title}
-                            <span className={`task-state state-${latest.data.state}`}>{taskStateText(latest)}</span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {selectionTasks.length > 4 && <p className="note">and {selectionTasks.length - 4} earlier</p>}
-                </>
-              )}
-              {related.length > 1 && (
-                <>
-                  <h3>Records so far today</h3>
-                  <ul className="records">
-                    {related.slice(0, 6).map((r) => (
-                      <li key={r.id}>
-                        <button type="button" className={r.id === shown?.id ? "current" : undefined} onClick={() => inspect(r.id)}>
-                          <span className="time">{timeOf(day, r)}</span>
-                          <span>{summarize(day, r)}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {related.length > 6 && <p className="note">and {related.length - 6} earlier</p>}
-                </>
-              )}
-            </section>
-          ) : (
-            !pinnedRecord && <p className="hint">Tap a shelf facing, a zone, a shopper, the robot, a checkout incident or a camera to see the OISS records behind it, or pick a record from the stream.</p>
-          )}
-
-          {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord ? () => setPinned(null) : undefined} t={t} />}
-
-          <section className="card">
-            <div className="tabs" role="tablist">
-              <button type="button" role="tab" aria-selected={tab === "story"} onClick={() => setTab("story")}>
-                Story
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "assistant"} onClick={() => setTab("assistant")}>
-                Ask the store
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "now"} onClick={() => setTab("now")}>
-                At {clock(t)}
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "tasks"} onClick={() => setTab("tasks")}>
-                Tasks{openTasks.length ? ` (${openTasks.length})` : ""}
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "faults"} onClick={() => setTab("faults")}>
-                Shelf faults
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "disagreements"} onClick={() => setTab("disagreements")}>
-                Disagreements{disputes.length ? ` (${disputes.length})` : ""}
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "stream"} onClick={() => setTab("stream")}>
-                Record stream
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "sources"} onClick={() => setTab("sources")}>
-                Sources
-              </button>
-              <button type="button" role="tab" aria-selected={tab === "vendors"} onClick={() => setTab("vendors")}>
-                Vendors
-              </button>
-            </div>
-
-            {tab === "story" && (
-              <>
-                <p className="note top">Four moments from this store day that a store team would act on, each found in the day's OISS records. Tap one to jump there.</p>
-                {beats.length ? (
-                  <ol className="beats">
-                    {beats.map((b, i) => (
-                      <li key={b.id} className={shown?.id === b.record.id ? "current" : undefined}>
-                        <button type="button" onClick={() => showBeat(b)}>
-                          <span className="step">{i + 1}</span>
-                          <span>
-                            <span className="beat-title">
-                              {b.title} <span className="time">{clock(b.t)}</span>
-                            </span>
-                            <span className="beat-what">{b.what}</span>
-                            <span className="beat-why">{b.why}</span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="note">None of the story's moments are in the feeds that are on.</p>
-                )}
-              </>
-            )}
-
-            {tab === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} />}
-
-            {tab === "now" && (
-              <>
+        <aside className="side">
+          <section className="card summary">
+                <h2>At {clock(t)}</h2>
                 <div className="kpis">
                   <div>
                     <b>{known ? pct((counts.in_stock + counts.low_stock) / known) : "–"}</b>
@@ -805,23 +854,23 @@ export function App({ start }: { start?: AppStart } = {}) {
                     <span>{robot ? `Robot, ${robot.stop - robot.run.first + 1} of ${robot.run.last - robot.run.first + 1} bay positions` : nextRun ? "Robot's next scan run" : "Robot's scan runs for today"}</span>
                   </div>
                 </div>
-                <p className="note">
-                  {known} of {day.facings.length} facings observed so far. Front-end figures are from the last 15-minute ZoneMetric.
-                </p>
-              </>
-            )}
-
-            {tab === "tasks" && (
-              <>
-                <p className="note top">
-                  The store's task management system raises a Task when the records call for work and assigns it to a team, whose associate fills the shelf, clears the go-back or fixes the tag. It closes the task when a later record shows the fix, such as the next shelf scan. Every status change is its own OISS record, so any vendor or agent can follow the work. Open tasks are circled on the floor plan.
-                </p>
+                <p className="note">{known} of {day.facings.length} facings observed so far. Front-end figures are from the last 15-minute ZoneMetric.</p>
+          </section>
+          <section className="card tasks">
+                <div className="task-head">
+                  <h2>Store tasks</h2>
+                  <select className="filter" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value as TaskFilter)} aria-label="Which tasks">
+                    <option value="open">Open</option>
+                    <option value="closed">Done, verified and cancelled</option>
+                    <option value="all">All so far</option>
+                  </select>
+                </div>
                 <div className="task-summary">
                   <span>
                     <b>{taskCounts.open}</b> open
                   </span>
                   <span>
-                    <b>{taskCounts.done}</b> done, waiting for a check
+                    <b>{taskCounts.done}</b> done, to verify
                   </span>
                   <span>
                     <b>{taskCounts.verified}</b> verified
@@ -830,13 +879,8 @@ export function App({ start }: { start?: AppStart } = {}) {
                     <b>{taskCounts.cancelled}</b> cancelled
                   </span>
                 </div>
-                <select className="filter" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value as TaskFilter)} aria-label="Which tasks">
-                  <option value="open">Open tasks</option>
-                  <option value="closed">Done, verified and cancelled</option>
-                  <option value="all">All tasks so far</option>
-                </select>
                 {shownTasks.length ? (
-                  <ul className="records">
+                  <ul className="records task-list">
                     {shownTasks.slice(0, 60).map(({ view, latest, changed }) => (
                       <li key={view.subject}>
                         <button type="button" className={shown?.type === "oiss.Task" && shown.subject === view.subject ? "current" : undefined} onClick={() => inspect(latest.id)}>
@@ -853,11 +897,96 @@ export function App({ start }: { start?: AppStart } = {}) {
                   <p className="note">{taskList.length ? "None of these yet." : off.size ? `No tasks by ${clock(t)} from the feeds that are on.` : `No tasks by ${clock(t)}.`}</p>
                 )}
                 {shownTasks.length > 60 && <p className="note">and {shownTasks.length - 60} more</p>}
-              </>
-            )}
+          </section>
 
-            {tab === "faults" && (
-              <>
+          {panel && (
+            <section className="drawer" aria-label={panelTitle}>
+              <div className="drawer-head">
+                {panel === "detail" && back ? (
+                  <button type="button" className="back" onClick={() => { setPanel(back); setBack(null); setPinned(null); }}>
+                    ← {PANEL_TITLE[back]}
+                  </button>
+                ) : (
+                  <h2>{panelTitle}</h2>
+                )}
+                <button type="button" className="close" onClick={closePanel} aria-label="Close">
+                  ×
+                </button>
+              </div>
+              <div className="drawer-body">
+                {panel === "detail" && (
+                  <>
+                    {selectionCard && (
+                      <div className="selection">
+                        {selectionCard}
+                        {selectionTasks.length > 0 && (
+                <>
+                  <h3>Store tasks here</h3>
+                  <ul className="records">
+                    {selectionTasks.slice(0, 4).map(({ view, latest }) => (
+                      <li key={view.subject}>
+                        <button type="button" className={latest.id === shown?.id ? "current" : undefined} onClick={() => inspect(latest.id)}>
+                          <span className="time">{timeOf(day, view.versions[0]!)}</span>
+                          <span>
+                            {latest.data.title}
+                            <span className={`task-state state-${latest.data.state}`}>{taskStateText(latest)}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {selectionTasks.length > 4 && <p className="note">and {selectionTasks.length - 4} earlier</p>}
+                </>
+              )}
+              {related.length > 1 && (
+                <>
+                  <h3>Records so far today</h3>
+                  <ul className="records">
+                    {related.slice(0, 6).map((r) => (
+                      <li key={r.id}>
+                        <button type="button" className={r.id === shown?.id ? "current" : undefined} onClick={() => inspect(r.id)}>
+                          <span className="time">{timeOf(day, r)}</span>
+                          <span>{summarize(day, r)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {related.length > 6 && <p className="note">and {related.length - 6} earlier</p>}
+                </>
+              )}
+                      </div>
+                    )}
+                    {shown && <Inspector key={shown.id} day={day} record={shown} onInspect={inspect} following={!pinnedRecord} onClose={pinnedRecord && selectionCard ? () => setPinned(null) : undefined} t={t} />}
+                  </>
+                )}
+                {panel === "assistant" && <AssistantPanel day={day} t={t} onInspect={inspect} entries={chat} setEntries={setChat} />}
+                {panel === "story" && (
+                  <>
+                <p className="note top">Four moments from this store day that a store team would act on, each found in the day's OISS records. Tap one to jump there.</p>
+                {storyBeatsSoFar.length ? (
+                  <ol className="beats">
+                    {storyBeatsSoFar.map((b, i) => (
+                      <li key={b.id} className={shown?.id === b.record.id ? "current" : undefined}>
+                        <button type="button" onClick={() => showBeat(b)}>
+                          <span className="step">{i + 1}</span>
+                          <span>
+                            <span className="beat-title">
+                              {b.title} <span className="time">{clock(b.t)}</span>
+                            </span>
+                            <span className="beat-what">{b.what}</span>
+                            <span className="beat-why">{b.why}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="note">{live && beats.length ? "None of today's story has happened yet." : "None of the story's moments are in the feeds that are on."}</p>
+                )}
+              </>
+                )}
+                {panel === "faults" && (
+                  <>
                 <p className="note top">
                   Make something go wrong at {clock(t)}, then play on to see whether the robot or the shelf cameras report it. Every record sent before {clock(t)} stays exactly the same. The day already has its own go-backs, wrong tags and phantom inventory, as any store does.
                 </p>
@@ -916,10 +1045,9 @@ export function App({ start }: { start?: AppStart } = {}) {
                   </>
                 )}
               </>
-            )}
-
-            {tab === "disagreements" && (
-              <>
+                )}
+                {panel === "disagreements" && (
+                  <>
                 <p className="note top">
                   Where two systems watching the same shelf don't agree, someone should look. Each robot pass is checked against what the shelf cameras and the shelf labels last reported for that facing. OISS makes this a simple comparison, because every vendor reports the same facing ids in the same format.
                 </p>
@@ -950,10 +1078,9 @@ export function App({ start }: { start?: AppStart } = {}) {
                   </p>
                 )}
               </>
-            )}
-
-            {tab === "stream" && (
-              <>
+                )}
+                {panel === "stream" && (
+                  <>
                 <select className="filter" value={streamType} onChange={(e) => setStreamType(e.target.value)} aria-label="Record type">
                   <option value="">All record types</option>
                   {STREAM_TYPES.map((ty) => (
@@ -976,29 +1103,9 @@ export function App({ start }: { start?: AppStart } = {}) {
                 </ul>
                 <p className="note">The newest records at {clock(t)}, newest first. Pause playback to read them.</p>
               </>
-            )}
-
-            {tab === "vendors" && (
-              <>
-                <p className="note top">The vendors are made up, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
-                <div className="vendors">
-                  {VENDORS.map((v) => (
-                    <section key={v.name}>
-                      <h3>
-                        {v.name} <span className="vendor">{v.kind}</span>
-                      </h3>
-                      {v.about.map((p, i) => (
-                        <p key={i}>{p}</p>
-                      ))}
-                      <p className="feeds-of">Feeds in this demo: {v.systems.join(", ")}</p>
-                    </section>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {tab === "sources" && (
-              <>
+                )}
+                {panel === "sources" && (
+                  <>
                 <p className="note top">Switch a feed off to see what the store would know without it. Counts are for the whole day. Vendors describes who sends each feed.</p>
                 <table className="feeds">
                   <thead>
@@ -1039,8 +1146,28 @@ export function App({ start }: { start?: AppStart } = {}) {
                   {total.toLocaleString("en-US")} records {off.size ? "from the feeds that are on" : "from every feed"}, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.
                 </p>
               </>
-            )}
-          </section>
+                )}
+                {panel === "vendors" && (
+                  <>
+                <p className="note top">The vendors are made up, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
+                <div className="vendors">
+                  {VENDORS.map((v) => (
+                    <section key={v.name}>
+                      <h3>
+                        {v.name} <span className="vendor">{v.kind}</span>
+                      </h3>
+                      {v.about.map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                      <p className="feeds-of">Feeds in this demo: {v.systems.join(", ")}</p>
+                    </section>
+                  ))}
+                </div>
+              </>
+                )}
+              </div>
+            </section>
+          )}
         </aside>
       </div>
     </div>
