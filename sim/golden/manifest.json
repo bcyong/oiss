@@ -11,8 +11,8 @@
     },
     "shelf-observations.jsonl": {
       "records": 7612,
-      "bytes": 7543193,
-      "sha256": "b8ca7b758356bccfff42d2adf6e594a0f15c748cee957f166f49e5d18b62414b"
+      "bytes": 7543188,
+      "sha256": "5bf88e769bb00b68a545fbc9400e71c41c9e695d3c10c11ab41210bdfc9027c1"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
@@ -47,8 +47,8 @@
       "sha256": "2c3e5da438da04bc2ed04eec41c2d209c446327315780913dc978b75b89f874c"
     },
     "vendor/mock-vendor-d-esl.ndjson": {
-      "bytes": 26930,
-      "sha256": "92bf39e7139ff089816a51967e3745f9ec06d6d58a0770b64242f6be404deadc"
+      "bytes": 26932,
+      "sha256": "7b8f5c222fe5a8c7bbb37fc813fc9e06792c240b399c775f305740c958e5ce58"
     },
     "item-master.json": {
       "bytes": 300731,

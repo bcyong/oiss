@@ -1021,3 +1021,23 @@ code {
 .seen-cleared {
   color: var(--low);
 }
+
+/* Vendor feed toggles on the Sources tab. */
+label.feed {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+label.feed input {
+  margin-top: 2px;
+}
+label.feed input:disabled + span {
+  cursor: default;
+}
+table.feeds td.num div {
+  white-space: nowrap;
+}
+table.feeds tr.off td {
+  color: var(--muted);
+}

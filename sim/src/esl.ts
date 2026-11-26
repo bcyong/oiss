@@ -6,7 +6,9 @@
  * that fails keeps showing its old price, and the system retries it every hour until the store
  * closes. A price mismatch whose cause is label_not_updated is one of those failures, so the label
  * system reports it within 15 minutes. A paper sale sign left up over a correct label is a price
- * mismatch the label system never sees.
+ * mismatch the label system never sees: the promotion ended overnight, the label took the regular
+ * price back and confirmed it, and the sign still shows the sale price. Only something that looks at
+ * the shelf, such as the robot, sees the sign, so the two sources disagree about that facing's price.
  *
  * The reports are in the vendor's own format, not OISS. The adapter in adapters/src/mock-esl.ts
  * turns them into ShelfObservation price checks. Everything here is synthetic and labeled as mock.
@@ -40,8 +42,11 @@ export function eslEvents(g: Ground): MockEslEvent[] {
   const failures = g.faults.filter((f) => f.kind === "price_mismatch" && f.cause === "label_not_updated");
   const failing = new Set(failures.filter((f) => !f.injected && f.start === ESL_PUSH).map((f) => f.facing));
 
-  // The rest of the overnight batch confirms. Chosen from their own stream, so a fault changes none of them.
-  const batch = rng.fork("batch").shuffle(catalog.planogram.map((p) => p.facing)).slice(0, PRICE_CHANGES);
+  // A sale sign left up means the promotion ended overnight, so its label is in the batch going back to
+  // the regular price. The rest of the batch is chosen from its own stream. Injected faults change none of it.
+  const saleEnded = new Set(g.faults.filter((f) => !f.injected && f.cause === "sale_sign_left_up" && f.start === ESL_PUSH).map((f) => f.facing));
+  const shuffled = rng.fork("batch").shuffle(catalog.planogram.map((p) => p.facing));
+  const batch = [...saleEnded, ...shuffled.filter((f) => !saleEnded.has(f))].slice(0, Math.max(PRICE_CHANGES, saleEnded.size));
   for (const facing of batch) {
     if (failing.has(facing)) continue;
     report(facing, ESL_PUSH + rng.fork(`confirm-${facing}`).uniform(20, 600), "PRICE_CONFIRMED", price(catalog.byFacing.get(facing)!.gtin), 1);
