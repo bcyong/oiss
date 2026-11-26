@@ -52,6 +52,7 @@ export function Timeline({ day, t, onSeek, limit }: { day: IndexedDay; t: number
   return (
     <div className="timeline">
       <div className="tl-head">
+        <span className="tl-title">Through the day</span>
         <span>
           <i className="swatch s-out_of_stock" /> Out of stock
         </span>
@@ -61,7 +62,6 @@ export function Timeline({ day, t, onSeek, limit }: { day: IndexedDay; t: number
         <span>
           <i className="swatch incident-swatch" /> Checkout incident
         </span>
-        <span className="muted">through the day</span>
       </div>
       <svg
         ref={ref}
