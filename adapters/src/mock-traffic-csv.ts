@@ -1,7 +1,7 @@
 /**
- * Adapter: Mock vendor C's people-counting CSV -> OISS ZoneMetric records.
+ * Adapter: Vendor C's people-counting CSV -> OISS ZoneMetric records.
  *
- * Mock vendor C is invented for the demo and labeled as mock. Its export is the kind of CSV a
+ * Vendor C is invented for the demo and labeled as mock. Its export is the kind of CSV a
  * traffic-counting vendor drops on an SFTP server every 15 minutes: the vendor's own store and
  * zone codes, interval start times in store wall-clock time with no UTC offset, blank cells for
  * metrics a zone doesn't have, and an accuracy percentage. The adapter:
@@ -88,7 +88,7 @@ export interface TrafficResult {
 
 export function adaptTraffic(rows: MockTrafficRow[], config: TrafficAdapterConfig): TrafficResult {
   const source = `urn:oiss:${config.store}:mock-vendor-c:people-counting`;
-  const provenance = { system: "Mock people-counting system", vendor: "Mock vendor C", model: { name: "people-counter", version: "0.2" }, adapter: ADAPTER, synthetic: true };
+  const provenance = { system: "Mock people-counting system", vendor: "Vendor C", model: { name: "people-counter", version: "0.2" }, adapter: ADAPTER, synthetic: true };
   const result: TrafficResult = { metrics: [], rejected: [] };
   const nextId = idCounter(config.timezone);
   rows.forEach((r, i) => {

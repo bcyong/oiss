@@ -1,7 +1,7 @@
 /**
- * Adapter: Mock vendor A's shelf-scanning robot missions -> OISS ShelfObservation and Evidence records.
+ * Adapter: Vendor A's shelf-scanning robot missions -> OISS ShelfObservation and Evidence records.
  *
- * Mock vendor A is invented for the demo and labeled as mock. Its export looks like a typical
+ * Vendor A is invented for the demo and labeled as mock. Its export looks like a typical
  * robot vendor's: one report per scan mission, with the vendor's own store code and section codes,
  * bay positions, shelves counted from the top, EAN-13 item codes, UTC timestamps, a percentage
  * fill and the vendor's own exception codes ("PLUG" for an item filling another item's hole,
@@ -54,7 +54,7 @@ export interface MockShelfCapture {
   shelves: MockShelfRead[];
 }
 
-/** One scan mission, as Mock vendor A exports it (one JSON object per line). */
+/** One scan mission, as Vendor A exports it (one JSON object per line). */
 export interface MockShelfScanMission {
   mission_id: string;
   site: string;
@@ -129,7 +129,7 @@ export function adaptShelfScans(missions: MockShelfScanMission[], config: ShelfS
   const index = layoutIndex(config.layout);
   const levels = new Map<string, number>();
   for (const s of config.layout.shelves) levels.set(s.fixture, Math.max(levels.get(s.fixture) ?? 0, s.level + 1));
-  const provenance = { system: "Mock shelf-scanning robot", vendor: "Mock vendor A", model: { name: "shelf-detector", version: "0.1" }, adapter: ADAPTER, synthetic: true };
+  const provenance = { system: "Mock shelf-scanning robot", vendor: "Vendor A", model: { name: "shelf-detector", version: "0.1" }, adapter: ADAPTER, synthetic: true };
   const result: ShelfScanResult = { observations: [], evidence: [], rejected: [] };
   const nextId = idCounter(config.timezone);
   const made: { ms: number; facing: string; obs: Envelope<"oiss.ShelfObservation">; ev?: Envelope<"oiss.Evidence"> }[] = [];

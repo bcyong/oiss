@@ -13,7 +13,7 @@
   "data": {
     "provenance": {
       "system": "Mock electronic shelf labels",
-      "vendor": "Mock vendor D",
+      "vendor": "Vendor D",
       "adapter": {
         "name": "mock-esl",
         "version": "0.1.0"

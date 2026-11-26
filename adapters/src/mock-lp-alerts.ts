@@ -1,7 +1,7 @@
 /**
- * Adapter: Mock vendor B's loss prevention alert feed -> OISS Incident and Evidence records.
+ * Adapter: Vendor B's loss prevention alert feed -> OISS Incident and Evidence records.
  *
- * Mock vendor B is invented for the demo and labeled as mock. Its feed looks
+ * Vendor B is invented for the demo and labeled as mock. Its feed looks
  * like a typical vendor export: the vendor's own store code and register
  * numbers, its own camera names, EAN-13 codes, UTC epoch milliseconds and a
  * 0 to 100 score. The adapter does what any OISS adapter does:
@@ -22,7 +22,7 @@
  * prevention agent.
  */
 
-/** One alert in Mock vendor B's feed (newline-delimited JSON). */
+/** One alert in Vendor B's feed (newline-delimited JSON). */
 export interface MockLpAlert {
   alert_id: string;
   /** The vendor's code for the store. */
@@ -112,7 +112,7 @@ const money = (n: number) => `$${n.toFixed(2)}`;
 
 export function adaptLpAlerts(alerts: MockLpAlert[], config: LpAdapterConfig): AdaptResult {
   const source = `urn:oiss:${config.store}:mock-vendor-b:lp-alerts`;
-  const provenance = { system: "Mock loss prevention", vendor: "Mock vendor B", model: { name: "exception-detector", version: "2.4" }, adapter: ADAPTER, synthetic: true };
+  const provenance = { system: "Mock loss prevention", vendor: "Vendor B", model: { name: "exception-detector", version: "2.4" }, adapter: ADAPTER, synthetic: true };
   const result: AdaptResult = { incidents: [], evidence: [], incidentFor: {}, rejected: [] };
   const counters = new Map<string, number>();
   const nextId = (prefix: string, ms: number) => {

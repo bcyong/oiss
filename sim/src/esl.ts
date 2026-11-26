@@ -1,5 +1,5 @@
 /**
- * Electronic shelf labels: the reports Mock vendor D's label system would send about the day.
+ * Electronic shelf labels: the reports Vendor D's label system would send about the day.
  *
  * Every facing has an electronic shelf label. At 6 AM the label system sends the overnight price
  * changes to the labels that need them, and each label confirms its new price or fails to. A label

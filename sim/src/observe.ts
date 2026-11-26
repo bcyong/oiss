@@ -5,16 +5,16 @@
  *
  * Sources in the demo store (all synthetic):
  * - Demo Grocery space planning (the retailer's own system): the StoreLayout and planogram, once before opening.
- * - Mock vendor A, a shelf-scanning robot: every facing it can reach, every two hours from 8 AM to 8 PM.
+ * - Vendor A, a shelf-scanning robot: every facing it can reach, every two hours from 8 AM to 8 PM.
  *   It reads shelf tag prices and flags misplaced items and price mismatches.
  * - Store shelf cameras (in-house): aisle 3 and the dairy wall every 5 minutes, reporting changes,
  *   misplaced items included. They can't read shelf tags.
- * - Mock vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
- * - Mock vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
- * - Mock vendor D, electronic shelf labels: a price check each time a label confirms a price
+ * - Vendor C, a people-counting system: ZoneMetric for every sales-floor zone every 15 minutes.
+ * - Vendor C, a multi-camera tracker: anonymous ShopperPaths whose ids rotate every 15 minutes.
+ * - Vendor D, electronic shelf labels: a price check each time a label confirms a price
  *   change or fails to (see esl.ts). Labels can't see the shelf, so these checks carry no status.
  *
- * Mock vendors A, C (counting) and D send their own formats, as mock vendor B does for loss
+ * Vendors A, C (counting) and D send their own formats, as Vendor B does for loss
  * prevention. Their adapters in adapters/src turn them into the OISS records here.
  *
  * Shelf images back every low-stock, out-of-stock and flagged read from the robot and the shelf cameras, as
@@ -39,7 +39,7 @@ export interface ObservedDay {
   zoneMetrics: OissRecord[];
   shopperPaths: OissRecord[];
   evidence: OissRecord[];
-  /** The robot's missions in Mock vendor A's own format, before the adapter. */
+  /** The robot's missions in Vendor A's own format, before the adapter. */
   shelfScanMissions: MockShelfScanMission[];
   /** The people-counting vendor's CSV rows, before the adapter. */
   trafficRows: MockTrafficRow[];
@@ -56,8 +56,8 @@ const MODEL = { name: "store-sim", version: "0.1.0" };
 const PROV = {
   planning: { system: "Demo Grocery space planning", synthetic: true },
   shelfCams: { system: "Store shelf cameras (in-house)", model: { name: "shelf-vision", version: "0.3" }, synthetic: true },
-  counting: { system: "Mock people-counting system", vendor: "Mock vendor C", model: { name: "people-counter", version: "0.2" }, synthetic: true },
-  tracker: { system: "Mock multi-camera tracker", vendor: "Mock vendor C", model: { name: "mtmc-tracker", version: "0.2" }, synthetic: true },
+  counting: { system: "Mock people-counting system", vendor: "Vendor C", model: { name: "people-counter", version: "0.2" }, synthetic: true },
+  tracker: { system: "Mock multi-camera tracker", vendor: "Vendor C", model: { name: "mtmc-tracker", version: "0.2" }, synthetic: true },
 } satisfies Record<string, Provenance>;
 
 /** Scan runs every two hours from 8 AM; each takes about 46 minutes. */
@@ -227,7 +227,7 @@ export function observeDay(g: Ground): ObservedDay {
     }
     return found;
   };
-  // The robot reports in Mock vendor A's own format; the mock-shelf-scan adapter turns that into OISS records.
+  // The robot reports in Vendor A's own format; the mock-shelf-scan adapter turns that into OISS records.
   const sectionOf = new Map(Object.entries(DEMO_001_SECTIONS).map(([code, fixture]) => [fixture, code]));
   const ean = (gtin: string) => gtin.slice(1);
   const vendorTime = (t: number) => new Date(clock.epochMs(t)).toISOString();
@@ -419,7 +419,7 @@ export function observeDay(g: Ground): ObservedDay {
       });
     });
   }
-  // Mock vendor C sends a CSV; the mock-traffic-csv adapter turns it into ZoneMetric records.
+  // Vendor C sends a CSV; the mock-traffic-csv adapter turns it into ZoneMetric records.
   const traffic = adaptTraffic(trafficRows, demo001TrafficConfig());
   if (traffic.rejected.length) throw new Error(`the traffic adapter rejected ${traffic.rejected.length} rows: ${traffic.rejected[0]!.reason}`);
   const zoneMetrics = traffic.metrics as unknown as OissRecord[];

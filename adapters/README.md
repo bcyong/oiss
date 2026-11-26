@@ -6,16 +6,16 @@ Each adapter here is plain TypeScript with no Node-only code, so the same source
 
 | Adapter | Vendor feed | OISS records | Status |
 | --- | --- | --- | --- |
-| [`mock-shelf-scan`](src/mock-shelf-scan.ts) | Mock vendor A's shelf-scanning robot missions, one JSON report per line | ShelfObservation, Evidence | Done in M3 |
-| [`mock-lp-alerts`](src/mock-lp-alerts.ts) | Mock vendor B's loss prevention exception alerts, newline-delimited JSON | Incident, Evidence | Done in M3 |
-| [`mock-traffic-csv`](src/mock-traffic-csv.ts) | Mock vendor C's people-counting CSV | ZoneMetric | Done in M3 |
-| [`mock-esl`](src/mock-esl.ts) | Mock vendor D's electronic shelf label reports, newline-delimited JSON | ShelfObservation price checks | Done in M3 |
+| [`mock-shelf-scan`](src/mock-shelf-scan.ts) | Vendor A's shelf-scanning robot missions, one JSON report per line | ShelfObservation, Evidence | Done in M3 |
+| [`mock-lp-alerts`](src/mock-lp-alerts.ts) | Vendor B's loss prevention exception alerts, newline-delimited JSON | Incident, Evidence | Done in M3 |
+| [`mock-traffic-csv`](src/mock-traffic-csv.ts) | Vendor C's people-counting CSV | ZoneMetric | Done in M3 |
+| [`mock-esl`](src/mock-esl.ts) | Vendor D's electronic shelf label reports, newline-delimited JSON | ShelfObservation price checks | Done in M3 |
 
 Every adapter shares [`common.ts`](src/common.ts): GS1 check digits, times in store time with the UTC offset, and lookups in the retailer's StoreLayout. Each keeps its own mapping table for store `demo-001`, the part a retailer fills in once per vendor.
 
 ## Shelf-scan missions
 
-Mock vendor A's robot sends one report per scan mission: its own store code (`DG0001`) and robot name, its own section codes (`A03L` for aisle 3, left side; `END01`; `DAIRY-WALL`), a bay position, shelves counted from the top, EAN-13 codes, UTC times, a fill percentage and its own exception codes (`PLUG` for an item filling another item's hole, `PRICE` for a shelf tag that disagrees with the price file).
+Vendor A's robot sends one report per scan mission: its own store code (`DG0001`) and robot name, its own section codes (`A03L` for aisle 3, left side; `END01`; `DAIRY-WALL`), a bay position, shelves counted from the top, EAN-13 codes, UTC times, a fill percentage and its own exception codes (`PLUG` for an item filling another item's hole, `PRICE` for a shelf tag that disagrees with the price file).
 
 The adapter:
 
@@ -26,7 +26,7 @@ The adapter:
 
 ## People-counting CSV
 
-Mock vendor C drops a CSV every 15 minutes: its own zone codes (`AISLE03`, `FRONTEND`, `SCO`), interval starts in store wall-clock time with no UTC offset, blank cells for metrics a zone doesn't have and an accuracy percentage.
+Vendor C drops a CSV every 15 minutes: its own zone codes (`AISLE03`, `FRONTEND`, `SCO`), interval starts in store wall-clock time with no UTC offset, blank cells for metrics a zone doesn't have and an accuracy percentage.
 
 The adapter:
 
@@ -37,7 +37,7 @@ The adapter:
 
 ## Shelf label reports
 
-Mock vendor D's label system reports each time a label confirms a new price or fails to: the label id, the item it is linked to, the price it shows and the price it was sent, as decimal strings, with UTC times.
+Vendor D's label system reports each time a label confirms a new price or fails to: the label id, the item it is linked to, the price it shows and the price it was sent, as decimal strings, with UTC times.
 
 The adapter:
 
@@ -49,7 +49,7 @@ A label only knows what it shows. A paper sale sign left up over a correct label
 
 ## Loss prevention alerts
 
-Mock vendor B watches the front end and sends an alert when it sees a possible non-scan, bottom-of-basket, ticket switch or sweethearting. Its feed looks like a typical vendor export: its own store code (`DG0001`), its own register codes (`R01` to `R08`, `SCO01` to `SCO06`), its own camera names, EAN-13 item codes, UTC epoch milliseconds and a 0 to 100 score.
+Vendor B watches the front end and sends an alert when it sees a possible non-scan, bottom-of-basket, ticket switch or sweethearting. Its feed looks like a typical vendor export: its own store code (`DG0001`), its own register codes (`R01` to `R08`, `SCO01` to `SCO06`), its own camera names, EAN-13 item codes, UTC epoch milliseconds and a 0 to 100 score.
 
 The adapter:
 

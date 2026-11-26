@@ -13,7 +13,7 @@
   "data": {
     "provenance": {
       "system": "Mock loss prevention",
-      "vendor": "Mock vendor B",
+      "vendor": "Vendor B",
       "adapter": {
         "name": "mock-lp-alerts",
         "version": "0.1.0"

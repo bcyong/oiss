@@ -502,7 +502,7 @@ export function App({ start }: { start?: AppStart } = {}) {
         <h2>Shelf-scanning robot</h2>
         <dl>
           <dt>Made by</dt>
-          <dd>Mock vendor A</dd>
+          <dd>Vendor A</dd>
           <dt>Scan run</dt>
           <dd>{run ? `Run ${runIndex + 1} of ${day.robot.runs.length}, started ${clock(run.start)}` : "Not scanning now"}</dd>
           {run && (
@@ -535,7 +535,7 @@ export function App({ start }: { start?: AppStart } = {}) {
           <h1>{day.layout.store.name}</h1>
           <p className="sub">
             A synthetic grocery day{live ? " running live" : ""}, {new Date(`${day.files.date}T12:00:00${day.offset}`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}, {live ? "simulated" : "replayed"} only from{" "}
-            <a href="/spec/">OISS</a> records sent by a mock shelf-scanning robot, in-house shelf cameras, a mock people-counting vendor, a mock loss prevention vendor and mock electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
+            <a href="/spec/">OISS</a> records sent by Vendor A's shelf-scanning robot, in-house shelf cameras, Vendor B's checkout loss prevention, Vendor C's people counting and Vendor D's electronic shelf labels. Tap anything on the floor plan to inspect the records behind it.
           </p>
         </div>
         <div className="day-source">
@@ -865,7 +865,7 @@ export function App({ start }: { start?: AppStart } = {}) {
 
             {tab === "vendors" && (
               <>
-                <p className="note top">The vendors are mock, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
+                <p className="note top">The vendors are made up, labeled A to D, and their feed formats are invented. Each is modeled on a kind of company that sells to retailers today.</p>
                 <div className="vendors">
                   {VENDORS.map((v) => (
                     <section key={v.name}>
