@@ -68,7 +68,7 @@ export function statedCauses(answer: string, toolText: string): string[] {
   for (const m of answer.replace(NOT_A_CAUSE, " ").matchAll(CAUSE)) {
     if (tools.includes(m[0].toLowerCase())) continue;
     // "cancelled due to no backroom stock" gives the cause a record gave, which is fine.
-    const after = answer.slice(m.index! + m[0].length).toLowerCase().match(/^\s+([a-z'-]+(?: [a-z'-]+){0,2})/);
+    const after = answer.slice(m.index! + m[0].length).toLowerCase().match(/^\s+["“'‘]?([a-z'-]+(?: [a-z'-]+){0,2})/);
     if (after && after[1]!.split(" ").length >= 2 && tools.includes(after[1]!)) continue;
     out.push(m[0].toLowerCase());
   }
@@ -130,8 +130,7 @@ const PROPOSED_IT = /\b(?:I(?:'ve| have)? proposed|proposed (?:for|tasks?|replen
 
 /** Words saying the assistant proposed a task, when the answer came with no proposal. */
 export function claimedProposal(answer: string, proposals: number): string | undefined {
-  // "Not proposed: …" is the page saying the store's rules turned the proposal down.
-  return proposals || /\bNot proposed:/.test(answer) ? undefined : answer.match(PROPOSED_IT)?.[0];
+  return proposals ? undefined : answer.match(PROPOSED_IT)?.[0];
 }
 
 /** Every finding for one answer. */

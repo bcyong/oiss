@@ -204,9 +204,22 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
                 <AnswerText text={e.answer.text} day={day} t={e.t} onInspect={onInspect} />
                 {e.answer.proposals.length > 0 && (
                   <div className="proposals">
+                    <p className="proposals-head">
+                      {e.answer.proposals.length === 1 ? "1 task proposed" : `${e.answer.proposals.length} tasks proposed`} for your approval
+                    </p>
                     {e.answer.proposals.map((p) => (
                       <ProposalCard key={proposalKey(p)} p={p} decision={e.decisions?.[proposalKey(p)]} t={t} onApprove={() => void approve(e.id, p)} onDismiss={() => decide(e.id, p, { state: "dismissed" })} onInspect={onInspect} disabled={busy || !onApprove || t >= day.close} />
                     ))}
+                  </div>
+                )}
+                {(e.answer.turnedDown?.length ?? 0) > 0 && (
+                  <div className="turned-down">
+                    <p className="proposals-head">Not proposed, by the store's rules</p>
+                    <ul>
+                      {e.answer.turnedDown.map((why) => (
+                        <li key={why}>{why}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 <p className="answer-meta">

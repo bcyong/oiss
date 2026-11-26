@@ -34,6 +34,8 @@ export interface Answer {
   safety: { question?: SafetyCheck; answer?: SafetyCheck };
   /** Tasks the agent proposed, each waiting for the store manager's approval on the page. */
   proposals: Proposal[];
+  /** Why the store's rules turned down each task the agent tried to propose. */
+  turnedDown: string[];
 }
 
 /** A model's name as NVIDIA's catalog gives it: nvidia/nemotron-3-ultra-550b-a55b is Nemotron 3 Ultra. */
@@ -121,6 +123,42 @@ export function dropToolCitations(text: string): string {
   });
 }
 
+/** A line that heads a list of proposals, such as "**Proposed tasks:**" or "I've proposed:". */
+const PROPOSAL_HEADING = /^\W*(?:I(?:'ve| have)? )?(?:proposed|proposals?)\b[^.!?\n]{0,40}:\W*$/i;
+/** A sentence that tells of the agent's own proposals. */
+const PROPOSAL_SENTENCE = /\b(?:I(?:'ve| have)? (?:also )?proposed|I(?:'m| am) proposing|(?:has|have) been proposed|proposed (?:a |the |two |three )?(?:tasks?|replenish\w*|go-backs?|shelf[- ]tag)|(?:awaits?|waits? for|pending) (?:the store manager's |your |store manager )?approval)\b/i;
+
+/**
+ * Takes the agent's own account of its proposals out of the answer. The page lists what was actually
+ * proposed, with Approve buttons, and what the store's rules turned down, so the answer's words can't
+ * claim a proposal that never reached a card.
+ */
+export function dropProposalTalk(text: string): string {
+  const out: string[] = [];
+  let inList = false;
+  for (const line of text.split("\n")) {
+    const bullet = /^\s*(?:[-*•]|\d+[.)])\s/.test(line);
+    if (PROPOSAL_HEADING.test(line.trim())) {
+      inList = true;
+      continue;
+    }
+    if (inList && (bullet || !line.trim())) {
+      if (!line.trim()) inList = false;
+      continue;
+    }
+    inList = false;
+    if (!PROPOSAL_SENTENCE.test(line)) {
+      out.push(line);
+      continue;
+    }
+    if (bullet) continue;
+    // Keep a paragraph's other sentences; drop only the ones about proposals.
+    const kept = line.split(/(?<=[.!?])\s+(?=[A-Z*])/).filter((sentence) => !PROPOSAL_SENTENCE.test(sentence));
+    if (kept.length) out.push(kept.join(" "));
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 /** Record ids cited in square brackets, such as [so-20261117-000123] or [so-…, task-…-v2]. */
 export function citations(text: string): string[] {
   const out = new Set<string>();
@@ -153,11 +191,15 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
   const seen = new Set<string>();
   const tools: ToolUse[] = [];
   const proposals: Proposal[] = [];
+  const turnedDown: string[] = [];
   const run = (name: string, args: ToolArgs) => {
     const result = runTool(day, t, agent, name, args);
     idsIn(result, seen);
     const p = (result as { decision?: string; proposal?: Proposal }).proposal;
     if (name === "propose_task" && p && !proposals.some((x) => x.kind === p.kind && x.facing === p.facing) && proposals.length < 3) proposals.push(p);
+    // A store rule's "no" is worth showing; a facing id the model got wrong or a kind it can't propose is not.
+    const no = (result as { decision?: string; reason?: string }).decision === "rejected" ? (result as { reason?: string }).reason : undefined;
+    if (name === "propose_task" && no && !/^(There is no facing|This agent can propose only)/.test(no) && !turnedDown.includes(no)) turnedDown.push(no);
     tools.push({ name, args });
     return asText(result);
   };
@@ -196,18 +238,13 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     const nudge: ChatMessage[] = [...messages, { role: "assistant", content: text }, { role: "user", content: PROPOSE_NUDGE }];
     try {
       const { message } = await step({ step: "agent", agent, store, now, messages: nudge, final: false });
-      const turnedDown = new Set<string>();
-      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) {
-        const r = JSON.parse(run(c.function.name, parseArgs(c.function.arguments))) as { decision?: string; answer?: string };
-        if (r.decision === "rejected" && r.answer) turnedDown.add(r.answer);
-      }
-      // The answer was written before the store's rules ruled, so a proposal they turned down is said plainly.
-      if (turnedDown.size) text = `${text}\n\n${[...turnedDown].join(" ")}`;
+      for (const c of (message.tool_calls ?? []).filter((c) => c.function.name === "propose_task").slice(0, 3)) run(c.function.name, parseArgs(c.function.arguments));
     } catch {
       // The answer is already in hand; a failed follow-up only means no proposals.
     }
   }
+  text = dropProposalTalk(text);
   if (!text) text = "I couldn't put an answer together from the records. Try asking a narrower question.";
   const cited = citations(text);
-  return { question: q, t, agent, routedBy, text, tools, cited: cited.filter((id) => seen.has(id)), unverified: cited.filter((id) => !seen.has(id)), models, safety, proposals };
+  return { question: q, t, agent, routedBy, text, tools, cited: cited.filter((id) => seen.has(id)), unverified: cited.filter((id) => !seen.has(id)), models, safety, proposals, turnedDown };
 }

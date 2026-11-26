@@ -27,6 +27,7 @@ test("an answer may not give a cause the records don't", () => {
   // A cause word is fine when what follows it is the cause a record gave.
   const cancelled = JSON.stringify({ outcome: "No backroom stock. The facing needs a store order." });
   assert.deepEqual(statedCauses("Its task was cancelled due to no backroom stock.", cancelled), []);
+  assert.deepEqual(statedCauses("All other facings have cancelled tasks due to \"No backroom stock\" and need store orders.", cancelled), []);
   assert.deepEqual(statedCauses("Its task was cancelled due to a late delivery.", cancelled), ["due to"]);
 });
 
@@ -67,7 +68,6 @@ test("an answer that says it proposed a task, with none proposed, is caught", ()
   assert.equal(claimedProposal("Proposed replenishment tasks for the Grocery team:", 0), "Proposed replenishment");
   assert.equal(claimedProposal("I proposed one replenishment task.", 1), undefined);
   assert.equal(claimedProposal("Nothing needs a task right now.", 0), undefined);
-  assert.equal(claimedProposal("Proposed for Grocery team.\n\nNot proposed: The facing needs a store order.", 0), undefined);
 });
 
 test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave aren't new numbers", () => {

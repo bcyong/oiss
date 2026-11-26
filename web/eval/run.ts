@@ -42,6 +42,7 @@ interface Row {
   /** The safety check's verdicts, so a run shows whether the safety model answered at all. */
   safety?: string;
   proposals?: number;
+  turnedDown?: number;
 }
 
 const rows: Row[] = [];
@@ -63,13 +64,13 @@ for (const t of TIMES) {
     try {
       const a = await ask(day, t, question, step);
       const verdict = (c?: { verdict: string; model?: string }) => (c ? `${c.verdict}${c.model ? ` (${c.model})` : ""}` : "off");
-      rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length });
+      rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length, turnedDown: a.turnedDown.length });
     } catch (err) {
       rows.push({ time: clock(t), question, findings: [], error: err instanceof Error ? err.message : String(err) });
     }
     const r = rows.at(-1)!;
     console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}`);
-    if (r.safety) console.log(`        safety: ${r.safety}; ${r.proposals} task(s) proposed`);
+    if (r.safety) console.log(`        safety: ${r.safety}; ${r.proposals} task(s) proposed, ${r.turnedDown ?? 0} turned down by the store's rules`);
     for (const f of r.findings) console.log(`        ${f.check}: ${f.detail}`);
     if (r.error) console.log(`        ${r.error}`);
     // A failed answer's own words, so the log shows what the check caught.

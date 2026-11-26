@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { approveTask, type Simulate } from "../src/approve.ts";
-import { ask, PROPOSE_NUDGE } from "../src/assistant/run.ts";
+import { AGENTS } from "../src/assistant/agents.ts";
+import { ask, dropProposalTalk, PROPOSE_NUDGE } from "../src/assistant/run.ts";
 import { ASSISTANT_CREATOR, decideTask, runTool } from "../src/assistant/tools.ts";
 import type { StepReply, StepRequest } from "../src/assistant/proxy.ts";
 import { indexDay, tasksAt } from "../src/day.ts";
@@ -18,6 +19,7 @@ const day = indexDay(files);
 const T = 13 * 3600;
 // Low stock at 1 PM and not on promotion, so the store's task system raises no task for it itself.
 const FACING = "A03-R-S4-F07";
+const AGENTS_START = AGENTS.availability.start.length;
 
 test("the store's rules decide what may be proposed, from the records alone", () => {
   const ok = decideTask(day, T, "replenish", FACING, ["replenish", "go_back"]);
@@ -122,14 +124,28 @@ test("an agent that recommends shelf work in words but proposes none gets one tu
   assert.equal(tagSent.filter((r) => r.step === "agent").length, 1);
 });
 
-test("a follow-up proposal the store's rules turn down is said plainly after the answer", async () => {
+test("the answer's own talk of proposals is dropped, and what the store's rules turned down comes with the answer", async () => {
+  // A facing whose latest read needs no replenishment, so the store's rules turn the proposal down.
+  const stocked = day.facings.map((f) => f.facing.id).find((id) => {
+    const d = decideTask(day, T, "replenish", id, ["replenish"]);
+    return d.decision === "rejected" && /needs no replenishment/.test(d.reason);
+  })!;
   const step = async (req: StepRequest): Promise<StepReply> => {
     if (req.step === "route") return { message: { content: '{"agent":"availability"}' } };
-    if (req.step === "agent" && req.messages.at(-1)?.content === PROPOSE_NUDGE)
-      return { message: { content: null, tool_calls: [{ id: "n1", type: "function", function: { name: "propose_task", arguments: JSON.stringify({ kind: "replenish", facing: "Z99-X-S0-F00" }) } }] } };
-    return { message: { content: "I proposed a replenish task." } };
+    const calls = req.messages.filter((m) => m.role === "tool").length;
+    if (req.step === "agent" && calls <= AGENTS_START)
+      return { message: { content: null, tool_calls: [FACING, stocked, "Z99-X-S0-F00"].map((facing, i) => ({ id: `p${i}`, type: "function" as const, function: { name: "propose_task", arguments: JSON.stringify({ kind: "replenish", facing }) } })) } };
+    return { message: { content: "Fill the Aisle 3 facing first. I've proposed three replenishment tasks.\n\n**Proposed tasks:**\n- Replenish A\n- Replenish B\n- Replenish C\n\nThe rest can wait." } };
   };
   const a = await ask(day, T, "Which low-stock items should we fill before they run out?", step);
-  assert.deepEqual(a.proposals, []);
-  assert.match(a.text, /^I proposed a replenish task\.\n\nNot proposed: /);
+  assert.equal(a.text, "Fill the Aisle 3 facing first.\n\nThe rest can wait.");
+  assert.deepEqual(a.proposals.map((p) => p.facing), [FACING]);
+  assert.equal(a.turnedDown.length, 1, "a facing id the model made up isn't shown as a store rule");
+  assert.match(a.turnedDown[0]!, /needs no replenishment/);
+});
+
+test("an answer keeps its other sentences when one tells of proposals", () => {
+  assert.equal(dropProposalTalk("Soda is out. I proposed a replenishment task for Grocery team. Chips are low."), "Soda is out. Chips are low.");
+  assert.equal(dropProposalTalk("- **Soda** is out\n- Proposed replenishment for Grocery team\n- **Chips** are low"), "- **Soda** is out\n- **Chips** are low");
+  assert.equal(dropProposalTalk("Nothing needs a task right now."), "Nothing needs a task right now.");
 });

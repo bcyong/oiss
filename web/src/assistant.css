@@ -4,6 +4,26 @@
   gap: 6px;
   margin: 8px 0 4px;
 }
+.proposals-head {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.turned-down {
+  margin: 8px 0 4px;
+}
+.turned-down ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.turned-down li + li {
+  margin-top: 2px;
+}
 .proposal {
   border: 1px solid var(--line);
   border-radius: 8px;
