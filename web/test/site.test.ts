@@ -73,7 +73,7 @@ test("the RFC in the repo renders whole, with its diagram and a way to comment o
   const doc = renderMarkdown(source, { image: (src) => `<figure data-src="${src}"></figure>` });
   assert.match(doc.title, /^OISS RFC/);
   const sections = doc.toc.map((e) => e.text);
-  for (const s of ["Summary", "1. The problem", "4. The proposal", "9. Governance, license and open questions", "Glossary", "References"]) assert.ok(sections.includes(s), s);
+  for (const s of ["Summary", "1. The problem", "4. The proposal", "9. Governance, license, and open questions", "Glossary", "References"]) assert.ok(sections.includes(s), s);
   assert.match(doc.html, /<figure data-src="how-oiss-fits\.svg">/);
   assert.doesNotMatch(doc.html, /embedded content|in this document\./);
   // Every Markdown link became a link, and no Markdown syntax is left over.
