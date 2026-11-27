@@ -777,6 +777,9 @@ const RANKED: [keyof StoreCard, "higher" | "lower", string][] = [
 ];
 
 /** The kind of task behind a store figure whose work goes to one team. Shelf figures span departments, so they name none. */
+/** Shelf figures in the district comparison, whose work routes by each item's department. */
+const SHELF_FIGURES = new Set<keyof StoreCard>(["onShelfAvailabilityPct", "outOfStock", "lowStock", "openReplenishmentTasks", "replenishmentsCancelledNoBackroomStock", "shelfTasksConfirmed"]);
+
 const ROUTED: Partial<Record<keyof StoreCard, TaskData["kind"]>> = {
   shelfTagsWrongOnShelf: "fix_shelf_tag",
   avgWaitSecondsSoFar: "open_lane",
@@ -799,6 +802,8 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const i = lastAtOrBefore(p.times, t);
     if (i >= 0) stores.push({ ...p.cards[i]!, asOf: clock(p.times[i]!) });
   }
+  // Shelf work routes to the team for each item's department, so a shelf figure names every team it could go to.
+  const shelfTeams = `the team for each item's department: ${[...new Set([...day.items.values()].map((i) => routedTo("replenish", i.department)))].sort().join(", ")}`;
   const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number; routedTo?: string }> = {};
   for (const [key, better, label] of RANKED) {
     const value = (c: StoreCard) => c[key] as number;
@@ -811,7 +816,7 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const bottom = better === "higher" ? Math.min(...values) : Math.max(...values);
     const named = (v: number) => `${stores.filter((c) => value(c) === v).map((c) => c.name).join("; ")} (${v})`;
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const team = ROUTED[key] && routedTo(ROUTED[key]);
+    const team = ROUTED[key] ? routedTo(ROUTED[key]) : SHELF_FIGURES.has(key) ? shelfTeams : undefined;
     ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top, routedTo: team } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10, routedTo: team };
   }
   return {

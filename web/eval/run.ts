@@ -107,7 +107,7 @@ for (const t of TIMES) {
 }
 
 const failed = rows.filter((r) => r.error || r.findings.length);
-const retried = rows.filter((r) => r.firstTry);
+const retried = rows.filter((r) => r.firstTry && !r.error && !r.findings.length);
 const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", "<br>");
 const summary = [
   `## Assistant answer check: ${rows.length - failed.length} of ${rows.length} passed${retried.length ? `, ${retried.length} after a second try` : ""}`,
