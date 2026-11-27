@@ -17,7 +17,7 @@ This RFC proposes an open industry standard and asks retail and consumer goods (
 
 Retailers now buy store intelligence from several vendors at once: shelf-scanning robots, shelf cameras, electronic shelf labels, and front-end and loss-prevention analytics. Each vendor reports what it sees in its own format, so retailers pay to stitch the data together, store teams work from several task lists, and no analytics tool or AI agent can read across vendors without a custom integration. No open standard covers this layer today.
 
-This RFC proposes the Open Intelligent Store Specification (OISS): an open, vendor-neutral format for what store-intelligence systems observe and the work they create, built on standards the industry already uses. It comes with a reference blueprint that shows AI agents acting on OISS data to fix empty shelves, wrong prices, and long queues.
+This RFC proposes the Open Intelligent Store Specification (OISS): an open, vendor-neutral format for what store-intelligence systems observe and the work they create, built on standards the industry already uses. It comes with a reference blueprint that shows AI agents acting on OISS data to fix empty shelves, wrong prices, and long checkout lines.
 
 The questions for readers are whether the problem matches their experience, whether the proposed scope is right, and who should steward the standard.
 
@@ -27,7 +27,7 @@ Store intelligence is now bought from several vendors, but the data they produce
 
 - **Shelf scanning:** robots or fixed cameras that check on-shelf availability, planogram compliance, and price accuracy.
 - **Shelf-edge systems:** electronic shelf labels and the platform that manages them.
-- **Front-end and loss prevention:** analytics that watch queues, self-checkout exceptions, and shrink.
+- **Front-end and loss prevention:** analytics that watch checkout lines, self-checkout exceptions, and shrink.
 - **In-house systems:** the item master, perpetual inventory, replenishment, and associate task management.
 
 Each vendor ships its own API, dashboard, and field names. The same empty facing can arrive as three different records with three different product codes, locations, and confidence scores. To use them together, the retailer's IT team, or a systems integrator it pays, builds and maintains a custom integration layer, one vendor at a time.
@@ -47,7 +47,7 @@ Open standards already cover the layers below store intelligence, but none cover
 | Standard | What it does, in plain terms | What it leaves out |
 | --- | --- | --- |
 | [GS1 identifiers](https://www.gs1.org/standards-overview) | Give every product (GTIN, the number behind the UPC or EAN barcode) and every location (GLN) a global ID | What is happening on the shelf right now |
-| [GS1 EPCIS and CBV](https://www.gs1.org/epcis) | Record supply-chain events (what, when, where, why), such as an item stocked or received; version 2.0 from June 2022 | Shelf facings, price-label checks, queues, store tasks, and video evidence |
+| [GS1 EPCIS and CBV](https://www.gs1.org/epcis) | Record supply-chain events (what, when, where, why), such as an item stocked or received; version 2.0 from June 2022 | Shelf facings, price-label checks, checkout lines, store tasks, and video evidence |
 | [ONVIF Profile M](https://www.onvif.org/profiles/profile-m/) | Lets security cameras report people, vehicles, and object counts in a common format | Anything about shelves, products, or store operations |
 | [OMG retail standards](https://www.omg.org/spec/category/retail/) (formerly ARTS at NRF) | Cover POS devices, digital receipts, and a 2019 video-analytics schema | Shelves, inventory, and store tasks; no sign the video schema was adopted |
 | [Bluetooth ESL](https://www.bluetooth.com/blog/bluetooth-esl-the-global-standard-for-the-electronic-shelf-label-market/) | Standardizes the radio link between access points and electronic shelf labels | The price data and compliance checks behind the label |
@@ -105,7 +105,7 @@ OISS includes a reference design for a Store Operations Assistant: a set of AI a
 
 - **Availability:** finds out-of-stocks and gaps and sends replenishment tasks.
 - **Price and label:** catches mismatches between shelf labels and the price file.
-- **Front-end:** watches queues and suggests when to open more registers.
+- **Front-end:** watches checkout lines and suggests when to open more registers.
 - **Loss prevention:** groups related incidents and their evidence for review.
 - **Store insights:** answers a manager's questions across all sources, flags where two sources disagree about the same shelf, and compares the store with others in its district.
 
