@@ -258,6 +258,8 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
     answer,
     asked: { status: want, department: dept || undefined },
     total: rows.length,
+    shown: Math.min(n, rows.length),
+    notShown: Math.max(0, rows.length - n),
     replenishment: counts,
     facings: facings.slice(0, n),
     note: "since: when the facing's current status began. notInStockSince: when it was last in stock. replenishment counts cover every facing listed in total, not only the rows shown. replenishmentTask.assignedTo is the team that has the task; routedTo, on a row with no task, is the team the store's task system routes replenishment to for that department.",
@@ -761,8 +763,14 @@ export interface PeerStore {
 const RANKED: [keyof StoreCard, "higher" | "lower", string][] = [
   ["onShelfAvailabilityPct", "higher", "on-shelf availability"],
   ["outOfStock", "lower", "out-of-stock facings"],
+  ["lowStock", "lower", "low-stock facings"],
+  ["openReplenishmentTasks", "lower", "open replenishment tasks"],
+  ["replenishmentsCancelledNoBackroomStock", "lower", "replenishments cancelled for no backroom stock"],
+  ["shelfTasksConfirmed", "higher", "shelf tasks confirmed"],
   ["shelfTagsWrongOnShelf", "lower", "shelf tags wrong on the shelf"],
+  ["shoppersThroughCheckout", "higher", "shoppers through checkout so far"],
   ["avgWaitSecondsSoFar", "lower", "average checkout wait so far"],
+  ["checkoutExceptions", "lower", "checkout exceptions"],
   ["checkoutExceptionsNotReviewed", "lower", "checkout exceptions not yet reviewed"],
   ["vendorDisagreementsStanding", "lower", "facings where two vendors still disagree"],
 ];
