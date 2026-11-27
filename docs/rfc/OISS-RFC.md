@@ -2,6 +2,12 @@
 
 Bryan Yong · November 2026
 
+The store-intelligence systems retailers need already exist, but they aren't compatible out of the box.
+
+![One shared record replaces an integration per vendor](today-vs-oiss.svg)
+
+Vendors keep their own systems either way. OISS changes how their data is described, so any tool or AI agent can read all of it without custom work.
+
 ## Status of this document
 
 | Item | Detail |
@@ -11,7 +17,7 @@ Bryan Yong · November 2026
 | Decision | The OISS editors revise the proposal after the comment period, then hand it to a neutral steward (section 9) |
 | Related | The OISS specification, which holds the technical detail |
 
-This RFC proposes an open industry standard and asks retail and consumer goods (CPG) leaders, store-intelligence vendors, and standards bodies one question: here is the direction, what are we missing? It is not yet the standard of any organization.
+This draft is for retail and consumer goods (CPG) leaders, store-intelligence vendors, and standards bodies to test against the stores and systems they run. What they find missing shapes OISS before any organization adopts it as a standard.
 
 ## Summary
 
