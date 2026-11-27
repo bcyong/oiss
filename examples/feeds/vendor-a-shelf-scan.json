@@ -1,0 +1,12 @@
+{
+  "oissversion": "0.2",
+  "system": "Mock shelf-scanning robot",
+  "vendor": "Vendor A",
+  "source": "urn:oiss:demo-001:mock-vendor-a",
+  "stores": ["demo-001"],
+  "produces": [
+    { "type": "oiss.ShelfObservation", "versions": ["0.2"], "extensions": ["com.example.shelfscan"] },
+    { "type": "oiss.Evidence", "versions": ["0.2"] }
+  ],
+  "contact": "Vendor A store integrations team"
+}

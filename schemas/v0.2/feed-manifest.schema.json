@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/feed-manifest.schema.json",
+  "title": "OISS v0.2 feed manifest",
+  "description": "What one system sends into a store's OISS data, or reads from it: each record type and the OISS versions it uses. Not a record. A retailer keeps one per connected system, so it can see who must move before a version is retired. See spec/feeds.md.",
+  "type": "object",
+  "properties": {
+    "oissversion": {
+      "const": "0.2",
+      "description": "The OISS version this manifest follows."
+    },
+    "system": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The system, as named in its records' provenance.system."
+    },
+    "vendor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "format": "uri-reference",
+      "minLength": 1,
+      "description": "The CloudEvents source its records carry, or a prefix of it."
+    },
+    "stores": {
+      "type": "array",
+      "items": {
+        "$ref": "defs.schema.json#/$defs/id"
+      },
+      "uniqueItems": true,
+      "description": "The stores it serves. Left out means every store."
+    },
+    "produces": {
+      "$ref": "#/$defs/uses",
+      "description": "Record types it writes, and the version of each it writes now."
+    },
+    "reads": {
+      "$ref": "#/$defs/uses",
+      "description": "Record types it reads, and every version of each it can read."
+    },
+    "contact": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who to ask about this system's upgrades: a team or role, not a person's private address."
+    }
+  },
+  "required": [
+    "oissversion",
+    "system"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "produces"
+      ]
+    },
+    {
+      "required": [
+        "reads"
+      ]
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "uses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "vocab.schema.json#/$defs/recordType"
+              },
+              {
+                "$ref": "defs.schema.json#/$defs/vendorRecordType"
+              }
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+$"
+            }
+          },
+          "extensions": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "defs.schema.json#/$defs/namespace"
+            },
+            "description": "Extension namespaces it writes or understands on this type."
+          }
+        },
+        "required": [
+          "type",
+          "versions"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

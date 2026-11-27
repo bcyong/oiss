@@ -2,6 +2,7 @@ import { disagreementsUpTo, groupDisagreements, incidentsUpTo, lastAtOrBefore, l
 import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, observer, STATUS_LABEL, TASK_KIND, TASK_OUTCOME, TASK_STATE, zoneName } from "../describe.ts";
 import { OPEN_LANE_WAIT_SECONDS, routeTask } from "@oiss/sim";
 import type { AnyRecord, IncidentData, OissRecord, ShelfObservationData, TaskData } from "../oiss.ts";
+import { effectivePrivacy } from "../versions.ts";
 import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
 
 /**
@@ -596,10 +597,12 @@ function getRecord(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
   const r = day.byId.get(id) as AnyRecord | undefined;
   if (!r || secondsOf(day, r.time) > t) return { error: `No record ${id} has arrived by ${clock(t)}.` };
   if (r.type === "oiss.StoreLayout") return { id: r.id, type: r.type, note: "The store layout and planogram. Use the other tools for its facings." };
-  if (r.oissprivacy === "restricted" && r.type !== "oiss.Incident") return { id: r.id, type: r.type, time: r.time, source: r.source, privacy: r.oissprivacy, note: "Restricted: only named roles may open this record's media." };
-  if (r.type === "oiss.ShopperPath") return { id: r.id, type: r.type, time: r.time, privacy: r.oissprivacy, note: "An anonymous shopper path; its points are left out." };
+  // A privacy class or record type the demo doesn't know counts as restricted (spec/versioning.md).
+  const privacy = effectivePrivacy(r);
+  if (privacy === "restricted" && r.type !== "oiss.Incident") return { id: r.id, type: r.type, time: r.time, source: r.source, privacy, note: "Restricted: only named roles may open this record's media." };
+  if (r.type === "oiss.ShopperPath") return { id: r.id, type: r.type, time: r.time, privacy, note: "An anonymous shopper path; its points are left out." };
   const { provenance, ...data } = r.data as unknown as { provenance: unknown } & Record<string, unknown>;
-  return { id: r.id, type: r.type, time: r.time, source: r.source, subject: r.subject, privacy: r.oissprivacy, provenance, data };
+  return { id: r.id, type: r.type, time: r.time, source: r.source, subject: r.subject, oissversion: r.oissversion, privacy, provenance, data };
 }
 
 // ---- store insights ---------------------------------------------------------------

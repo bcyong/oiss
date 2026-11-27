@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/vocab.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/vocab.schema.json",
   "title": "OISS v0.1 vocabularies",
   "description": "Controlled values shared by the OISS record types. See spec/vocabularies.md.",
   "$defs": {

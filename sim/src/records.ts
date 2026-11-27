@@ -1,7 +1,9 @@
-/** OISS v0.1 record envelopes (CloudEvents 1.0, structured JSON). See spec/envelope.md. */
+/** OISS v0.2 record envelopes (CloudEvents 1.0, structured JSON). See spec/envelope.md. */
 
-export const OISS_VERSION = "0.1";
-export const SCHEMA_BASE = "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/";
+import { OISS_VERSION, type OissVersion, schemaBase } from "../../adapters/src/common.ts";
+
+export { OISS_VERSION };
+export const SCHEMA_BASE = schemaBase(OISS_VERSION);
 export const SIM_VERSION = "0.1.0";
 
 export type RecordType = "StoreLayout" | "ShelfObservation" | "ZoneMetric" | "ShopperPath" | "Incident" | "Evidence" | "Task";
@@ -26,7 +28,8 @@ export interface OissRecord<D = Record<string, unknown>> {
   subject: string;
   dataschema: string;
   datacontenttype: "application/json";
-  oissversion: typeof OISS_VERSION;
+  /** The simulator writes OISS_VERSION; records adapted from a vendor may carry an older one. */
+  oissversion: OissVersion;
   oissstore: string;
   oissprivacy: PrivacyClass;
   data: D;

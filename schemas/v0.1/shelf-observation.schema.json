@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shelf-observation.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/shelf-observation.schema.json",
   "title": "OISS v0.1 ShelfObservation data",
   "description": "What a shelf scan, shelf camera, audit or shelf label system found at one facing: on-shelf availability, planogram compliance and price integrity. subject is the facing id. A record carries status, tagPrice or both: a shelf label system knows the price a label shows but can't see the shelf.",
   "type": "object",

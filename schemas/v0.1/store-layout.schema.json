@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/store-layout.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/store-layout.schema.json",
   "title": "OISS v0.1 StoreLayout data",
   "description": "The store layout and planogram: zones, fixtures, shelves, facings with their planogram items, and cameras. subject is the store id.",
   "type": "object",

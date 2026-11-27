@@ -1,0 +1,15 @@
+{
+  "oissversion": "0.2",
+  "system": "Store Operations Assistant",
+  "reads": [
+    { "type": "oiss.StoreLayout", "versions": ["0.1", "0.2"] },
+    { "type": "oiss.ShelfObservation", "versions": ["0.1", "0.2"] },
+    { "type": "oiss.ZoneMetric", "versions": ["0.1", "0.2"] },
+    { "type": "oiss.Incident", "versions": ["0.1", "0.2"] },
+    { "type": "oiss.Task", "versions": ["0.1", "0.2"] }
+  ],
+  "produces": [
+    { "type": "oiss.Task", "versions": ["0.2"] }
+  ],
+  "contact": "Store systems team"
+}

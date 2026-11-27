@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/zone-metric.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/zone-metric.schema.json",
   "title": "OISS v0.1 ZoneMetric data",
   "description": "Traffic, dwell and front-end measures for one zone over one interval. Aggregates only. subject is the zone id.",
   "type": "object",

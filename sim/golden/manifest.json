@@ -7,37 +7,37 @@
     "store-layout.json": {
       "records": 1,
       "bytes": 337504,
-      "sha256": "f2da62e68c249480528bace966583b85db73de59a71fef18b506d75c8096a1a5"
+      "sha256": "eb2a422459fa42d7c969d47e4131c2b39399bf77b7bf67181203fa2fc98e5604"
     },
     "shelf-observations.jsonl": {
       "records": 7590,
       "bytes": 7481725,
-      "sha256": "49c1be1608e7a886139c17817b88c4940d56b72fe6a991f9c7f302891fbf94ec"
+      "sha256": "7ffe42ad0c87b6303ab22d740a69cb6aa2199dc5a6178199f0d00a119c3457bd"
     },
     "zone-metrics.jsonl": {
       "records": 1054,
       "bytes": 864246,
-      "sha256": "51521813ad5cff2e1d35107cb853e893b80b6b73c84589ff928a73c067e4dd02"
+      "sha256": "6dea1dda1ea0f19dbb32b2b6d6ee4e9fad0534f50cc22a7bf00c26c4f0785abe"
     },
     "shopper-paths.jsonl": {
       "records": 2332,
       "bytes": 6342890,
-      "sha256": "8a7eb9466f6b7138f9db4891fb5ba8b79df0ce98589246addf76fd82090cecef"
+      "sha256": "7b1ef91a4007d543aafe3540ffec13c2bbc2734019c12907672e254f064cce38"
     },
     "evidence.jsonl": {
       "records": 971,
       "bytes": 936561,
-      "sha256": "4d01aaa9f870a9cd9cb88082fdc87ed4390749966c16b5d4c600ceda5d5d2311"
+      "sha256": "099ca0059179f6197f10b889bcb2d0cf62b50bd3860a646c2c048a8033423de9"
     },
     "incidents.jsonl": {
       "records": 21,
       "bytes": 20623,
-      "sha256": "e585bcbda84581f3e37f375cc3a70433046ccbe258a1f15a3b14730ba50e956b"
+      "sha256": "1352dd1e23261f25e370ba4c4fed13bd14c4a9443f881fdbfb1fae55df9cf3dd"
     },
     "tasks.jsonl": {
       "records": 778,
       "bytes": 616661,
-      "sha256": "d17b9c8f2ecee523eaae21f55036d97ce525bbebd778cbe3739204a45dd73ff5"
+      "sha256": "28513a5188016864e2e6af2772f9e71e5c7e0fbdc1915b21bbf12cd2bce014a4"
     },
     "vendor/mock-vendor-a-shelf-scans.ndjson": {
       "bytes": 1258828,

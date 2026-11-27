@@ -1,0 +1,12 @@
+{
+  "oissversion": "0.2",
+  "system": "Mock loss prevention",
+  "vendor": "Vendor B",
+  "source": "urn:oiss:demo-001:mock-vendor-b:lp-alerts",
+  "stores": ["demo-001"],
+  "produces": [
+    { "type": "oiss.Incident", "versions": ["0.1"] },
+    { "type": "oiss.Evidence", "versions": ["0.1"] }
+  ],
+  "contact": "Vendor B support"
+}

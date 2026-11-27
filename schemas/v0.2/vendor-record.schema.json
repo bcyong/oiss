@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/vendor-record.schema.json",
+  "title": "OISS v0.2 vendor-defined record data",
+  "description": "The data of a record whose type an organization defines in its own namespace. It carries the shared fields, provenance included, and anything else its owner defines. It must not hold biometric identifiers or personal data. See spec/extensions.md.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL of the JSON Schema the rest of the data follows, if its owner publishes one."
+    }
+  }
+}

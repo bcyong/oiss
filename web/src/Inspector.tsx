@@ -4,6 +4,7 @@ import type { IndexedDay } from "./day.ts";
 import { assigneeName, checkoutName, duration, summarize, TASK_KIND, TASK_OUTCOME, TASK_STATE, flagDetail, flagName, humanize, INCIDENT_LABEL, INCIDENT_STATUS, itemNameAt, money, pct, PRIVACY, SPEC_SLUG, STATUS_LABEL, timeOf, typeName, zoneName } from "./describe.ts";
 import { EvidencePreview } from "./EvidencePreview.tsx";
 import { VENDOR_NAME, type VendorRaw, vendorRawFor } from "./vendorRaw.ts";
+import { effectivePrivacy } from "./versions.ts";
 import type { AnyRecord, EvidenceData, IncidentData, OissRecord, Provenance, ShelfObservationData, ShopperPathData, StoreLayoutData, TaskData, ZoneMetricData } from "./oiss.ts";
 
 /** Lists longer than this are cut in the JSON view, so a StoreLayout or a long path stays readable. */
@@ -338,7 +339,7 @@ function Details({ day, record, onInspect, t }: { day: IndexedDay; record: AnyRe
 export function Inspector({ day, record, onInspect, onClose, following, t }: { day: IndexedDay; record: AnyRecord; onInspect: (id: string) => void; onClose?: () => void; following: boolean; /** The playback time, so a task's history stops there. */ t?: number }) {
   const [tab, setTab] = useState<"summary" | "json">("summary");
   const [copied, setCopied] = useState(false);
-  const privacy = PRIVACY[record.oissprivacy];
+  const privacy = PRIVACY[effectivePrivacy(record)];
   const provenance = (record.data as { provenance: Provenance }).provenance;
   const evidenceIds = (record.data as { evidence?: string[] }).evidence ?? [];
   const asEvidence = record.type === "oiss.Evidence" ? (record as OissRecord<EvidenceData>) : undefined;

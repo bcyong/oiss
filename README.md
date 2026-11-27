@@ -4,7 +4,7 @@ OISS is a draft open interchange standard for store-intelligence data. Its goal 
 
 Each source publishes what it saw as OISS records, so any consumer, from a store operations dashboard to an AI agent, reads one record set for the whole store. OISS also includes a blueprint for using that data with agent platforms: a reference app where agents read OISS records and raise store tasks, so the value shows right away.
 
-> **Status:** v0.1 draft, the website part of milestone M3 is in (vendor feeds and adapters, feed toggles and the disagreement view, loss prevention, shelf faults and the live store); M3's server pieces are deferred until the website is complete. Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
+> **Status:** v0.2 draft, the website part of milestone M3 is in (vendor feeds and adapters, feed toggles and the disagreement view, loss prevention, shelf faults and the live store); M3's server pieces are deferred until the website is complete. Nothing here is stable yet. The goal is a live web demo of a synthetic grocery store running on OISS records, with agents that act on them.
 
 ## Why a retailer would adopt it
 
@@ -44,7 +44,8 @@ Data moves top to bottom, in five layers:
   - **Front-end agent:** opens a lane when a queue grows, and feeds queue trends to labor scheduling.
   - **Loss prevention agent:** ties a front-end exception to an anonymous shopper path, a missing item and the evidence, for a person to review.
   - **Store insights agent:** flags where two vendors disagree about the same shelf, compares the store with the other stores in its district, and measures display lift.
-- **Seven record types.** A small shared core, versioned as v0.1 and listed below.
+- **Seven record types.** A small shared core, versioned as v0.2 and listed below, with namespaced extensions and vendor record types for anything else.
+- **Versions side by side.** Each record says which OISS version it follows, so one store can hold records from vendors that upgrade on different schedules. The demo store does: its loss prevention feed still sends v0.1.
 - **Adapters and validation.** One adapter per vendor export, a schema validator, and a mapping from ShelfObservation to a GS1 EPCIS 2.0 ObjectEvent.
 - **Storage and query.** DuckDB for current state, Parquet for history, and an evidence store that enforces retention.
 - **Agent access.** An MCP server with tools such as out-of-stocks since a time, zone status, open incidents and create task.
@@ -70,7 +71,7 @@ Today the spec, schemas, examples, validator, store simulator, the demo replay w
 | Folder | Contents | Milestone |
 | --- | --- | --- |
 | [`spec`](spec) | The specification text: envelope, store layout model, record types, vocabularies, identifiers, versioning | M0–M1 |
-| [`schemas/v0.1`](schemas/v0.1) | JSON Schemas (draft 2020-12) for the envelope and the seven record types | M0 |
+| [`schemas`](schemas) | JSON Schemas (draft 2020-12) for the envelope and the seven record types, one frozen folder per version, listed in `versions.json` | M0 |
 | [`examples`](examples) | One valid and one invalid record per type | M0 |
 | [`validator`](validator) | `oiss-validate`, a Python validator for vendors and integration teams | M0 |
 | [`sim`](sim) | Synthetic grocery store simulator that writes a day of OISS records from a seed | M1 |

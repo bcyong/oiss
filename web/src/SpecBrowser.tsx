@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { CURRENT } from "./versions.ts";
 
 // The schemas and examples are bundled from the repo at build time, so this page always matches the
 // schemas the validator checks.
@@ -14,6 +15,7 @@ type Schema = {
   required?: string[];
   items?: Schema;
   allOf?: Schema[];
+  anyOf?: Schema[];
   if?: Schema;
   then?: Schema;
   $defs?: Record<string, Schema>;
@@ -23,7 +25,7 @@ type Schema = {
   pattern?: string;
 };
 
-const schemaFiles = import.meta.glob<Schema>("../../schemas/v0.1/*.schema.json", { eager: true, import: "default" });
+const schemaFiles = import.meta.glob<Schema>("../../schemas/v0.2/*.schema.json", { eager: true, import: "default" });
 const validFiles = import.meta.glob<unknown>("../../examples/valid/*.json", { eager: true, import: "default" });
 const invalidFiles = import.meta.glob<unknown>("../../examples/invalid/*.json", { eager: true, import: "default" });
 const invalidNotes = import.meta.glob<string>("../../examples/invalid/README.md", { eager: true, import: "default", query: "?raw" });
@@ -69,6 +71,9 @@ const DEF_LABEL: Record<string, string> = {
   evidenceRefs: "Evidence ids",
   recordRefs: "record ids",
   money: "money",
+  namespace: "namespace",
+  vendorRecordType: "vendor record type",
+  extensions: "extensions",
 };
 
 const humanize = (v: string) => v.replaceAll("_", " ");
@@ -115,6 +120,13 @@ function typeOf(s: Schema): ReactNode {
     if (file === "defs") return <a href={`#shared-${name}`}>{DEF_LABEL[name] ?? name}</a>;
     return s.$ref;
   }
+  if (s.anyOf)
+    return s.anyOf.map((alt, i) => (
+      <span key={i}>
+        {i ? " or " : ""}
+        {typeOf(alt)}
+      </span>
+    ));
   if (s.const !== undefined) return <code>{JSON.stringify(s.const)}</code>;
   if (s.enum)
     return (
@@ -224,7 +236,7 @@ function RecordPage({ slug }: { slug: (typeof RECORD_TYPES)[number]["slug"] }) {
         <dd>{privacy.map(humanize).join(" or ")}</dd>
         <dt>Schema</dt>
         <dd>
-          <a href={`https://github.com/bcyong/oiss/blob/main/schemas/v0.1/${slug}.schema.json`} target="_blank" rel="noopener noreferrer">{slug}.schema.json</a>
+          <a href={`https://github.com/bcyong/oiss/blob/main/schemas/v${CURRENT}/${slug}.schema.json`} target="_blank" rel="noopener noreferrer">{slug}.schema.json</a>
         </dd>
       </dl>
       <p>{s.description}</p>
@@ -362,7 +374,7 @@ export function SpecBrowser({ initialPage }: { initialPage?: string } = {}) {
     <div className="app spec">
       <div className="spec-layout">
         <nav className="spec-nav" aria-label="Spec pages">
-          <p className="eyebrow">OISS v0.1</p>
+          <p className="eyebrow">OISS v{CURRENT}</p>
           {PAGES.map((p, i) => (
             <a key={p.slug} href={`#${p.slug}`} aria-current={page === p.slug ? "page" : undefined} className={i === 1 || i === RECORD_TYPES.length + 1 ? "gap" : undefined}>
               {p.label}

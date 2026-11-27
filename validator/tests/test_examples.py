@@ -4,11 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from oiss_validate import Validator, gtin_check_digit_ok
+from oiss_validate import Validator, effective_privacy, gtin_check_digit_ok, known_versions
 from oiss_validate.cli import main
 
 ROOT = Path(__file__).resolve().parents[2]
 VALID = sorted((ROOT / "examples" / "valid").glob("*.json"))
+OLDER = sorted((ROOT / "examples" / "older").glob("*.json"))
 INVALID = sorted((ROOT / "examples" / "invalid").glob("*.json"))
 
 # What each invalid example must be rejected for.
@@ -22,6 +23,10 @@ EXPECTED = {
     "evidence-no-retention.json": ("schema", "retainUntil"),
     "task-verified-without-proof.json": ("schema", "verifiedBy"),
     "task-unknown-outcome.json": ("schema", "item_returned"),
+    "extension-face-field.json": ("no-personal-data", "shopperFaceEmbedding"),
+    "extension-reserved-namespace.json": ("schema", "oiss.shelfscan"),
+    "shelf-observation-unknown-version.json": ("unsupported-version", "0.3"),
+    "vendor-record-type-phone-number.json": ("no-personal-data", "PhoneNumber"),
 }
 
 RECORD_TYPES = {"StoreLayout", "ShelfObservation", "ZoneMetric", "ShopperPath", "Incident", "Evidence", "Task"}
@@ -37,8 +42,8 @@ def load(path):
 
 
 def test_every_record_type_has_a_valid_and_an_invalid_example():
-    valid_types = {load(p)["type"].removeprefix("oiss.") for p in VALID}
-    invalid_types = {load(p)["type"].removeprefix("oiss.") for p in INVALID}
+    oiss_types = lambda paths: {load(p)["type"].removeprefix("oiss.") for p in paths if load(p)["type"].startswith("oiss.")}
+    valid_types, invalid_types = oiss_types(VALID), oiss_types(INVALID)
     assert valid_types == RECORD_TYPES
     assert invalid_types == RECORD_TYPES
     assert set(EXPECTED) == {p.name for p in INVALID}
@@ -47,6 +52,13 @@ def test_every_record_type_has_a_valid_and_an_invalid_example():
 @pytest.mark.parametrize("path", VALID, ids=lambda p: p.name)
 def test_valid_examples_pass(validator, path):
     assert validator.problems(load(path)) == []
+
+
+@pytest.mark.parametrize("path", OLDER, ids=lambda p: p.name)
+def test_older_version_examples_still_pass(validator, path):
+    record = load(path)
+    assert record["oissversion"] != known_versions()[-1]
+    assert validator.problems(record) == []
 
 
 @pytest.mark.parametrize("path", INVALID, ids=lambda p: p.name)
@@ -92,6 +104,6 @@ def test_timestamps_need_an_offset(validator):
 
 
 def test_cli_exit_codes(capsys):
-    assert main([str(ROOT / "examples" / "valid"), "-q"]) == 0
+    assert main([str(ROOT / "examples" / "valid"), str(ROOT / "examples" / "older"), "-q"]) == 0
     assert main([str(ROOT / "examples" / "invalid"), "-q"]) == 1
     assert f"0 of {len(INVALID)} records valid" in capsys.readouterr().out

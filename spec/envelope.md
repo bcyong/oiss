@@ -1,6 +1,6 @@
 # Envelope
 
-Every OISS record is a [CloudEvents 1.0](https://github.com/cloudevents/spec) event in structured JSON mode, so any CloudEvents tooling can route, filter and store it. Schema: [`envelope.schema.json`](../schemas/v0.1/envelope.schema.json).
+Every OISS record is a [CloudEvents 1.0](https://github.com/cloudevents/spec) event in structured JSON mode, so any CloudEvents tooling can route, filter and store it. Schema: [`envelope.schema.json`](../schemas/v0.2/envelope.schema.json).
 
 ## CloudEvents attributes
 
@@ -9,10 +9,10 @@ Every OISS record is a [CloudEvents 1.0](https://github.com/cloudevents/spec) ev
 | `specversion` | yes | Always `"1.0"`. |
 | `id` | yes | Unique per `source`. A record that updates another (such as a task's new status) gets a new `id` and keeps the same `subject`. |
 | `source` | yes | The producing system or device, as a URI reference. A URN such as `urn:oiss:<store>:<vendor>:<device>` works. |
-| `type` | yes | The record type: `oiss.StoreLayout`, `oiss.ShelfObservation`, `oiss.ZoneMetric`, `oiss.ShopperPath`, `oiss.Incident`, `oiss.Evidence` or `oiss.Task`. |
+| `type` | yes | The record type: `oiss.StoreLayout`, `oiss.ShelfObservation`, `oiss.ZoneMetric`, `oiss.ShopperPath`, `oiss.Incident`, `oiss.Evidence` or `oiss.Task`, or a [vendor record type](extensions.md#vendor-record-types) in its owner's namespace, such as `com.example.FloorHazard`. |
 | `time` | yes | When the observed thing happened, or when the record's state took effect. RFC 3339 with an offset. |
 | `subject` | yes | The id of the thing the record is about: a store, facing, zone, shopper path, incident, evidence item or task. |
-| `dataschema` | no | The URL of the record type's schema. |
+| `dataschema` | no | The URL of the record type's schema, at the tagged address of the record's own version (see [versioning.md](versioning.md#schema-locations)). |
 | `datacontenttype` | yes | Always `"application/json"`. |
 | `data` | yes | The record body, described by the record type's schema. |
 
@@ -22,9 +22,9 @@ CloudEvents extension values must be simple strings, so OISS puts only the field
 
 | Attribute | Required | Meaning |
 | --- | --- | --- |
-| `oissversion` | yes | The OISS version the record follows. `"0.1"` for now. |
+| `oissversion` | yes | The OISS version the record follows, such as `"0.2"`. A store may hold records of several versions; each is read by its own version's rules (see [versioning.md](versioning.md#records-of-several-versions-in-one-store)). |
 | `oissstore` | yes | The store id, as defined by the store's StoreLayout. |
-| `oissprivacy` | yes | The record's privacy class (see [vocabularies.md](vocabularies.md#privacy-classes)). A reader MUST NOT see a record above the class it's cleared for. |
+| `oissprivacy` | yes | The record's privacy class (see [vocabularies.md](vocabularies.md#privacy-classes)). A reader MUST NOT see a record above the class it's cleared for, and MUST treat a class it doesn't know as `restricted`. |
 
 Each record type has a privacy floor: StoreLayout is `operational`, ZoneMetric at least `aggregate`, ShopperPath at least `anonymous_path`, and Incident and Evidence are always `restricted`.
 
@@ -39,8 +39,9 @@ Structured fields that every record may carry sit inside `data`:
 | `location` | Where the record applies, as StoreLayout ids (`zone`, `fixture`, `shelf`, `facing`, `camera`) and an optional floor-plan `point`. |
 | `confidence` | From 0 to 1: how sure the producer is. |
 | `evidence` | Ids of Evidence records that back this one. |
+| `extensions` | Data an organization adds beyond OISS, keyed by its namespace (see [extensions.md](extensions.md)). New in v0.2. |
 
-Each record type says which of these it requires. Records MUST NOT carry fields their schema doesn't define, so a producer can't slip biometric or personal data into a record.
+Each record type says which of these it requires. Outside `extensions`, records MUST NOT carry fields their version's schema doesn't define, so a producer can't slip biometric or personal data into a record; inside `extensions`, the [no personal data](extensions.md#no-personal-data) rule applies.
 
 ## Example
 
@@ -52,8 +53,9 @@ Each record type says which of these it requires. Records MUST NOT carry fields 
   "type": "oiss.ShelfObservation",
   "time": "2026-11-25T09:14:00-08:00",
   "subject": "A07-L-S3-F05",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/shelf-observation.schema.json",
   "datacontenttype": "application/json",
-  "oissversion": "0.1",
+  "oissversion": "0.2",
   "oissstore": "demo-001",
   "oissprivacy": "operational",
   "data": {

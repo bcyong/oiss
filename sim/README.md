@@ -1,6 +1,6 @@
 # Simulator
 
-A deterministic simulator of one synthetic grocery store, `demo-001`. From a seed and a date it simulates a store day (shoppers, on-shelf inventory, recovery and the front end) and writes what four kinds of sources would report about it, as valid OISS v0.1 records.
+A deterministic simulator of one synthetic grocery store, `demo-001`. From a seed and a date it simulates a store day (shoppers, on-shelf inventory, recovery and the front end) and writes what four kinds of sources would report about it, as valid OISS records: v0.2 from most feeds, and v0.1 from the loss prevention vendor, which hasn't upgraded yet.
 
 It is plain TypeScript with no Node-only code, so the same source runs in Node from the command line and in the browser, where the demo's **Simulate another day** button uses it.
 

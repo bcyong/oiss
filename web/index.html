@@ -33,7 +33,7 @@
         <div class="hero-inner">
           <div class="title-row">
             <h1>Open Intelligent Store Specification</h1>
-            <span class="badge">Draft v0.1</span>
+            <span class="badge">Draft v0.2</span>
             <span class="badge">Open standard</span>
           </div>
           <p class="lede">An open interchange standard for store-intelligence data, so a retailer can combine several vendors' data with its own systems and use it to run its stores better.</p>
@@ -126,7 +126,7 @@
                     <li><strong>Store Insights Agent:</strong> flags where two vendors disagree about the same shelf and which facings to check, and compares the store with the other stores in its district on availability, shelf tag accuracy, checkout waits and exceptions. <span class="planned">Planned</span> Measuring display lift, once sales records are in the spec.</li>
                   </ul>
                 </li>
-                <li><strong>Seven Record Types:</strong> StoreLayout, ShelfObservation, ZoneMetric, ShopperPath, Incident, Evidence and Task, versioned together as v0.1</li>
+                <li><strong>Seven Record Types:</strong> StoreLayout, ShelfObservation, ZoneMetric, ShopperPath, Incident, Evidence and Task, versioned together as v0.2, with namespaced extensions for anything else</li>
                 <li><strong>Adapters and Validation:</strong> one adapter per vendor export, the <code>oiss-validate</code> schema validator, and a mapping from ShelfObservation to a GS1 EPCIS 2.0 ObjectEvent</li>
                 <li><strong>Storage and Query:</strong> current state and history for every record, held in the browser in the demo. <span class="planned">Planned</span> A query API over a database, and an evidence store that enforces retention.</li>
                 <li><strong>Agent Access:</strong> <span class="planned">Planned</span> an MCP server with tools such as out-of-stocks since a time, zone status, open incidents and create task</li>

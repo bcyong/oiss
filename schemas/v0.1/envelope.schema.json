@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/envelope.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/envelope.schema.json",
   "title": "OISS v0.1 record envelope",
   "description": "Every OISS record is a CloudEvents 1.0 event in structured JSON mode. CloudEvents attributes carry routing fields; the record body is in data. See spec/envelope.md.",
   "type": "object",

@@ -3,7 +3,14 @@
  * store's local time with its UTC offset, which is how OISS writes every time.
  */
 
-export const SCHEMA_BASE = "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/";
+/** The OISS version these adapters write, unless an adapter says otherwise. */
+export const OISS_VERSION = "0.2";
+/** OISS versions an adapter can write. */
+export type OissVersion = "0.1" | "0.2";
+
+/** Where a version's schemas are published: its git tag, never a branch, so they can't change. See schemas/versions.json. */
+export const schemaBase = (version: OissVersion) => `https://raw.githubusercontent.com/bcyong/oiss/v${version}/schemas/v${version}/`;
+export const SCHEMA_BASE = schemaBase(OISS_VERSION);
 
 /** GS1 check digit for the digits before it. */
 export function gs1CheckDigit(body: string): number {
@@ -137,7 +144,7 @@ export interface Envelope<T extends string = string> {
   subject: string;
   dataschema: string;
   datacontenttype: "application/json";
-  oissversion: "0.1";
+  oissversion: OissVersion;
   oissstore: string;
   oissprivacy: "operational" | "aggregate" | "anonymous_path" | "restricted";
   data: Record<string, unknown>;
@@ -153,7 +160,7 @@ export function envelope<T extends string>(fields: { type: T; id: string; source
     subject: fields.subject,
     dataschema: SCHEMA_BASE + fields.schema,
     datacontenttype: "application/json",
-    oissversion: "0.1",
+    oissversion: OISS_VERSION,
     oissstore: fields.store,
     oissprivacy: fields.privacy,
     data: fields.data,

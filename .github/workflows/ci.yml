@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -24,8 +26,20 @@ jobs:
               Draft202012Validator.check_schema(json.loads(path.read_text()))
               print("ok", path)
           PY
+      - name: Released schema versions are frozen
+        # Once a version is tagged, its schema folder must match the tag exactly.
+        run: |
+          for v in $(jq -r '.versions[].version' schemas/versions.json); do
+            if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+              git diff --exit-code "v$v" -- "schemas/v$v" && echo "ok v$v matches its tag"
+            else
+              echo "v$v has no tag yet"
+            fi
+          done
       - name: Valid examples pass
-        run: oiss-validate examples/valid
+        run: oiss-validate examples/valid examples/older
+      - name: Valid examples pass as a reader
+        run: oiss-validate --reader examples/valid examples/older
       - name: Invalid examples fail
         run: "! oiss-validate -q examples/invalid"
       - name: Tests
