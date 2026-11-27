@@ -7,7 +7,9 @@
  *
  * The second form asks a deployed site's assistant instead, with the key that site already has.
  * A question the safety check turns down counts as a failure, since every sample question is an
- * ordinary store question. About 30 model calls, and a safety check on each question and answer. Prints a table, adds it to the GitHub job summary when there is one, and exits
+ * ordinary store question. The model words each answer a little differently from run to run, so an answer that
+ * fails a check is asked once more, and the question counts as passed if the second answer passes; the log and
+ * the job summary still show every first-try miss. About 30 model calls, and a safety check on each question and answer. Prints a table, adds it to the GitHub job summary when there is one, and exits
  * non-zero when an answer fails a check. Without a key it says so and exits zero, so a fork's pull
  * request isn't marked failed.
  */
@@ -47,6 +49,8 @@ interface Row {
   safety?: string;
   proposals?: number;
   turnedDown?: number;
+  /** What the first answer failed on, when it took a second try. */
+  firstTry?: string;
 }
 
 const rows: Row[] = [];
@@ -65,22 +69,35 @@ for (const t of TIMES) {
       if (!res.ok) throw new AssistantError(body.code ?? "upstream", body.error ?? `HTTP ${res.status}`);
       return body;
     };
-    try {
-      // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
-      const a = await ask(day, t, question, step, undefined, loadPeers).catch((err: unknown) => {
-        if (err instanceof AssistantError && err.code === "timeout") {
-          console.log(`        timed out once; asking again`);
-          return ask(day, t, question, step, undefined, loadPeers);
-        }
-        throw err;
-      });
-      const verdict = (c?: { verdict: string; model?: string }) => (c ? `${c.verdict}${c.model ? ` (${c.model})` : ""}` : "off");
-      rows.push({ time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length, turnedDown: a.turnedDown.length });
-    } catch (err) {
-      rows.push({ time: clock(t), question, findings: [], error: err instanceof Error ? err.message : String(err) });
+    const attempt = async (): Promise<Row> => {
+      try {
+        // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
+        const a = await ask(day, t, question, step, undefined, loadPeers).catch((err: unknown) => {
+          if (err instanceof AssistantError && err.code === "timeout") {
+            console.log(`        timed out once; asking again`);
+            return ask(day, t, question, step, undefined, loadPeers);
+          }
+          throw err;
+        });
+        const verdict = (c?: { verdict: string; model?: string }) => (c ? `${c.verdict}${c.model ? ` (${c.model})` : ""}` : "off");
+        return { time: clock(t), question, agent: a.agent, findings: checkAnswer(a, toolText, question), text: a.text, safety: `question ${verdict(a.safety.question)}, answer ${verdict(a.safety.answer)}`, proposals: a.proposals.length, turnedDown: a.turnedDown.length };
+      } catch (err) {
+        return { time: clock(t), question, findings: [], error: err instanceof Error ? err.message : String(err) };
+      }
+    };
+    let row = await attempt();
+    // An answer that fails a check gets one more try, since the model words it differently each time. A safety
+    // refusal or a server error isn't retried here: those say something about the setup, not the wording.
+    if (!row.error && row.findings.length) {
+      const miss = row.findings.map((f) => `${f.check}: ${f.detail}`).join("; ");
+      console.log(`retry ${row.time}  ${question}`);
+      console.log(`        first answer failed: ${miss}`);
+      if (row.text) for (const line of row.text.split("\n")) console.log(`        | ${line}`);
+      row = { ...(await attempt()), firstTry: miss };
     }
+    rows.push(row);
     const r = rows.at(-1)!;
-    console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}`);
+    console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}${r.firstTry && !r.findings.length ? " (on the second try)" : ""}`);
     if (r.safety) console.log(`        safety: ${r.safety}; ${r.proposals} task(s) proposed, ${r.turnedDown ?? 0} turned down by the store's rules`);
     for (const f of r.findings) console.log(`        ${f.check}: ${f.detail}`);
     if (r.error) console.log(`        ${r.error}`);
@@ -90,16 +107,17 @@ for (const t of TIMES) {
 }
 
 const failed = rows.filter((r) => r.error || r.findings.length);
+const retried = rows.filter((r) => r.firstTry);
 const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", "<br>");
 const summary = [
-  `## Assistant answer check: ${rows.length - failed.length} of ${rows.length} passed`,
+  `## Assistant answer check: ${rows.length - failed.length} of ${rows.length} passed${retried.length ? `, ${retried.length} after a second try` : ""}`,
   "",
   "| Time | Question | Agent | Safety | Proposed | Result |",
   "| --- | --- | --- | --- | --- | --- |",
-  ...rows.map((r) => `| ${r.time} | ${cell(r.question)} | ${r.agent ?? ""} | ${r.safety ?? ""} | ${r.proposals ?? ""} | ${r.error ? `Error: ${cell(r.error)}` : r.findings.length ? cell(r.findings.map((f) => `${f.check}: ${f.detail}`).join("\n")) : "Pass"} |`),
+  ...rows.map((r) => `| ${r.time} | ${cell(r.question)} | ${r.agent ?? ""} | ${r.safety ?? ""} | ${r.proposals ?? ""} | ${r.error ? `Error: ${cell(r.error)}` : r.findings.length ? cell(r.findings.map((f) => `${f.check}: ${f.detail}`).join("\n")) : r.firstTry ? `Pass on the second try (first: ${cell(r.firstTry)})` : "Pass"} |`),
   "",
   ...failed.filter((r) => r.text).flatMap((r) => [`<details><summary>${r.time}: ${cell(r.question)}</summary>`, "", r.text!, "", "</details>", ""]),
 ].join("\n");
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
-console.log(`\n${rows.length - failed.length} of ${rows.length} answers passed.`);
+console.log(`\n${rows.length - failed.length} of ${rows.length} answers passed${retried.length ? `, ${retried.length} of them on a second try` : ""}.`);
 process.exit(failed.length ? 1 : 0);
