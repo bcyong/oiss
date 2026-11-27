@@ -77,7 +77,7 @@ export function statedCauses(answer: string, toolText: string): string[] {
   return [...new Set(out)];
 }
 
-const GENERIC = new Set(["the", "a", "an", "your", "that", "this", "each", "which", "store", "store's", "same", "other", "responsible", "right", "assigned"]);
+const GENERIC = new Set(["the", "a", "an", "your", "that", "this", "each", "which", "store", "store's", "same", "other", "responsible", "right", "assigned", "routed"]);
 
 /** Team names in the answer, such as "Price integrity team", that no tool returned. */
 export function unknownTeams(answer: string, toolText: string): string[] {

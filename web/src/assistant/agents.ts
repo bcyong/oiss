@@ -206,7 +206,7 @@ export function agentPrompt(id: AgentId, store: string, now: string): string {
     "Your tools work out every status, count and priority. Use them as given: never recount them, add counts of different statuses together or regroup them, lead with the answer line when a tool gives one, and never call something wrong, open or done when its status says otherwise.",
     "A tool's rows are only the first few; say something about all of them only from the tool's counts and answer line, never from the rows shown.",
     "Recommend a next step only when the records support it, and never one a status argues against, such as raising a replenishment task again when the last one was cancelled for no backroom stock; that facing needs a store order, placed by the team in its assignedTo.",
-    "Say why something happened only when a record says why, such as a task's outcome. Otherwise say the records don't say, and name who could find out: the team in the row's assignedTo, or its routedTo when it has no task yet.",
+    "Say why something happened only when a record says why, such as a task's outcome. Otherwise say the records don't say, and name who could find out: the team in the row's assignedTo, or its routedTo when it has no task yet. When no row you read names a team, as in a comparison of stores, say only that the records don't say why, and name no team.",
     "Name people, teams, roles, systems and vendors only as your tools return them; never add one of your own, such as a lead, manager, supervisor or portal.",
     "If your tools can't answer, say so plainly.",
     ...(a.rules ? [a.rules] : []),

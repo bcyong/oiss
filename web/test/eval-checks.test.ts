@@ -81,6 +81,7 @@ test("the 15 minutes of a ZoneMetric and 'the other N' of a count the tools gave
   assert.deepEqual(unsupportedNumbers("All other 16 out-of-stock facings need store orders.", '{"outOfStock":17}'), []);
   assert.deepEqual(unsupportedNumbers("16 facings are out.", '{"outOfStock":17}'), ["16"]);
   assert.deepEqual(unknownTeams("each assigned team places a store order", ""), []);
+  assert.deepEqual(unknownTeams("each routed team should check its facings", ""), []);
 });
 
 test("the store manager who approves a proposal isn't a new role", () => {
