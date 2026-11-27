@@ -776,6 +776,14 @@ const RANKED: [keyof StoreCard, "higher" | "lower", string][] = [
   ["vendorDisagreementsStanding", "lower", "facings where two vendors still disagree"],
 ];
 
+/** The kind of task behind a store figure whose work goes to one team. Shelf figures span departments, so they name none. */
+const ROUTED: Partial<Record<keyof StoreCard, TaskData["kind"]>> = {
+  shelfTagsWrongOnShelf: "fix_shelf_tag",
+  avgWaitSecondsSoFar: "open_lane",
+  checkoutExceptions: "review_exception",
+  checkoutExceptionsNotReviewed: "review_exception",
+};
+
 function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefined): ToolResult {
   if (!peers?.length) return { error: "The other stores' figures aren't available right now, so this store can't be compared with them." };
   const own = storeCard(day, t);
@@ -791,7 +799,7 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const i = lastAtOrBefore(p.times, t);
     if (i >= 0) stores.push({ ...p.cards[i]!, asOf: clock(p.times[i]!) });
   }
-  const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number }> = {};
+  const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number; routedTo?: string }> = {};
   for (const [key, better, label] of RANKED) {
     const value = (c: StoreCard) => c[key] as number;
     const beats = (x: number, y: number) => (better === "higher" ? x > y : x < y);
@@ -803,13 +811,14 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const bottom = better === "higher" ? Math.min(...values) : Math.max(...values);
     const named = (v: number) => `${stores.filter((c) => value(c) === v).map((c) => c.name).join("; ")} (${v})`;
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10 };
+    const team = ROUTED[key] && routedTo(ROUTED[key]);
+    ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top, routedTo: team } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10, routedTo: team };
   }
   return {
     asOf: clock(t),
     stores,
     ranks,
-    note: `This store is ${own.name}; the others are the district's stores, built to the same prototype floor plan and planogram, so each figure compares like for like. Every figure comes from each store's own OISS records at the same time of day (each store's asOf). Only this store's records are on this page: cite its ids from records, and name the store for any other store's figure instead of citing an id. onShelfAvailabilityPct is the share of facings read so far whose latest read isn't out of stock. shoppersThroughCheckout counts shoppers through the staffed lanes and self-checkout so far. avgWaitSecondsSoFar averages the staffed lanes' 15-minute average waits since opening. The records don't say why one store differs from another; say so, and name what the figures point to. This tool names no team, so name none. Cite this store's figures with the ids in its records, such as latestFrontEndMetric for its checkout wait.`,
+    note: `This store is ${own.name}; the others are the district's stores, built to the same prototype floor plan and planogram, so each figure compares like for like. Every figure comes from each store's own OISS records at the same time of day (each store's asOf). Only this store's records are on this page: cite its ids from records, and name the store for any other store's figure instead of citing an id. onShelfAvailabilityPct is the share of facings read so far whose latest read isn't out of stock. shoppersThroughCheckout counts shoppers through the staffed lanes and self-checkout so far. avgWaitSecondsSoFar averages the staffed lanes' 15-minute average waits since opening. The records don't say why one store differs from another; say so, and name what the figures point to. A figure's routedTo is the team the store routes that kind of work to; name a team only from a routedTo, and for a figure without one name none. Cite this store's figures with the ids in its records, such as latestFrontEndMetric for its checkout wait.`,
   };
 }
 
