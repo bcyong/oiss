@@ -651,6 +651,7 @@ function vendorDisagreements(day: IndexedDay, t: number, args: ToolArgs): ToolRe
         robot: { says: saidBy(d, d.robot), at: clock(secondsOf(day, d.robot.time)), id: d.robot.id },
         other: { source: sourceKind(d.other), says: saidBy(d, d.other), at: clock(secondsOf(day, d.other.time)), id: d.other.id },
         matchesRegisterPrice: d.kind === "price" ? (matches(d.robot) ? "the robot's read" : matches(d.other) ? `the ${sourceKind(d.other)}` : "neither") : undefined,
+        readToCheck: d.kind === "price" ? (matches(d.robot) ? `the ${sourceKind(d.other)}'s, which doesn't match the register price` : matches(d.other) ? "the robot's, which doesn't match the register price" : "both, since neither matches the register price") : undefined,
         since: clock(g.first),
         robotPasses: g.passes,
         status: standing ? "Still disagreeing: the robot hasn't passed the facing again since." : `Settled: the robot's later pass at ${clock(lastRobot!.at)} no longer disagrees.`,
@@ -665,7 +666,7 @@ function vendorDisagreements(day: IndexedDay, t: number, args: ToolArgs): ToolRe
     answer: groups.length ? `${plural(counts.standing, "facing still has", "facings still have")} ${kind ? `a ${DISAGREEMENT_LABEL[kind]} disagreement` : "a disagreement between two sources"}; ${counts.settled} more settled on the robot's next pass.` : `No ${what} so far today.`,
     counts: { ...counts, byKind, bySources: byPair },
     disagreements: rows.slice(0, n).map((r) => r.row),
-    note: "Each pass of the shelf-scanning robot is checked against the latest report from the shelf cameras and the electronic shelf labels for the same facing; every vendor reports the same facing ids, so the check is a simple comparison. The records don't say which source is right, except for a shelf tag price, where matchesRegisterPrice says whose read matches the item master. Someone should look at a facing that is still disagreeing; routedTo is the team the store routes that kind of shelf work to.",
+    note: "Each pass of the shelf-scanning robot is checked against the latest report from the shelf cameras and the electronic shelf labels for the same facing; every vendor reports the same facing ids, so the check is a simple comparison. The records don't say which source is right or why two sources disagree, except for a shelf tag price, where matchesRegisterPrice says whose read matches the item master and readToCheck names the read to check. Don't guess beyond that: never say what is likely wrong or what likely needs fixing. Someone should look at a facing that is still disagreeing; routedTo is the team the store routes that kind of shelf work to.",
   };
 }
 
