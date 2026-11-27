@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 472" role="img" aria-labelledby="oiss-hook-title" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <title id="oiss-hook-title">One shared record replaces an integration per vendor</title>
+  <style>
+    .oiss-fig-edge { fill: none; stroke: #8a8f86; stroke-width: 1.25; }
+    .oiss-fig-head { fill: #8a8f86; }
+    .oiss-fig-ink { fill: #1c1f1a; }
+    .oiss-fig-quiet { fill: #5f665b; }
+    .oiss-fig-small { font-size: 11.5px; }
+    .oiss-fig-accent { fill: #76b900; fill-opacity: 0.12; stroke: #76b900; stroke-width: 2; }
+    .oiss-fig-warn { fill: #e7ad33; fill-opacity: 0.12; stroke: #e7ad33; stroke-width: 1.5; }
+    .oiss-fig-rule { stroke: #d9dcd5; stroke-width: 1; }
+    .oiss-fig-strong { font-weight: 600; }
+    @media (prefers-color-scheme: dark) {
+      .oiss-fig-ink { fill: #eeeeee; }
+      .oiss-fig-quiet { fill: #a7a7a7; }
+      .oiss-fig-rule { stroke: #333333; }
+    }
+  </style>
+  <defs>
+    <marker id="oiss-hook-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="oiss-fig-head" /></marker>
+  </defs>
+  <text x="24" y="34" font-size="15" class="oiss-fig-ink oiss-fig-strong">One shared record replaces an integration per vendor</text>
+  <text x="24" y="72" class="oiss-fig-ink oiss-fig-strong">Today</text>
+  <text x="76" y="72" class="oiss-fig-quiet" style="font-size: 13px">each vendor needs its own custom integration</text>
+  <g class="oiss-fig-edge">
+    <path d="M208 104H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 104H470" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 144H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 144H470" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 184H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 184H470" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 224H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 224H470" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 312H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 352H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 392H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M208 432H246" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 332H470" marker-end="url(#oiss-hook-arrow)" />
+    <path d="M432 412H470" marker-end="url(#oiss-hook-arrow)" />
+    <rect x="24" y="88" width="184" height="32" rx="8" />
+    <rect x="24" y="128" width="184" height="32" rx="8" />
+    <rect x="24" y="168" width="184" height="32" rx="8" />
+    <rect x="24" y="208" width="184" height="32" rx="8" />
+    <rect x="24" y="296" width="184" height="32" rx="8" />
+    <rect x="24" y="336" width="184" height="32" rx="8" />
+    <rect x="24" y="376" width="184" height="32" rx="8" />
+    <rect x="24" y="416" width="184" height="32" rx="8" />
+    <rect x="472" y="88" width="264" height="32" rx="8" />
+    <rect x="472" y="128" width="264" height="32" rx="8" />
+    <rect x="472" y="168" width="264" height="32" rx="8" />
+    <rect x="472" y="208" width="264" height="32" rx="8" />
+    <rect x="472" y="304" width="264" height="56" rx="8" />
+    <rect x="472" y="384" width="264" height="56" rx="8" />
+  </g>
+  <rect x="248" y="88" width="184" height="32" rx="8" class="oiss-fig-warn" />
+  <rect x="248" y="128" width="184" height="32" rx="8" class="oiss-fig-warn" />
+  <rect x="248" y="168" width="184" height="32" rx="8" class="oiss-fig-warn" />
+  <rect x="248" y="208" width="184" height="32" rx="8" class="oiss-fig-warn" />
+  <rect x="248" y="296" width="184" height="152" rx="8" class="oiss-fig-accent" />
+  <line x1="24" x2="736" y1="252" y2="252" class="oiss-fig-rule" />
+  <text x="24" y="280" class="oiss-fig-ink oiss-fig-strong">With OISS</text>
+  <text x="108" y="280" class="oiss-fig-quiet" style="font-size: 13px">every vendor writes one shared record</text>
+  <g text-anchor="middle" class="oiss-fig-ink">
+    <text x="116" y="108">Shelf scanning</text>
+    <text x="116" y="148">Shelf-edge labels</text>
+    <text x="116" y="188">Front-end analytics</text>
+    <text x="116" y="228">In-house systems</text>
+    <text x="340" y="108">Custom integration</text>
+    <text x="340" y="148">Custom integration</text>
+    <text x="340" y="188">Custom integration</text>
+    <text x="340" y="228">Custom integration</text>
+    <text x="604" y="108">Its own dashboard and tasks</text>
+    <text x="604" y="148">Its own dashboard and tasks</text>
+    <text x="604" y="188">Its own dashboard and tasks</text>
+    <text x="604" y="228">Its own dashboard and tasks</text>
+    <text x="116" y="316">Shelf scanning</text>
+    <text x="116" y="356">Shelf-edge labels</text>
+    <text x="116" y="396">Front-end analytics</text>
+    <text x="116" y="436">In-house systems</text>
+    <text x="340" y="366" font-size="15" class="oiss-fig-strong">OISS</text>
+    <text x="340" y="388">one shared store record</text>
+    <text x="604" y="328" class="oiss-fig-strong">Any analytics tool or AI agent</text>
+    <text x="604" y="408" class="oiss-fig-strong">One task list for associates</text>
+  </g>
+  <g text-anchor="middle" class="oiss-fig-quiet oiss-fig-small">
+    <text x="604" y="344">reads all vendors, no custom work</text>
+    <text x="604" y="424">and one view of each store</text>
+  </g>
+</svg>
