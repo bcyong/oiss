@@ -24,6 +24,7 @@ test("numbers, times and amounts must come from the tool results", () => {
 test("an answer may not give a cause the records don't", () => {
   assert.deepEqual(statedCauses("The tag is wrong, likely because the price file changed overnight.", tools), ["likely", "because"]);
   assert.deepEqual(statedCauses("The records don't say why. Replenish by likely lost sales.", tools), []);
+  assert.deepEqual(statedCauses("The forecast can't say which shelves are likely to run out yet.", tools), []);
   // A cause word is fine when what follows it is the cause a record gave.
   const cancelled = JSON.stringify({ outcome: "No backroom stock. The facing needs a store order." });
   assert.deepEqual(statedCauses("Its task was cancelled due to no backroom stock.", cancelled), []);

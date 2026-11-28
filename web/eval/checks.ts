@@ -61,7 +61,7 @@ export function unsupportedNumbers(answer: string, toolText: string, question = 
 
 const CAUSE = /\b(because|due to|caused by|owing to|probably|likely|the reason)\b/gi;
 /** Phrases that use a cause word without giving a cause. */
-const NOT_A_CAUSE = /likely lost sales|most likely to lose sales/gi;
+const NOT_A_CAUSE = /likely lost sales|most likely to lose sales|(?:most |more |less |least )?likely to (?:run out|be out of stock)/gi;
 
 /** Words in the answer that give a cause, when the tool results give none. */
 export function statedCauses(answer: string, toolText: string): string[] {

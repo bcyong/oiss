@@ -16,6 +16,8 @@ import { DISTRICT_PEERS, runDay } from "@oiss/sim";
 import { simulatePeerStore } from "../src/peers.ts";
 import { SAMPLE_QUESTIONS } from "../src/assistant/agents.ts";
 import { handleAssistant, type StepReply, type StepRequest } from "../src/assistant/proxy.ts";
+import { handleForecast } from "../src/assistant/forecastProxy.ts";
+import { httpForecast, type Forecaster } from "../src/assistant/forecast.ts";
 import { ask, AssistantError, httpStep, type Step } from "../src/assistant/run.ts";
 import { clock, indexDay } from "../src/day.ts";
 import type { DayFiles } from "../src/load.ts";
@@ -49,11 +51,34 @@ interface Row {
   turnedDown?: number;
 }
 
+// The stock forecast goes to NVIDIA Kumo Relational the same way: in process, or through a deployed site.
+let forecastNote = "";
+const callForecast: Forecaster = url
+  ? httpForecast(url.replace(/\/api\/assistant\/?$/, "/api/forecast"))
+  : async (input) => {
+      const res = await handleForecast(new Request("https://eval.invalid/api/forecast", { method: "POST", headers: { "content-type": "application/json", "x-nf-client-connection-ip": `eval-forecast-${n}` }, body: JSON.stringify(input) }), { key, forecast: process.env.NVIDIA_FORECAST });
+      const body = (await res.json()) as { model: string; probabilities: (number | null)[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      return body;
+    };
+// What the forecast did, so a run shows whether Kumo answered at all.
+const forecaster: Forecaster = async (input) => {
+  try {
+    const reply = await callForecast(input);
+    forecastNote = `${reply.model} scored ${reply.probabilities.filter((p) => p !== null).length} of ${input.predict.length} facings from ${input.context.length} labeled rows`;
+    return reply;
+  } catch (err) {
+    forecastNote = `failed: ${err instanceof Error ? err.message : String(err)}`;
+    throw err;
+  }
+};
+
 const rows: Row[] = [];
 let n = 0;
 for (const t of TIMES) {
   for (const question of SAMPLE_QUESTIONS) {
     n++;
+    forecastNote = "";
     // The tool results the model last saw, which every fact in the answer has to come from.
     let toolText = "";
     const step: Step = async (req: StepRequest) => {
@@ -67,10 +92,10 @@ for (const t of TIMES) {
     };
     try {
       // A model call that runs past the server's time limit says nothing about the answer, so it gets one more try.
-      const a = await ask(day, t, question, step, undefined, loadPeers).catch((err: unknown) => {
+      const a = await ask(day, t, question, step, undefined, loadPeers, forecaster).catch((err: unknown) => {
         if (err instanceof AssistantError && err.code === "timeout") {
           console.log(`        timed out once; asking again`);
-          return ask(day, t, question, step, undefined, loadPeers);
+          return ask(day, t, question, step, undefined, loadPeers, forecaster);
         }
         throw err;
       });
@@ -82,6 +107,7 @@ for (const t of TIMES) {
     const r = rows.at(-1)!;
     console.log(`${r.error ? "ERROR" : r.findings.length ? "FAIL " : "pass "} ${r.time}  ${question}`);
     if (r.safety) console.log(`        safety: ${r.safety}; ${r.proposals} task(s) proposed, ${r.turnedDown ?? 0} turned down by the store's rules`);
+    if (forecastNote) console.log(`        forecast: ${forecastNote}`);
     for (const f of r.findings) console.log(`        ${f.check}: ${f.detail}`);
     if (r.error) console.log(`        ${r.error}`);
     // A failed answer's own words, so the log shows what the check caught.

@@ -8,8 +8,8 @@
   publish = "web/dist"
 
 [functions]
-  # The Store Operations Assistant's model proxy, served at /api/assistant. It needs NVIDIA_API_KEY in the
-  # site's environment variables; see docs/deploy-netlify.md.
+  # The Store Operations Assistant's model proxy, served at /api/assistant, and its stock forecast, served at
+  # /api/forecast. Both need NVIDIA_API_KEY in the site's environment variables; see docs/deploy-netlify.md.
   directory = "netlify/functions"
   node_bundler = "esbuild"
 

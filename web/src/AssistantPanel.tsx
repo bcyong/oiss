@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { clock, secondsOf, type IndexedDay } from "./day.ts";
 import { AGENTS, SAMPLE_QUESTIONS } from "./assistant/agents.ts";
 import { ask, AssistantError, httpStep, modelName, type Answer, type LoadPeers, type Step } from "./assistant/run.ts";
+import { httpForecast, type Forecaster } from "./assistant/forecast.ts";
 import { loadDistrict } from "./district.ts";
 import type { Proposal } from "./assistant/tools.ts";
 import type { Approval } from "./approve.ts";
@@ -131,6 +132,8 @@ function modelsLine(a: Answer): string {
   const agent = modelName(a.models.agent);
   if (router && agent && router !== agent) parts.push(`routed by ${router}, answered by ${agent}`);
   else if (agent) parts.push(`answered by ${agent}`);
+  const forecast = modelName(a.models.forecast);
+  if (forecast) parts.push(`stock forecast by ${forecast}`);
   const checks = [a.safety.question, a.safety.answer].filter((c) => c && c.verdict !== "unchecked");
   const safetyModel = modelName(checks[0]?.model);
   if (checks.length && safetyModel) parts.push(`${a.safety.answer?.verdict === "unsafe" ? "answer withheld" : "screened"} by ${safetyModel}`);
@@ -138,7 +141,7 @@ function modelsLine(a: Answer): string {
   return parts.join(" · ");
 }
 
-export function AssistantPanel({ day, t, onInspect, entries, setEntries, onApprove, step = httpStep(), loadPeers }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; onApprove?: (p: Proposal) => Promise<Approval>; step?: Step; loadPeers?: LoadPeers }) {
+export function AssistantPanel({ day, t, onInspect, entries, setEntries, onApprove, step = httpStep(), loadPeers, forecaster = httpForecast() }: { day: IndexedDay; t: number; onInspect: (id: string) => void; entries: ChatEntry[]; setEntries: (f: (e: ChatEntry[]) => ChatEntry[]) => void; onApprove?: (p: Proposal) => Promise<Approval>; step?: Step; loadPeers?: LoadPeers; forecaster?: Forecaster }) {
   const [draft, setDraft] = useState("");
   const date = day.files.date;
   const peers: LoadPeers = loadPeers ?? (() => loadDistrict(date));
@@ -172,7 +175,7 @@ export function AssistantPanel({ day, t, onInspect, entries, setEntries, onAppro
     setEntries((es) => [...es, { id, question: q, t, state: "asking", progress: "Starting" }]);
     const update = (e: ChatEntry) => setEntries((es) => es.map((x) => (x.id === id ? e : x)));
     try {
-      const answer = await ask(day, t, q, step, (progress) => update({ id, question: q, t, state: "asking", progress }), peers);
+      const answer = await ask(day, t, q, step, (progress) => update({ id, question: q, t, state: "asking", progress }), peers, forecaster);
       update({ id, question: q, t, state: "answered", answer });
     } catch (err) {
       const code = err instanceof AssistantError ? err.code : "upstream";
