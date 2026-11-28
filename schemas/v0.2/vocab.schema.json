@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/vocab.schema.json",
+  "title": "OISS v0.2 vocabularies",
+  "description": "Controlled values shared by the OISS record types. See spec/vocabularies.md.",
+  "$defs": {
+    "recordType": {
+      "enum": [
+        "oiss.StoreLayout",
+        "oiss.ShelfObservation",
+        "oiss.ZoneMetric",
+        "oiss.ShopperPath",
+        "oiss.Incident",
+        "oiss.Evidence",
+        "oiss.Task"
+      ],
+      "x-oiss-vocabulary": "closed",
+      "description": "The record types OISS defines. Closed: a reader that meets a type it doesn't know skips the record and treats it as restricted. Organizations may also define their own types (see defs vendorRecordType)."
+    },
+    "privacyClass": {
+      "description": "Ordered from least to most sensitive: operational, aggregate, anonymous_path, restricted. Closed: a reader MUST treat a class it doesn't know as restricted.",
+      "enum": [
+        "operational",
+        "aggregate",
+        "anonymous_path",
+        "restricted"
+      ],
+      "x-oiss-vocabulary": "closed"
+    },
+    "shelfStatus": {
+      "enum": [
+        "in_stock",
+        "low_stock",
+        "out_of_stock",
+        "unknown"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "shelfFlag": {
+      "description": "Shelf conditions found during a scan or audit.",
+      "enum": [
+        "misplaced_item",
+        "price_mismatch",
+        "missing_tag",
+        "facing_count_mismatch",
+        "needs_recovery",
+        "damaged_item",
+        "planogram_noncompliant"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "zoneKind": {
+      "enum": [
+        "aisle",
+        "endcap",
+        "front_end",
+        "self_checkout",
+        "entrance",
+        "exit",
+        "produce",
+        "deli",
+        "bakery",
+        "meat_and_seafood",
+        "dairy",
+        "frozen",
+        "pharmacy",
+        "service_counter",
+        "backroom",
+        "other"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "fixtureKind": {
+      "enum": [
+        "gondola",
+        "endcap",
+        "wall_section",
+        "cooler",
+        "freezer",
+        "display",
+        "pallet_display",
+        "bin",
+        "service_counter",
+        "checkout_lane",
+        "self_checkout",
+        "other"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "objectClass": {
+      "description": "Human, Vehicle, Bicycle and Animal follow ONVIF's analytics object type names. Cart, Basket, Bag and Item are OISS additions for retail. ONVIF's HumanFace and LicensePlate are left out on purpose.",
+      "enum": [
+        "Human",
+        "Vehicle",
+        "Bicycle",
+        "Animal",
+        "Cart",
+        "Basket",
+        "Bag",
+        "Item"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "incidentType": {
+      "description": "Loss-prevention exceptions and store safety incidents.",
+      "enum": [
+        "non_scan",
+        "ticket_switching",
+        "bottom_of_basket",
+        "sweethearting",
+        "push_out",
+        "shelf_sweep",
+        "safety_hazard",
+        "other"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "incidentStatus": {
+      "enum": [
+        "open",
+        "under_review",
+        "confirmed",
+        "dismissed"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "taskKind": {
+      "enum": [
+        "replenish",
+        "recover",
+        "fix_shelf_tag",
+        "go_back",
+        "open_lane",
+        "review_exception",
+        "cleanup",
+        "other"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "taskState": {
+      "description": "open → assigned → in_progress → done → verified. A task that needs verification closes only at verified. cancelled can follow any state.",
+      "enum": [
+        "open",
+        "assigned",
+        "in_progress",
+        "done",
+        "verified",
+        "cancelled"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "taskOutcome": {
+      "description": "How a task was resolved. For a cancelled task, the reason: duplicate, resolved_elsewhere, no_backroom_stock or no_longer_needed. For a loss prevention review, the disposition: confirmed_loss, customer_paid or false_alarm.",
+      "enum": [
+        "duplicate",
+        "resolved_elsewhere",
+        "no_backroom_stock",
+        "no_longer_needed",
+        "confirmed_loss",
+        "customer_paid",
+        "false_alarm",
+        "other"
+      ],
+      "x-oiss-vocabulary": "open"
+    },
+    "redaction": {
+      "enum": [
+        "none",
+        "people_blurred",
+        "people_masked",
+        "cropped_to_shelf"
+      ],
+      "x-oiss-vocabulary": "open"
+    }
+  }
+}

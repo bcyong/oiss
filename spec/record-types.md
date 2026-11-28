@@ -1,6 +1,6 @@
-# Record types (v0.1)
+# Record types (v0.2)
 
-Each record type has its own schema for `data` in [`schemas/v0.1`](../schemas/v0.1), and a valid and an invalid example in [`examples`](../examples).
+Each record type has its own schema for `data` in [`schemas/v0.2`](../schemas/v0.2), and a valid and an invalid example in [`examples`](../examples). Organizations may also define their own record types for data none of these cover; see [extensions.md](extensions.md#vendor-record-types).
 
 | Record | About (`subject`) | What it says | Typical sources | Privacy floor |
 | --- | --- | --- | --- | --- |

@@ -1,0 +1,30 @@
+{
+  "specversion": "1.0",
+  "id": "fh-0001",
+  "source": "urn:oiss:demo-001:mock-vendor-d:floor-cam-3",
+  "type": "com.example.FloorHazard",
+  "time": "2026-11-25T10:02:00-08:00",
+  "subject": "fh-0001",
+  "datacontenttype": "application/json",
+  "oissversion": "0.2",
+  "oissstore": "demo-001",
+  "oissprivacy": "operational",
+  "data": {
+    "schema": "https://hazards.example.com/oiss/floor-hazard-1.json",
+    "provenance": {
+      "system": "Mock floor hazard detection",
+      "vendor": "Vendor D",
+      "synthetic": true
+    },
+    "location": {
+      "zone": "aisle-07",
+      "point": {
+        "x": 21.4,
+        "y": 8.2
+      }
+    },
+    "confidence": 0.88,
+    "hazard": "liquid_spill",
+    "areaSquareMeters": 0.6
+  }
+}

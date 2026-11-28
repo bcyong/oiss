@@ -6,7 +6,7 @@ The public site, deployed to Netlify from this repository (see [deploy-netlify.m
 - **`/demo/`**: the demo store, built with React and SVG. It reads only OISS records and the retailer's item master, the same way any OISS consumer would.
 - **`/rfc/`**: the OISS RFC, rendered at build time from [`docs/rfc/OISS-RFC.md`](../docs/rfc/OISS-RFC.md) by a small Markdown renderer in [`site/markdown.ts`](site/markdown.ts). Edit the Markdown to change the page.
 - **`/github/`**: an overview of the repository, with links out to GitHub from the page itself.
-- **`/spec/`**: the spec browser. Every record type with its fields, rules, vocabularies and the valid example, read straight from `schemas/v0.1` and `examples/valid` at build time.
+- **`/spec/`**: the spec browser. Every record type with its fields, rules, vocabularies and the valid example, read straight from the current version's schemas (`schemas/v0.2`) and `examples/valid` at build time.
 
 ## The demo store
 

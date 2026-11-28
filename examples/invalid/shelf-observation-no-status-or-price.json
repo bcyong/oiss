@@ -5,9 +5,9 @@
   "type": "oiss.ShelfObservation",
   "time": "2026-11-25T06:15:41-08:00",
   "subject": "A04-R-S0-F12",
-  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shelf-observation.schema.json",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/shelf-observation.schema.json",
   "datacontenttype": "application/json",
-  "oissversion": "0.1",
+  "oissversion": "0.2",
   "oissstore": "demo-001",
   "oissprivacy": "operational",
   "data": {

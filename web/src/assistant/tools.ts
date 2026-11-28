@@ -2,6 +2,7 @@ import { disagreementsUpTo, groupDisagreements, incidentsUpTo, lastAtOrBefore, l
 import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, observer, STATUS_LABEL, TASK_KIND, TASK_OUTCOME, TASK_STATE, zoneName } from "../describe.ts";
 import { OPEN_LANE_WAIT_SECONDS, routeTask } from "@oiss/sim";
 import type { AnyRecord, IncidentData, OissRecord, ShelfObservationData, TaskData } from "../oiss.ts";
+import { effectivePrivacy } from "../versions.ts";
 import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
 import type { ForecastRun } from "./forecast.ts";
 
@@ -258,6 +259,8 @@ function shelfGaps(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
     answer,
     asked: { status: want, department: dept || undefined },
     total: rows.length,
+    shown: Math.min(n, rows.length),
+    notShown: Math.max(0, rows.length - n),
     replenishment: counts,
     facings: facings.slice(0, n),
     note: "since: when the facing's current status began. notInStockSince: when it was last in stock. replenishment counts cover every facing listed in total, not only the rows shown. replenishmentTask.assignedTo is the team that has the task; routedTo, on a row with no task, is the team the store's task system routes replenishment to for that department.",
@@ -597,10 +600,12 @@ function getRecord(day: IndexedDay, t: number, args: ToolArgs): ToolResult {
   const r = day.byId.get(id) as AnyRecord | undefined;
   if (!r || secondsOf(day, r.time) > t) return { error: `No record ${id} has arrived by ${clock(t)}.` };
   if (r.type === "oiss.StoreLayout") return { id: r.id, type: r.type, note: "The store layout and planogram. Use the other tools for its facings." };
-  if (r.oissprivacy === "restricted" && r.type !== "oiss.Incident") return { id: r.id, type: r.type, time: r.time, source: r.source, privacy: r.oissprivacy, note: "Restricted: only named roles may open this record's media." };
-  if (r.type === "oiss.ShopperPath") return { id: r.id, type: r.type, time: r.time, privacy: r.oissprivacy, note: "An anonymous shopper path; its points are left out." };
+  // A privacy class or record type the demo doesn't know counts as restricted (spec/versioning.md).
+  const privacy = effectivePrivacy(r);
+  if (privacy === "restricted" && r.type !== "oiss.Incident") return { id: r.id, type: r.type, time: r.time, source: r.source, privacy, note: "Restricted: only named roles may open this record's media." };
+  if (r.type === "oiss.ShopperPath") return { id: r.id, type: r.type, time: r.time, privacy, note: "An anonymous shopper path; its points are left out." };
   const { provenance, ...data } = r.data as unknown as { provenance: unknown } & Record<string, unknown>;
-  return { id: r.id, type: r.type, time: r.time, source: r.source, subject: r.subject, privacy: r.oissprivacy, provenance, data };
+  return { id: r.id, type: r.type, time: r.time, source: r.source, subject: r.subject, oissversion: r.oissversion, privacy, provenance, data };
 }
 
 // ---- store insights ---------------------------------------------------------------
@@ -647,6 +652,7 @@ function vendorDisagreements(day: IndexedDay, t: number, args: ToolArgs): ToolRe
         robot: { says: saidBy(d, d.robot), at: clock(secondsOf(day, d.robot.time)), id: d.robot.id },
         other: { source: sourceKind(d.other), says: saidBy(d, d.other), at: clock(secondsOf(day, d.other.time)), id: d.other.id },
         matchesRegisterPrice: d.kind === "price" ? (matches(d.robot) ? "the robot's read" : matches(d.other) ? `the ${sourceKind(d.other)}` : "neither") : undefined,
+        readToCheck: d.kind === "price" ? (matches(d.robot) ? `the ${sourceKind(d.other)}'s, which doesn't match the register price` : matches(d.other) ? "the robot's, which doesn't match the register price" : "both, since neither matches the register price") : undefined,
         since: clock(g.first),
         robotPasses: g.passes,
         status: standing ? "Still disagreeing: the robot hasn't passed the facing again since." : `Settled: the robot's later pass at ${clock(lastRobot!.at)} no longer disagrees.`,
@@ -661,7 +667,7 @@ function vendorDisagreements(day: IndexedDay, t: number, args: ToolArgs): ToolRe
     answer: groups.length ? `${plural(counts.standing, "facing still has", "facings still have")} ${kind ? `a ${DISAGREEMENT_LABEL[kind]} disagreement` : "a disagreement between two sources"}; ${counts.settled} more settled on the robot's next pass.` : `No ${what} so far today.`,
     counts: { ...counts, byKind, bySources: byPair },
     disagreements: rows.slice(0, n).map((r) => r.row),
-    note: "Each pass of the shelf-scanning robot is checked against the latest report from the shelf cameras and the electronic shelf labels for the same facing; every vendor reports the same facing ids, so the check is a simple comparison. The records don't say which source is right, except for a shelf tag price, where matchesRegisterPrice says whose read matches the item master. Someone should look at a facing that is still disagreeing; routedTo is the team the store routes that kind of shelf work to.",
+    note: "Each pass of the shelf-scanning robot is checked against the latest report from the shelf cameras and the electronic shelf labels for the same facing; every vendor reports the same facing ids, so the check is a simple comparison. The records don't say which source is right or why two sources disagree, except for a shelf tag price, where matchesRegisterPrice says whose read matches the item master and readToCheck names the read to check. Don't guess beyond that: never say what is likely wrong or what likely needs fixing. Someone should look at a facing that is still disagreeing; routedTo is the team the store routes that kind of shelf work to.",
   };
 }
 
@@ -759,11 +765,28 @@ export interface PeerStore {
 const RANKED: [keyof StoreCard, "higher" | "lower", string][] = [
   ["onShelfAvailabilityPct", "higher", "on-shelf availability"],
   ["outOfStock", "lower", "out-of-stock facings"],
+  ["lowStock", "lower", "low-stock facings"],
+  ["openReplenishmentTasks", "lower", "open replenishment tasks"],
+  ["replenishmentsCancelledNoBackroomStock", "lower", "replenishments cancelled for no backroom stock"],
+  ["shelfTasksConfirmed", "higher", "shelf tasks confirmed"],
   ["shelfTagsWrongOnShelf", "lower", "shelf tags wrong on the shelf"],
+  ["shoppersThroughCheckout", "higher", "shoppers through checkout so far"],
   ["avgWaitSecondsSoFar", "lower", "average checkout wait so far"],
+  ["checkoutExceptions", "lower", "checkout exceptions"],
   ["checkoutExceptionsNotReviewed", "lower", "checkout exceptions not yet reviewed"],
   ["vendorDisagreementsStanding", "lower", "facings where two vendors still disagree"],
 ];
+
+/** The kind of task behind a store figure whose work goes to one team. Shelf figures span departments, so they name none. */
+/** Shelf figures in the district comparison, whose work routes by each item's department. */
+const SHELF_FIGURES = new Set<keyof StoreCard>(["onShelfAvailabilityPct", "outOfStock", "lowStock", "openReplenishmentTasks", "replenishmentsCancelledNoBackroomStock", "shelfTasksConfirmed"]);
+
+const ROUTED: Partial<Record<keyof StoreCard, TaskData["kind"]>> = {
+  shelfTagsWrongOnShelf: "fix_shelf_tag",
+  avgWaitSecondsSoFar: "open_lane",
+  checkoutExceptions: "review_exception",
+  checkoutExceptionsNotReviewed: "review_exception",
+};
 
 function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefined): ToolResult {
   if (!peers?.length) return { error: "The other stores' figures aren't available right now, so this store can't be compared with them." };
@@ -780,7 +803,9 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const i = lastAtOrBefore(p.times, t);
     if (i >= 0) stores.push({ ...p.cards[i]!, asOf: clock(p.times[i]!) });
   }
-  const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number }> = {};
+  // Shelf work routes to the team for each item's department, so a shelf figure names every team it could go to.
+  const shelfTeams = `the team for each item's department: ${[...new Set([...day.items.values()].map((i) => routedTo("replenish", i.department)))].sort().join(", ")}`;
+  const ranks: Record<string, { thisStore: string; best?: string; worst?: string; allTied?: number; districtAverage: number; routedTo?: string }> = {};
   for (const [key, better, label] of RANKED) {
     const value = (c: StoreCard) => c[key] as number;
     const beats = (x: number, y: number) => (better === "higher" ? x > y : x < y);
@@ -792,13 +817,14 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
     const bottom = better === "higher" ? Math.min(...values) : Math.max(...values);
     const named = (v: number) => `${stores.filter((c) => value(c) === v).map((c) => c.name).join("; ")} (${v})`;
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10 };
+    const team = ROUTED[key] ? routedTo(ROUTED[key]) : SHELF_FIGURES.has(key) ? shelfTeams : undefined;
+    ranks[label] = top === bottom ? { thisStore: `tied with every store`, allTied: top, districtAverage: top, routedTo: team } : { thisStore: `${place} of ${stores.length}${tied ? ", tied" : ""}`, best: named(top), worst: named(bottom), districtAverage: Math.round(avg * 10) / 10, routedTo: team };
   }
   return {
     asOf: clock(t),
     stores,
     ranks,
-    note: `This store is ${own.name}; the others are the district's stores, built to the same prototype floor plan and planogram, so each figure compares like for like. Every figure comes from each store's own OISS records at the same time of day (each store's asOf). Only this store's records are on this page: cite its ids from records, and name the store for any other store's figure instead of citing an id. onShelfAvailabilityPct is the share of facings read so far whose latest read isn't out of stock. shoppersThroughCheckout counts shoppers through the staffed lanes and self-checkout so far. avgWaitSecondsSoFar averages the staffed lanes' 15-minute average waits since opening. The records don't say why one store differs from another; say so, and name what the figures point to. This tool names no team, so name none. Cite this store's figures with the ids in its records, such as latestFrontEndMetric for its checkout wait.`,
+    note: `This store is ${own.name}; the others are the district's stores, built to the same prototype floor plan and planogram, so each figure compares like for like. Every figure comes from each store's own OISS records at the same time of day (each store's asOf). Only this store's records are on this page: cite its ids from records, and name the store for any other store's figure instead of citing an id. onShelfAvailabilityPct is the share of facings read so far whose latest read isn't out of stock. shoppersThroughCheckout counts shoppers through the staffed lanes and self-checkout so far. avgWaitSecondsSoFar averages the staffed lanes' 15-minute average waits since opening. The records don't say why one store differs from another; say so, and name what the figures point to. A figure's routedTo is the team the store routes that kind of work to; name a team only from a routedTo, and for a figure without one name none. Cite this store's figures with the ids in its records, such as latestFrontEndMetric for its checkout wait.`,
   };
 }
 

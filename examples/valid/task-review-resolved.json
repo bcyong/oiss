@@ -5,9 +5,9 @@
   "type": "oiss.Task",
   "time": "2026-11-25T14:32:00-08:00",
   "subject": "task-0002",
-  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/task.schema.json",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/task.schema.json",
   "datacontenttype": "application/json",
-  "oissversion": "0.1",
+  "oissversion": "0.2",
   "oissstore": "demo-001",
   "oissprivacy": "operational",
   "data": {

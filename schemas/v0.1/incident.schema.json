@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/incident.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/incident.schema.json",
   "title": "OISS v0.1 Incident data",
   "description": "A loss-prevention exception or store safety incident. It is a signal with a confidence for a person to review, not an accusation. subject is the incident id.",
   "type": "object",

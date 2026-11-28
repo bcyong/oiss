@@ -1,10 +1,14 @@
 # Vocabularies
 
-The controlled values used by OISS v0.1, in standard retail terms. Schema: [`vocab.schema.json`](../schemas/v0.1/vocab.schema.json).
+The controlled values used by OISS v0.2, in standard retail terms. Schema: [`vocab.schema.json`](../schemas/v0.2/vocab.schema.json).
+
+## Open and closed vocabularies
+
+Most vocabularies are **open**: a minor version may add values, and a reader that meets a value it doesn't know treats it as `unknown` or "other" rather than rejecting the record. Two are **closed**, because guessing wrong about them could expose something: privacy classes and record types. A reader treats a privacy class it doesn't know as `restricted`, and skips a record type it doesn't know and treats it as `restricted`. Adding a privacy class is a major change. Each vocabulary's schema says which it is in `x-oiss-vocabulary`. See [versioning.md](versioning.md#rules-for-readers).
 
 ## Privacy classes
 
-From least to most sensitive. A reader is cleared up to a class and sees nothing above it.
+From least to most sensitive. A reader is cleared up to a class and sees nothing above it. Closed: a class a reader doesn't know counts as `restricted`.
 
 | Class | Holds | Default access |
 | --- | --- | --- |

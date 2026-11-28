@@ -1,0 +1,69 @@
+{
+  "specversion": "1.0",
+  "id": "so-0004",
+  "source": "urn:oiss:demo-001:mock-vendor-a:scanner-1",
+  "type": "oiss.ShelfObservation",
+  "time": "2026-11-25T09:14:00-08:00",
+  "subject": "A07-L-S3-F05",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/shelf-observation.schema.json",
+  "datacontenttype": "application/json",
+  "oissversion": "0.2",
+  "oissstore": "demo-001",
+  "oissprivacy": "operational",
+  "data": {
+    "provenance": {
+      "system": "Mock shelf-scanning robot",
+      "vendor": "Vendor A",
+      "model": {
+        "name": "shelf-detector",
+        "version": "0.1"
+      },
+      "adapter": {
+        "name": "mock-shelf-scan",
+        "version": "0.1.0"
+      },
+      "synthetic": true
+    },
+    "window": {
+      "start": "2026-11-25T09:13:40-08:00",
+      "end": "2026-11-25T09:14:00-08:00"
+    },
+    "location": {
+      "zone": "aisle-07",
+      "fixture": "A07-L",
+      "shelf": "A07-L-S3",
+      "facing": "A07-L-S3-F05",
+      "camera": "cam-12"
+    },
+    "status": "low_stock",
+    "flags": [
+      "price_mismatch"
+    ],
+    "observedGtin": "02000000001012",
+    "planogramGtin": "02000000001012",
+    "fillLevel": 0.2,
+    "tagPrice": {
+      "amount": 3.99,
+      "currency": "USD"
+    },
+    "systemPrice": {
+      "amount": 3.49,
+      "currency": "USD"
+    },
+    "confidence": 0.91,
+    "evidence": [
+      "ev-0001"
+    ],
+    "extensions": {
+      "oiss.shelfscan": {
+        "schema": "https://shelfscan.example.com/oiss/shelf-observation-ext-1.json",
+        "data": {
+          "missionId": "M-20261125-0914",
+          "pass": 2,
+          "shelfEdgeLabelReadable": true,
+          "imageQuality": 0.87
+        }
+      }
+    }
+  }
+}

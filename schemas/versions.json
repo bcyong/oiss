@@ -1,0 +1,22 @@
+{
+  "description": "Every OISS version, where its schemas are published and whether they are frozen. Readers and validators use this list to pick the schemas for each record by its oissversion. See spec/versioning.md.",
+  "current": "0.2",
+  "versions": [
+    {
+      "version": "0.1",
+      "released": "2026-11-25",
+      "tag": "v0.1",
+      "base": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/",
+      "status": "supported",
+      "changelog": "CHANGELOG.md#01"
+    },
+    {
+      "version": "0.2",
+      "released": "2026-11-26",
+      "tag": "v0.2",
+      "base": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/",
+      "status": "current",
+      "changelog": "CHANGELOG.md#02"
+    }
+  ]
+}

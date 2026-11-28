@@ -1,7 +1,8 @@
-"""Command line: oiss-validate FILE_OR_DIR ...
+"""Command line: oiss-validate [--reader] FILE_OR_DIR ...
 
 Each file holds one record, or a JSON array of records. Use - to read from
-stdin, or a .jsonl file for one record per line. Exits 1 if anything fails.
+stdin, or a .jsonl file for one record per line. Records may be of different
+OISS versions; each is checked against its own. Exits 1 if anything fails.
 """
 
 from __future__ import annotations
@@ -9,10 +10,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
 
-from .core import DEFAULT_SCHEMA_DIR, Validator
+from .core import Validator
 
 
 def _records(path: str) -> Iterator[tuple[str, Any]]:
@@ -41,15 +43,18 @@ def _records(path: str) -> Iterator[tuple[str, Any]]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="oiss-validate", description="Validate OISS records.")
     parser.add_argument("paths", nargs="+", help="files or directories of records, or - for stdin")
-    parser.add_argument("--schemas", default=str(DEFAULT_SCHEMA_DIR), help="schema directory (default: %(default)s)")
+    parser.add_argument("--schemas", default=None, help="check every record against this one schema folder, whatever its oissversion (default: each record's own version, from schemas/versions.json)")
+    parser.add_argument("--reader", action="store_true", help="check as a reader: allow fields and values the record's version doesn't define, and newer minor versions from 1.0 up")
     parser.add_argument("-q", "--quiet", action="store_true", help="print only failures")
     args = parser.parse_args(argv)
 
-    validator = Validator(args.schemas)
+    validator = Validator(args.schemas, mode="reader" if args.reader else "producer")
     failed = checked = 0
+    by_version: Counter[str] = Counter()
     for path in args.paths:
         for label, record in _records(path):
             checked += 1
+            by_version[str(record.get("oissversion")) if isinstance(record, dict) else "?"] += 1
             problems = validator.problems(record)
             if problems:
                 failed += 1
@@ -58,7 +63,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  {problem}")
             elif not args.quiet:
                 print(f"ok   {label}")
-    print(f"{checked - failed} of {checked} records valid")
+    versions = ", ".join(f"{n} at {v}" for v, n in sorted(by_version.items()))
+    print(f"{checked - failed} of {checked} records valid" + (f" ({versions})" if len(by_version) > 1 else ""))
     return 1 if failed else 0
 
 

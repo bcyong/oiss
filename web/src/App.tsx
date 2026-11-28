@@ -7,6 +7,7 @@ import { FloorPlan, type CheckoutIncidents, type Selection } from "./FloorPlan.t
 import { Inspector } from "./Inspector.tsx";
 import { storyBeats, type Beat } from "./story.ts";
 import { VENDORS } from "./vendors.ts";
+import { CURRENT } from "./versions.ts";
 import { loadGoldenDay, simulateInBrowser } from "./load.ts";
 import type { AnyRecord, OissRecord, ShelfObservationData, ShelfStatus, TaskData, TaskState } from "./oiss.ts";
 import { Timeline } from "./Timeline.tsx";
@@ -432,12 +433,14 @@ export function App({ start }: { start?: AppStart } = {}) {
 
   // Each source system is one feed the visitor can switch off. The store layout is the frame every
   // record refers to, so it stays on.
-  const feeds: { system: string; vendor?: string; types: { type: string; records: number }[] }[] = [];
+  const feeds: { system: string; vendor?: string; versions: string[]; types: { type: string; records: number }[] }[] = [];
   for (const src of day.sources) {
     let f = feeds.find((x) => x.system === src.system);
-    if (!f) feeds.push((f = { system: src.system, vendor: src.vendor, types: [] }));
+    if (!f) feeds.push((f = { system: src.system, vendor: src.vendor, versions: [], types: [] }));
     f.types.push({ type: src.type, records: src.records });
+    for (const v of src.versions) if (!f.versions.includes(v)) f.versions.push(v);
   }
+  const mixedVersions = new Set(feeds.flatMap((f) => f.versions)).size > 1;
   const toggleFeed = (system: string) => {
     const next = new Set(off);
     if (next.has(system)) next.delete(system);
@@ -1208,6 +1211,7 @@ export function App({ start }: { start?: AppStart } = {}) {
                               <span>
                                 {f.system}
                                 {f.vendor ? <span className="vendor">{f.vendor}</span> : null}
+                                <span className="vendor">OISS {[...f.versions].sort().join(", ")}</span>
                                 {fixed ? <span className="vendor">Always on: every record refers to it</span> : null}
                               </span>
                             </label>
@@ -1227,6 +1231,11 @@ export function App({ start }: { start?: AppStart } = {}) {
                 <p className="note">
                   {total.toLocaleString("en-US")} records {off.size ? "from the feeds that are on" : "from every feed"}, all synthetic. Item names come from the retailer's item master, which OISS keys by GTIN.
                 </p>
+                {mixedVersions && (
+                  <p className="note">
+                    Feeds upgrade to a new OISS version on their own schedule, so this store holds records of more than one version. Each record says which version it follows, and the demo reads them all as {CURRENT}.
+                  </p>
+                )}
               </>
                 )}
                 {panel === "vendors" && (

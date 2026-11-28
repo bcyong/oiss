@@ -59,7 +59,15 @@ export interface LpAdapterConfig {
   accessRoles: string[];
 }
 
-import { SCHEMA_BASE, localIso, midnightAfter, toGtin14 } from "./common.ts";
+import { localIso, midnightAfter, schemaBase, toGtin14 } from "./common.ts";
+
+/**
+ * This adapter still writes OISS 0.1 on purpose. A store's vendors upgrade on their own
+ * schedules, so the demo store holds records of two versions side by side, and every reader in
+ * this repository has to cope with that (see spec/versioning.md). Its feed manifest is
+ * examples/feeds/vendor-b-loss-prevention.json.
+ */
+export const LP_OISS_VERSION = "0.1" as const;
 
 export { gs1CheckDigit, localIso, toGtin14 } from "./common.ts";
 
@@ -96,7 +104,7 @@ export interface AdaptedRecord {
   subject: string;
   dataschema: string;
   datacontenttype: "application/json";
-  oissversion: "0.1";
+  oissversion: typeof LP_OISS_VERSION;
   oissstore: string;
   oissprivacy: "restricted";
   data: Record<string, unknown>;
@@ -132,9 +140,9 @@ export function adaptLpAlerts(alerts: MockLpAlert[], config: LpAdapterConfig): A
     type,
     time: localIso(ms, config.timezone),
     subject: id,
-    dataschema: SCHEMA_BASE + schema,
+    dataschema: schemaBase(LP_OISS_VERSION) + schema,
     datacontenttype: "application/json",
-    oissversion: "0.1",
+    oissversion: LP_OISS_VERSION,
     oissstore: config.store,
     oissprivacy: "restricted",
     data,

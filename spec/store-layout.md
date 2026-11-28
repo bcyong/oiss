@@ -1,6 +1,6 @@
 # Store layout
 
-All OISS records place things on one store layout, so outputs from different vendors line up on the same aisle, fixture and facing. The layout is published as a StoreLayout record ([`store-layout.schema.json`](../schemas/v0.1/store-layout.schema.json)), usually from the retailer's space planning or planogram system.
+All OISS records place things on one store layout, so outputs from different vendors line up on the same aisle, fixture and facing. The layout is published as a StoreLayout record ([`store-layout.schema.json`](../schemas/v0.2/store-layout.schema.json)), usually from the retailer's space planning or planogram system.
 
 ## Store
 
@@ -35,4 +35,4 @@ Other records point into the layout through `data.location`, from coarse to fine
 
 ## Cameras
 
-A camera has a `position` on the floor plan (with `z` for mounting height), a `yaw` in degrees counterclockwise from +x, a `pitch` in degrees (negative looks down), horizontal and vertical fields of view (`hfov`, `vfov`), a useful `range` in meters and the zones it `covers`. That is enough to show coverage on the store map and to place detections on the floor. Full camera calibration is out of scope for v0.1.
+A camera has a `position` on the floor plan (with `z` for mounting height), a `yaw` in degrees counterclockwise from +x, a `pitch` in degrees (negative looks down), horizontal and vertical fields of view (`hfov`, `vfov`), a useful `range` in meters and the zones it `covers`. That is enough to show coverage on the store map and to place detections on the floor. Full camera calibration is out of scope for v0.2.

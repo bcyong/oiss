@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/shopper-path.schema.json",
+  "title": "OISS v0.2 ShopperPath data",
+  "description": "One anonymous shopper path on the floor plan. subject is the path id, which rotates and never encodes identity. Off by default.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
+  "properties": {
+    "objectClass": {
+      "$ref": "vocab.schema.json#/$defs/objectClass"
+    },
+    "idValidUntil": {
+      "$ref": "defs.schema.json#/$defs/timestamp",
+      "description": "After this time the producer must issue a new path id for the same shopper."
+    },
+    "points": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "$ref": "defs.schema.json#/$defs/timestamp"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "t",
+          "x",
+          "y"
+        ],
+        "additionalProperties": false
+      },
+      "description": "In time order."
+    }
+  },
+  "required": [
+    "objectClass",
+    "idValidUntil",
+    "points",
+    "window"
+  ],
+  "unevaluatedProperties": false
+}

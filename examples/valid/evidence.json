@@ -5,9 +5,9 @@
   "type": "oiss.Evidence",
   "time": "2026-11-25T17:42:10-08:00",
   "subject": "ev-0002",
-  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/evidence.schema.json",
+  "dataschema": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/evidence.schema.json",
   "datacontenttype": "application/json",
-  "oissversion": "0.1",
+  "oissversion": "0.2",
   "oissstore": "demo-001",
   "oissprivacy": "restricted",
   "data": {

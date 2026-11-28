@@ -1,5 +1,6 @@
 import { adaptLpAlerts, demo001Config, type MockLpAlert } from "@oiss/adapters/mock-lp-alerts";
 import type { DayFiles } from "./load.ts";
+import { readable } from "./versions.ts";
 import type { AnyRecord, EvidenceData, Facing, Fixture, IncidentData, OissRecord, Point, ShelfObservationData, ShelfStatus, ShopperPathData, StoreLayoutData, TaskData, Zone, ZoneMetricData } from "./oiss.ts";
 
 export interface Rect {
@@ -99,7 +100,8 @@ export interface IndexedDay {
   paths: PathView[];
   items: Map<string, DayFiles["itemMaster"]["items"][number]>;
   /** Every source system and record type in the day, with full-day counts whether or not the feed is on. */
-  sources: { system: string; vendor?: string; type: string; records: number }[];
+  /** Each source system and record type, with how many records it sent and in which OISS versions. */
+  sources: { system: string; vendor?: string; type: string; records: number; versions: string[] }[];
   /** Where the robot and another source disagree about a facing, ascending by time. */
   disagreements: Disagreement[];
   /** Index into facings by facing id. */
@@ -159,7 +161,9 @@ export function lastAtOrBefore(xs: number[], v: number): number {
   return ans;
 }
 
-export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): IndexedDay {
+export function indexDay(given: DayFiles, off: Set<string> = new Set()): IndexedDay {
+  // Records of every version the demo reads, in the current version's shape (see versions.ts).
+  const allFiles: DayFiles = { ...given, records: readable(given.records) };
   const full = allFiles.records;
   const on = <R extends AnyRecord>(rs: R[] | undefined): R[] => (rs ?? []).filter((r) => !off.has(r.data.provenance.system));
   const records: DayFiles["records"] = off.size
@@ -275,14 +279,15 @@ export function indexDay(allFiles: DayFiles, off: Set<string> = new Set()): Inde
       if (id) vendorAlertFor.set(id, a);
     }
   }
-  const sourceCounts = new Map<string, { system: string; vendor?: string; type: string; records: number }>();
+  const sourceCounts = new Map<string, IndexedDay["sources"][number]>();
   const taskList = records.tasks ?? [];
   const all: AnyRecord[] = [records.storeLayout, ...records.shelfObservations, ...records.zoneMetrics, ...records.shopperPaths, ...evidenceList, ...incidentList, ...taskList];
   const everything: AnyRecord[] = off.size ? [full.storeLayout, ...full.shelfObservations, ...full.zoneMetrics, ...full.shopperPaths, ...(full.evidence ?? []), ...(full.incidents ?? []), ...(full.tasks ?? [])] : all;
   for (const r of everything) {
     const key = `${r.data.provenance.system}|${r.type}`;
-    const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0 };
+    const entry = sourceCounts.get(key) ?? { system: r.data.provenance.system, vendor: r.data.provenance.vendor, type: r.type.replace(/^oiss\./, ""), records: 0, versions: [] };
     entry.records++;
+    if (!entry.versions.includes(r.oissversion)) entry.versions.push(r.oissversion);
     sourceCounts.set(key, entry);
   }
 

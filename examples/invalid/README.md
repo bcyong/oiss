@@ -12,3 +12,7 @@ Each file breaks one rule. The validator must reject every one of them.
 | `incident-wrong-privacy.json` | an Incident must be privacy class restricted (schema) |
 | `evidence-no-retention.json` | evidence has no retention date (schema required) |
 | `task-verified-without-proof.json` | a verified task must name the record that showed the fix (schema) |
+| `extension-face-field.json` | an extension carries a face embedding, which OISS doesn't allow anywhere (no-personal-data) |
+| `extension-reserved-namespace.json` | an extension uses the oiss. namespace, which is reserved for the spec (schema) |
+| `shelf-observation-unknown-version.json` | names OISS 0.3, which doesn't exist yet (unsupported-version) |
+| `vendor-record-type-phone-number.json` | a vendor record type carries a phone number (no-personal-data) |

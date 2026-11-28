@@ -105,6 +105,16 @@ Every record points to a place in a single store model: store, department or zon
 
 A vendor, the retailer, or the community can write the adapter for a feed, and once written it serves every retailer that uses that vendor. Where an existing standard already fits, OISS uses it: shelf observations map to GS1 EPCIS events, camera metadata follows ONVIF, and records travel in the CloudEvents envelope.
 
+### Room to grow without breaking stores
+
+A standard that stores depend on has to change without forcing every vendor to upgrade on the same day. OISS is built for a store whose data comes from systems on different versions at once.
+
+- **Every record names its version:** a store can hold records from a vendor on the newest version beside records from one that hasn't upgraded, and each is checked by its own version's rules.
+- **Upgrades only add, until a major version:** a minor version adds fields and values; a system built for the last one keeps working by ignoring what it doesn't know. Changes that would break a system wait for a major version, with notice and a migration note.
+- **Unknowns stay private:** a system that meets a privacy level or record type it doesn't recognize treats it as restricted, so a newer version never makes an older system show more than it should.
+- **A place for vendor data:** a vendor can send data OISS doesn't define yet, labelled as its own, instead of keeping a side channel. Data that several vendors send is a candidate for the shared core. The ban on personal and biometric data applies there too.
+- **A register of feeds:** each connected system states which records and versions it sends and reads, so an IT team can see when every vendor has moved and an old version can be retired.
+
 ### A blueprint for agents
 
 OISS includes a reference design for a Store Operations Assistant: a set of AI agents, each focused on one area of store operations, that read OISS records through MCP and propose tasks, which a manager approves before they reach the store.

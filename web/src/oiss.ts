@@ -1,4 +1,4 @@
-// The parts of OISS v0.1 records that the demo reads. The app works only from OISS records
+// The parts of OISS records that the demo reads, in the current version's shape (see versions.ts). The app works only from OISS records
 // (plus the retailer's item master), the same way any other consumer would.
 
 export interface Point {

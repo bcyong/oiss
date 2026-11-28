@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/shelf-observation.schema.json",
+  "title": "OISS v0.2 ShelfObservation data",
+  "description": "What a shelf scan, shelf camera, audit or shelf label system found at one facing: on-shelf availability, planogram compliance and price integrity. subject is the facing id. A record carries status, tagPrice or both: a shelf label system knows the price a label shows but can't see the shelf.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "status"
+          ]
+        },
+        {
+          "required": [
+            "tagPrice"
+          ]
+        }
+      ],
+      "description": "A record reports on-shelf availability, a shelf tag price, or both."
+    }
+  ],
+  "properties": {
+    "status": {
+      "$ref": "vocab.schema.json#/$defs/shelfStatus",
+      "description": "On-shelf availability. Left out by sources that can't see the shelf, such as a shelf label system reporting a price check."
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "$ref": "vocab.schema.json#/$defs/shelfFlag"
+      },
+      "uniqueItems": true
+    },
+    "observedGtin": {
+      "$ref": "defs.schema.json#/$defs/gtin",
+      "description": "The item seen at the facing, if identified."
+    },
+    "planogramGtin": {
+      "$ref": "defs.schema.json#/$defs/gtin",
+      "description": "The item the planogram assigns to the facing."
+    },
+    "fillLevel": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "How full the facing is, from 0 (empty) to 1 (at capacity)."
+    },
+    "tagPrice": {
+      "$ref": "defs.schema.json#/$defs/money",
+      "description": "The price on the shelf tag or electronic shelf label."
+    },
+    "systemPrice": {
+      "$ref": "defs.schema.json#/$defs/money",
+      "description": "The price in the retailer's price file or POS."
+    }
+  },
+  "required": [
+    "location",
+    "confidence",
+    "window"
+  ],
+  "unevaluatedProperties": false
+}

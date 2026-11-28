@@ -1,4 +1,4 @@
-# OISS specification, v0.1 draft
+# OISS specification, v0.2 draft
 
 The Open Intelligent Store Specification (OISS) is a draft open interchange standard for store-intelligence data. Its goal is to let a retailer combine data from several vendors with complementary services and its own in-house systems to run its stores better. Shelf-scanning robots and cameras, people-counting and shopper analytics, loss-prevention vision and space planning systems each publish what they saw as OISS records, so any consumer, including an AI agent, reads one record set for the whole store.
 
@@ -11,13 +11,15 @@ It is written for retail technology leaders and their integration teams: what ea
 | [record-types.md](record-types.md) | The seven record types and what each one says |
 | [vocabularies.md](vocabularies.md) | Controlled values: shelf conditions, zone and fixture types, incident types, task types and states, privacy classes |
 | [identifiers.md](identifiers.md) | Store numbers, GTINs, GLNs, OISS ids, and synthetic identifiers that can't collide with real items |
-| [versioning.md](versioning.md) | What a version number promises, compatible and breaking changes, deprecation, and drafts before 1.0 |
+| [versioning.md](versioning.md) | What a version number promises, compatible and breaking changes, records of several versions in one store, how readers and producers check records, adding a version, deprecation, and drafts before 1.0 |
+| [extensions.md](extensions.md) | Where a vendor puts data OISS doesn't define: namespaced extensions on any record, vendor record types, and the rule against personal data |
+| [feeds.md](feeds.md) | Feed manifests: which record types and versions each connected system writes and reads |
 
-The machine-readable form is in [`schemas/v0.1`](../schemas/v0.1), with examples in [`examples`](../examples) and a validator in [`validator`](../validator).
+The machine-readable form is in [`schemas/v0.2`](../schemas/v0.2), with every version listed in [`schemas/versions.json`](../schemas/versions.json), examples in [`examples`](../examples), a validator in [`validator`](../validator) and the history in the [changelog](../CHANGELOG.md).
 
 ## Status
 
-Draft v0.1, not stable. Field names and values may still change, under the draft rules in [versioning.md](versioning.md#drafts-before-10). The transport binding (MQTT and HTTP), the query API and conformance levels come in later milestones.
+Draft v0.2, not stable. Field names and values may still change, under the draft rules in [versioning.md](versioning.md#drafts-before-10). The transport binding (MQTT and HTTP), the query API and conformance levels come in later milestones.
 
 The key words MUST, MUST NOT, SHOULD and MAY are used as described in RFC 2119.
 

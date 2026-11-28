@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/evidence.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/evidence.schema.json",
   "title": "OISS v0.1 Evidence data",
   "description": "A reference to an image or clip, with its retention and access policy. The media itself stays in the evidence store. subject is the evidence id.",
   "type": "object",

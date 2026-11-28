@@ -1,7 +1,7 @@
 /**
  * The observation layer: what each source would report about the ground
  * truth, on its own schedule and with its own errors. Every record here is
- * a valid OISS v0.1 record with provenance.synthetic set.
+ * a valid OISS v0.2 record with provenance.synthetic set.
  *
  * Sources in the demo store (all synthetic):
  * - Demo Grocery space planning (the retailer's own system): the StoreLayout and planogram, once before opening.

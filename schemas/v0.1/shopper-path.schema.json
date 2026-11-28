@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/shopper-path.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/shopper-path.schema.json",
   "title": "OISS v0.1 ShopperPath data",
   "description": "One anonymous shopper path on the floor plan. subject is the path id, which rotates and never encodes identity. Off by default.",
   "type": "object",

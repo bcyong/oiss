@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.2/schemas/v0.2/task.schema.json",
+  "title": "OISS v0.2 Task data",
+  "description": "Store task management: a recommended or assigned action and where it stands. subject is the task id; each status change is a new record with the same subject.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "defs.schema.json#/$defs/common"
+    }
+  ],
+  "properties": {
+    "kind": {
+      "$ref": "vocab.schema.json#/$defs/taskKind"
+    },
+    "state": {
+      "$ref": "vocab.schema.json#/$defs/taskState"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The associate, agent or system that raised it."
+    },
+    "assignedTo": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The associate or team the task is assigned to."
+    },
+    "due": {
+      "$ref": "defs.schema.json#/$defs/timestamp"
+    },
+    "basedOn": {
+      "$ref": "defs.schema.json#/$defs/recordRefs",
+      "description": "Records that led to the task."
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "verifiedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CloudEvents id of the record that showed the fix."
+        }
+      },
+      "required": [
+        "required"
+      ],
+      "additionalProperties": false
+    },
+    "resolution": {
+      "type": "object",
+      "description": "How the task ended: why it was cancelled, or what a review found. Optional; the source's own records, such as an Incident, keep what the source sent.",
+      "properties": {
+        "outcome": {
+          "$ref": "vocab.schema.json#/$defs/taskOutcome"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "resolvedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The associate, team or system that resolved it."
+        },
+        "resolvedAt": {
+          "$ref": "defs.schema.json#/$defs/timestamp"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "kind",
+    "state",
+    "title",
+    "createdBy",
+    "location"
+  ],
+  "if": {
+    "properties": {
+      "state": {
+        "const": "verified"
+      }
+    },
+    "required": [
+      "state"
+    ]
+  },
+  "then": {
+    "properties": {
+      "verification": {
+        "required": [
+          "required",
+          "verifiedBy"
+        ]
+      }
+    },
+    "required": [
+      "verification"
+    ]
+  },
+  "unevaluatedProperties": false
+}

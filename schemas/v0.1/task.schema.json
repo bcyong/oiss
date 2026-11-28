@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bcyong/oiss/main/schemas/v0.1/task.schema.json",
+  "$id": "https://raw.githubusercontent.com/bcyong/oiss/v0.1/schemas/v0.1/task.schema.json",
   "title": "OISS v0.1 Task data",
   "description": "Store task management: a recommended or assigned action and where it stands. subject is the task id; each status change is a new record with the same subject.",
   "type": "object",
