@@ -820,7 +820,7 @@ function stockForecast(day: IndexedDay, t: number, args: ToolArgs, run: Forecast
   if (!run) return { error: "The stock forecast isn't available right now." };
   if (run.state !== "ready") return { error: run.state === "not_enough" ? run.reason : `The stock forecast couldn't run: ${run.reason}` };
   const n = int(args.limit, 10);
-  const dept = str(args.department).toLowerCase().replaceAll(" ", "_").replace("&", "and");
+  const dept = str(args.department).toLowerCase().replaceAll(" ", "_").replaceAll("&", "and");
   const { input, reply, meta } = run;
   const traffic = trafficByZone(day, t);
   const scored = input.predict
