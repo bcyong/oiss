@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { runDay } from "@oiss/sim";
 import { startTools } from "../src/assistant/agents.ts";
@@ -148,4 +149,13 @@ test("the availability agent starts a run-out question from the forecast, cites 
   assert.equal(early.state, "not_enough");
   assert.match((runTool(day, T, "availability", "stock_forecast", {}, {}) as { error: string }).error, /isn't available/);
   assert.match((runTool(day, T, "availability", "stock_forecast", {}, { forecast: { state: "error", reason: "The forecast model is busy." } }) as { error: string }).error, /couldn't run: The forecast model is busy/);
+});
+
+test("the forecast function's code imports nothing from the page's day index", () => {
+  // Netlify bundles the function from these files; the workspace packages behind the day index don't load there.
+  const imports = (f: string) => [...readFileSync(new URL(`../src/assistant/${f}`, import.meta.url), "utf8").matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]);
+  assert.deepEqual(imports("forecastRows.ts"), []);
+  assert.deepEqual(imports("forecastProxy.ts"), ["./forecastRows.ts", "./proxy.ts"]);
+  assert.deepEqual(imports("proxy.ts"), ["./agents.ts"]);
+  assert.deepEqual(imports("agents.ts"), []);
 });

@@ -1,4 +1,4 @@
-import { FEATURES, LIMITS, type ContextRow, type ForecastInput, type ForecastReply, type PredictRow } from "./forecast.ts";
+import { FEATURES, LIMITS, type ContextRow, type ForecastInput, type ForecastReply, type PredictRow } from "./forecastRows.ts";
 import { rateLimited } from "./proxy.ts";
 
 /**
