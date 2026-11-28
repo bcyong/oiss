@@ -2,6 +2,12 @@
 
 Bryan Yong · November 2026
 
+The store-intelligence systems retailers need already exist, but they aren't compatible out of the box.
+
+![One shared record replaces an integration per vendor](today-vs-oiss.svg)
+
+Vendors keep their own systems either way. OISS changes how their data is described, so any tool or AI agent can read all of it without custom work.
+
 ## Status of this document
 
 | Item | Detail |
@@ -11,13 +17,13 @@ Bryan Yong · November 2026
 | Decision | The OISS editors revise the proposal after the comment period, then hand it to a neutral steward (section 9) |
 | Related | The OISS specification, which holds the technical detail |
 
-This RFC proposes an open industry standard and asks retail and consumer goods (CPG) leaders, store-intelligence vendors and standards bodies one question: here is the direction, what are we missing? It is not yet the standard of any organization.
+This draft is for retail and consumer goods (CPG) leaders, store-intelligence vendors, and standards bodies to test against the stores and systems they run. What they find missing shapes OISS before any organization adopts it as a standard.
 
 ## Summary
 
 Retailers now buy store intelligence from several vendors at once: shelf-scanning robots, shelf cameras, electronic shelf labels, and front-end and loss-prevention analytics. Each vendor reports what it sees in its own format, so retailers pay to stitch the data together, store teams work from several task lists, and no analytics tool or AI agent can read across vendors without a custom integration. No open standard covers this layer today.
 
-This RFC proposes the Open Intelligent Store Specification (OISS): an open, vendor-neutral format for what store-intelligence systems observe and the work they create, built on standards the industry already uses. It comes with a reference blueprint that shows AI agents acting on OISS data to fix empty shelves, wrong prices and long queues.
+This RFC proposes the Open Intelligent Store Specification (OISS): an open, vendor-neutral format for what store-intelligence systems observe and the work they create, built on standards the industry already uses. It comes with a reference blueprint that shows AI agents acting on OISS data to fix empty shelves, wrong prices, and long checkout lines.
 
 The questions for readers are whether the problem matches their experience, whether the proposed scope is right, and who should steward the standard.
 
@@ -25,20 +31,20 @@ The questions for readers are whether the problem matches their experience, whet
 
 Store intelligence is now bought from several vendors, but the data they produce can't be combined without custom work. A typical grocer might run:
 
-- **Shelf scanning:** robots or fixed cameras that check on-shelf availability, planogram compliance and price accuracy.
+- **Shelf scanning:** robots or fixed cameras that check on-shelf availability, planogram compliance, and price accuracy.
 - **Shelf-edge systems:** electronic shelf labels and the platform that manages them.
-- **Front-end and loss prevention:** analytics that watch queues, self-checkout exceptions and shrink.
-- **In-house systems:** the item master, perpetual inventory, replenishment and associate task management.
+- **Front-end and loss prevention:** analytics that watch checkout lines, self-checkout exceptions, and shrink.
+- **In-house systems:** the item master, perpetual inventory, replenishment, and associate task management.
 
-Each vendor ships its own API, dashboard and field names. The same empty facing can arrive as three different records with three different product codes, locations and confidence scores. To use them together, the retailer's IT team, or a systems integrator it pays, builds and maintains a custom integration layer, one vendor at a time.
+Each vendor ships its own API, dashboard, and field names. The same empty facing can arrive as three different records with three different product codes, locations, and confidence scores. To use them together, the retailer's IT team, or a systems integrator it pays, builds and maintains a custom integration layer, one vendor at a time.
 
 The integration layer is only part of the cost:
 
 1. **Integration cost and lock-in:** every new vendor, and every change of vendor, means new integration work. Retailers end up locked in, slow to add or switch vendors even when a better one appears.
-2. **Store execution:** associates receive tasks from several systems that don't know about each other, and no one has a single view of on-shelf availability, price accuracy or shrink for a store.
+2. **Store execution:** associates receive tasks from several systems that don't know about each other, and no one has a single view of on-shelf availability, price accuracy, or shrink for a store.
 3. **Blocked automation:** analytics and AI agents can only act on data they can read, so each agent built on store data has to repeat the integration work before it can do anything.
 
-CPG brands feel the same gap from the other side. On-shelf availability, planogram compliance and promotion execution at retail are their numbers too, but each retailer and each vendor reports them differently, if at all.
+CPG brands feel the same gap from the other side. On-shelf availability, planogram compliance, and promotion execution at retail are their numbers too, but each retailer and each vendor reports them differently, if at all.
 
 ## 2. What exists today, and why it falls short
 
@@ -47,12 +53,12 @@ Open standards already cover the layers below store intelligence, but none cover
 | Standard | What it does, in plain terms | What it leaves out |
 | --- | --- | --- |
 | [GS1 identifiers](https://www.gs1.org/standards-overview) | Give every product (GTIN, the number behind the UPC or EAN barcode) and every location (GLN) a global ID | What is happening on the shelf right now |
-| [GS1 EPCIS and CBV](https://www.gs1.org/epcis) | Record supply-chain events (what, when, where, why), such as an item stocked or received; version 2.0 from June 2022 | Shelf facings, price-label checks, queues, store tasks and video evidence |
-| [ONVIF Profile M](https://www.onvif.org/profiles/profile-m/) | Lets security cameras report people, vehicles and object counts in a common format | Anything about shelves, products or store operations |
-| [OMG retail standards](https://www.omg.org/spec/category/retail/) (formerly ARTS at NRF) | Cover POS devices, digital receipts and a 2019 video-analytics schema | Shelves, inventory and store tasks; no sign the video schema was adopted |
+| [GS1 EPCIS and CBV](https://www.gs1.org/epcis) | Record supply-chain events (what, when, where, why), such as an item stocked or received; version 2.0 from June 2022 | Shelf facings, price-label checks, checkout lines, store tasks, and video evidence |
+| [ONVIF Profile M](https://www.onvif.org/profiles/profile-m/) | Lets security cameras report people, vehicles, and object counts in a common format | Anything about shelves, products, or store operations |
+| [OMG retail standards](https://www.omg.org/spec/category/retail/) (formerly ARTS at NRF) | Cover POS devices, digital receipts, and a 2019 video-analytics schema | Shelves, inventory, and store tasks; no sign the video schema was adopted |
 | [Bluetooth ESL](https://www.bluetooth.com/blog/bluetooth-esl-the-global-standard-for-the-electronic-shelf-label-market/) | Standardizes the radio link between access points and electronic shelf labels | The price data and compliance checks behind the label |
 | [CloudEvents](https://www.cncf.io/announcements/2024/01/25/cloud-native-computing-foundation-announces-the-graduation-of-cloudevents/) | A common envelope for event data across cloud systems | Anything retail |
-| [Universal Commerce Protocol](https://www.shopify.com/ucp) | Lets AI agents shop online: discovery, checkout and orders | Physical store operations |
+| [Universal Commerce Protocol](https://www.shopify.com/ucp) | Lets AI agents shop online: discovery, checkout, and orders | Physical store operations |
 
 Retail-specific efforts have not filled the gap either. The [Open Retail Reference Architecture](https://lf-edgexfoundry.atlassian.net/wiki/spaces/FA/pages/11675186/Open+Retail+Reference+Architecture), an edge platform effort by several large technology companies, defined no data model and has held no regular meetings since January 2023. A major cloud provider's [common data model for store operations](https://learn.microsoft.com/en-us/common-data-model/schema/core/industrycommon/retail/storeoperationsassistcommon/overview) defines store task entities but no shelf or sensor data. GS1 has no global planogram standard; GS1 Canada and GS1 Sweden run national services that supply product images and dimensions to space-planning tools.
 
@@ -81,23 +87,23 @@ Each vendor keeps its own system. A small adapter turns its feed into OISS recor
 
 ### One map of the store
 
-Every record points to a place in a single store model: store, department or zone, fixture (an aisle, endcap or case), shelf and facing. These are the terms planogram and space-planning teams already use. Products are identified by GTIN and locations by GLN, the GS1 identifiers that retailers and suppliers already exchange.
+Every record points to a place in a single store model: store, department or zone, fixture (an aisle, endcap, or case), shelf, and facing. These are the terms planogram and space-planning teams already use. Products are identified by GTIN and locations by GLN, the GS1 identifiers that retailers and suppliers already exchange.
 
 ### Seven kinds of record
 
 | Record | What it says | Typical source |
 | --- | --- | --- |
-| Store layout | The fixtures, shelves and planned facings in each zone | Space planning and planogram systems |
+| Store layout | The fixtures, shelves, and planned facings in each zone | Space planning and planogram systems |
 | Shelf observation | What was seen at a facing: in stock, out of stock, wrong price, misplaced product | Shelf-scanning robots, fixed cameras, electronic shelf labels |
-| Zone metric | A measure for an area over time, such as queue length, traffic or dwell | Front-end and traffic analytics |
+| Zone metric | A measure for an area over time, such as queue length, traffic, or dwell | Front-end and traffic analytics |
 | Shopper path | Anonymous movement through the store, with no identity attached | Camera or sensor analytics |
 | Incident | Something that needs attention, such as a suspected loss event or a missed scan at checkout | Loss-prevention and checkout vision |
-| Evidence | The image, clip or reading behind an observation or incident, with its retention rule | Any vision vendor |
+| Evidence | The image, clip, or reading behind an observation or incident, with its retention rule | Any vision vendor |
 | Task | Work assigned to associates to fix an issue, and its outcome | Task management systems and AI agents |
 
 ### Adapters
 
-A vendor, the retailer or the community can write the adapter for a feed, and once written it serves every retailer that uses that vendor. Where an existing standard already fits, OISS uses it: shelf observations map to GS1 EPCIS events, camera metadata follows ONVIF, and records travel in the CloudEvents envelope.
+A vendor, the retailer, or the community can write the adapter for a feed, and once written it serves every retailer that uses that vendor. Where an existing standard already fits, OISS uses it: shelf observations map to GS1 EPCIS events, camera metadata follows ONVIF, and records travel in the CloudEvents envelope.
 
 ### Room to grow without breaking stores
 
@@ -111,22 +117,22 @@ A standard that stores depend on has to change without forcing every vendor to u
 
 ### A blueprint for agents
 
-OISS includes a reference design for a Store Operations Assistant: a set of AI agents, each focused on one area of store operations, that read OISS records through MCP and raise tasks.
+OISS includes a reference design for a Store Operations Assistant: a set of AI agents, each focused on one area of store operations, that read OISS records through MCP and propose tasks, which a manager approves before they reach the store.
 
 - **Availability:** finds out-of-stocks and gaps and sends replenishment tasks.
 - **Price and label:** catches mismatches between shelf labels and the price file.
-- **Front-end:** watches queues and suggests when to open more registers.
+- **Front-end:** watches checkout lines and suggests when to open more registers.
 - **Loss prevention:** groups related incidents and their evidence for review.
-- **Store insights:** answers a manager's questions across all sources.
+- **Store insights:** answers a manager's questions across all sources, flags where two sources disagree about the same shelf, and compares the store with others in its district.
 
 The agents read OISS records and never process raw video. Each answer and task cites the records behind it, so a manager can check it before acting.
 
-An early reference demonstration, a simulated grocery store fed by three representative vendors, is at [open-intelligent-store.netlify.app](https://open-intelligent-store.netlify.app/). The OISS specification holds the technical detail.
+An early reference demonstration is at [open-intelligent-store.netlify.app](https://open-intelligent-store.netlify.app/): a simulated grocery store fed by four representative vendors and the retailer's own systems, with three more stores in its district for comparison. The OISS specification holds the technical detail.
 
 ### What OISS does not do
 
 - It does not change how any vendor detects or measures; it only describes the results.
-- It does not require a particular camera, robot, cloud or agent platform.
+- It does not require a particular camera, robot, cloud, or agent platform.
 - It does not set store policy, such as replenishment rules or staffing levels; those stay with each retailer.
 - It does not move data anywhere the retailer has not chosen to send it.
 
@@ -135,14 +141,14 @@ An early reference demonstration, a simulated grocery store fed by three represe
 ### For retailers
 
 - **Lower integration cost:** each vendor connects once to a shared format instead of to every other system in the store.
-- **Freedom to choose vendors:** a vendor can be added, replaced or run side by side with another without rebuilding integrations.
-- **One view of the shelf:** findings from robots, cameras and shelf labels about the same facing come together. Where sources disagree, the disagreement shows up in one place instead of in separate dashboards.
+- **Freedom to choose vendors:** a vendor can be added, replaced, or run side by side with another without rebuilding integrations.
+- **One view of the shelf:** findings from robots, cameras, and shelf labels about the same facing come together. Where sources disagree, the disagreement shows up in one place instead of in separate dashboards.
 - **Agents that work across vendors:** one assistant can act on every source, and each answer and task traces back to the records behind it.
 - **Faster store execution:** issues become tasks for associates and their outcomes are recorded, so the retailer can measure time to fix as well as time to detect.
 
 ### For CPG brands
 
-- **Comparable data across retail partners:** on-shelf availability, price accuracy and placement are described in the same terms and keyed to the same GTINs, where retailers choose to share them.
+- **Comparable data across retail partners:** on-shelf availability, price accuracy, and placement are described in the same terms and keyed to the same GTINs, where retailers choose to share them.
 - **Better retail execution and promotion compliance:** brands and retailers can agree on what a gap or a missed promotion means and act on the same facts.
 
 ### For technology vendors
@@ -164,7 +170,7 @@ OISS is designed to be adopted in steps, alongside the systems a retailer alread
 
 What each party does:
 
-- **Retailers:** map their store layout into the model, pick a first use case and ask vendors for OISS output.
+- **Retailers:** map their store layout into the model, pick a first use case, and ask vendors for OISS output.
 - **Vendors:** publish or support an adapter for their feed.
 - **CPG brands:** agree with retail partners on which records to share and on shared definitions.
 
@@ -180,18 +186,18 @@ What each party does:
 
 ## 8. Privacy, security and responsible use
 
-Store intelligence involves cameras, shoppers and associates, so OISS builds privacy and security into the format itself. It proposes these principles:
+Store intelligence involves cameras, shoppers, and associates, so OISS builds privacy and security into the format itself. It proposes these principles:
 
-- **No identity by default:** records describe shelves, zones and events, and identify no one. Shopper paths are anonymous and carry no face, name or loyalty ID.
+- **No identity by default:** records describe shelves, zones, and events, and identify no one. Shopper paths are anonymous and carry no face, name, or loyalty ID.
 - **Evidence under control:** images and clips stay with the retailer or its vendor. Records point to them without copying them, and carry their retention period and access rules.
 - **People decide:** agents can flag a suspected loss event and gather its evidence, but a person reviews it before anyone is approached or accused.
 - **Associates are not scored by stealth:** task records measure how quickly store issues are fixed. They are not a way to score individual associates without their knowledge.
-- **The retailer controls sharing:** nothing flows to a vendor, a brand or an agent platform unless the retailer chooses to share it.
+- **The retailer controls sharing:** nothing flows to a vendor, a brand, or an agent platform unless the retailer chooses to share it.
 - **Security and provenance:** every record names its source and time, so systems can authenticate feeds and agents can show where each fact came from.
 
 Local law, such as privacy and biometric rules, still governs each deployment. OISS is meant to make compliance with it easier to show.
 
-## 9. Governance, license and open questions
+## 9. Governance, license, and open questions
 
 The plan is for a neutral industry body to govern OISS.
 
@@ -201,14 +207,14 @@ The plan is for a neutral industry body to govern OISS.
 ### Open questions
 
 1. Which organization should steward OISS, and on what timeline?
-2. Which first use cases matter most to retailers and brands: availability, price accuracy, front-end service or loss prevention?
+2. Which first use cases matter most to retailers and brands: availability, price accuracy, front-end service, or loss prevention?
 3. How much of a store's layout should be shared with vendors, and how should it be protected?
 4. Should shelf observations travel as native EPCIS events, or as OISS records with a published EPCIS mapping?
 5. How should conformance be tested and recognized, so retailers can trust a vendor's claim of OISS support?
 
 ### Request for comment
 
-Comments are welcome from retailers, CPG brands, technology vendors and standards bodies, and from beyond technology teams: store operations, merchandising, loss prevention, and privacy and legal. The most useful comments name a real use case, a gap in the record types, or an existing standard OISS should adopt.
+Comments are welcome from retailers, CPG brands, technology vendors, and standards bodies, and from beyond technology teams: store operations, merchandising, loss prevention, and privacy and legal. The most useful comments name a real use case, a gap in the record types, or an existing standard OISS should adopt.
 
 - **How to comment:** open an issue in the [OISS repository on GitHub](https://github.com/bcyong/oiss/issues).
 - **When:** the comment period is open until January 15, 2027.
@@ -227,14 +233,14 @@ Comments are welcome from retailers, CPG brands, technology vendors and standard
 | Term | Plain meaning |
 | --- | --- |
 | Adapter | A small piece of software that translates one vendor's output into OISS records |
-| AI agent | Software that reads data, reasons about it and takes or proposes an action, such as raising a task |
+| AI agent | Software that reads data, reasons about it, and takes or proposes an action, such as raising a task |
 | CBV | Core Business Vocabulary: GS1's standard list of business steps and product states used with EPCIS |
 | CloudEvents | An open, vendor-neutral envelope for describing an event that one system sends to another, stewarded by the Cloud Native Computing Foundation |
 | CPG | Consumer packaged goods: the brands and manufacturers whose products retailers sell |
-| EPCIS | Electronic Product Code Information Services: GS1's standard for recording what happened to a product, where and when |
+| EPCIS | Electronic Product Code Information Services: GS1's standard for recording what happened to a product, where, and when |
 | ESL | Electronic shelf label: a digital price label on the shelf edge |
 | Facing | One product position on a shelf, as planned in the planogram |
-| Fixture | A unit of store furniture that holds product, such as a gondola, endcap or case |
+| Fixture | A unit of store furniture that holds product, such as a gondola, endcap, or case |
 | GLN | Global Location Number: GS1's identifier for a place, such as a store or a location within it |
 | GTIN | Global Trade Item Number: the GS1 product number behind a barcode |
 | MCP | Model Context Protocol: an open way for AI agents to connect to business systems and data |

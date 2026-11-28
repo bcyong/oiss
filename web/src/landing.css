@@ -470,6 +470,12 @@ td:first-child {
   background: none;
   padding: 0;
 }
+/* The RFC opens on its one-sentence hook, set larger than the body text. */
+.doc > p:first-child {
+  font-size: 1.25em;
+  line-height: 1.45;
+  color: var(--text);
+}
 .rfc-figure {
   margin: 16px 0 8px;
 }
@@ -488,6 +494,9 @@ td:first-child {
 }
 .rfc-figure .oiss-fig-head {
   fill: #8a8a8a;
+}
+.rfc-figure .oiss-fig-rule {
+  stroke: var(--line);
 }
 @media (max-width: 700px) {
   .hero-plain h1 {

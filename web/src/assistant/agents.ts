@@ -7,7 +7,7 @@
 
 export type AgentId = "availability" | "price_and_label" | "front_end" | "loss_prevention" | "store_insights";
 
-export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record" | "vendor_disagreements" | "compare_stores" | "propose_task";
+export type ToolName = "store_summary" | "shelf_gaps" | "find_item" | "store_tasks" | "shelf_tag_issues" | "front_end_status" | "zone_traffic" | "checkout_incidents" | "get_record" | "vendor_disagreements" | "compare_stores" | "stock_forecast" | "propose_task";
 
 export interface ToolSpec {
   name: ToolName;
@@ -126,6 +126,16 @@ export const TOOLS: Record<ToolName, ToolSpec> = {
       "This store against the other stores in its district at the same time of day: on-shelf availability, out-of-stock and low-stock facings, open replenishment tasks, replenishments cancelled for no backroom stock, shelf tasks confirmed, shelf tags wrong on the shelf, shoppers through checkout so far, checkout waits and open lanes, checkout exceptions and how many aren't reviewed, and facings where two vendors still disagree. Ranks this store on each, with the best and worst store and the district average.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
+  stock_forecast: {
+    name: "stock_forecast",
+    description:
+      "A forecast from NVIDIA Kumo Relational of which facings that aren't out of stock now are likely to be out of stock when the shelf-scanning robot next passes, most likely first. It learns from today's earlier robot passes: where each facing stood then and whether the next pass found it out of stock. Each row has the item, location, the chance, its status and fill level now, the record of its latest shelf read, its zone's traffic and any open replenishment task. Counts cover every facing scored, not only the rows shown. Early in the day it says there isn't enough history yet.",
+    parameters: {
+      type: "object",
+      properties: { department: { type: "string", description: "Only this department, such as dairy or produce." }, limit },
+      additionalProperties: false,
+    },
+  },
   get_record: {
     name: "get_record",
     description: "One OISS record by id, as it arrived, for details the other tools leave out. Restricted records (shopper paths, evidence) show only their envelope.",
@@ -137,10 +147,13 @@ export const AGENTS: Record<AgentId, AgentSpec> = {
   availability: {
     id: "availability",
     name: "Availability agent",
-    handles: "Out-of-stocks, low stock, empty shelves, replenishment priorities, go-backs and misplaced items, phantom inventory, store tasks and whether shelf work got done.",
-    role: "You prioritize replenishment by likely lost sales and follow store tasks until a later shelf observation shows the fix.",
-    tools: ["store_summary", "shelf_gaps", "find_item", "store_tasks", "zone_traffic", "get_record", "propose_task"],
+    handles: "Out-of-stocks, low stock, empty shelves, which shelves will run out next (the stock forecast), replenishment priorities, go-backs and misplaced items, phantom inventory, store tasks and whether shelf work got done.",
+    role: "You prioritize replenishment by likely lost sales, get ahead of shelves likely to run out before the robot's next pass, and follow store tasks until a later shelf observation shows the fix.",
+    tools: ["store_summary", "shelf_gaps", "stock_forecast", "find_item", "store_tasks", "zone_traffic", "get_record", "propose_task"],
     start: [{ name: "store_summary", args: {} }, { name: "shelf_gaps", args: { status: "out_of_stock", limit: 10 } }],
+    startWhen: [{ pattern: /\b(run(ning)? out|forecast\w*|predict\w*|likely|next pass|next hour|before (they|it) (empty|runs?)|get ahead|soon)\b/i, start: [{ name: "store_summary", args: {} }, { name: "stock_forecast", args: { limit: 10 } }] }],
+    rules:
+      "stock_forecast's chances are a forecast, not a shelf read: say a facing is likely to run out, never that it is out of stock, give the chance as the tool gives it, and cite the facing's latest shelf read record. When the forecast says there isn't enough history yet, say so and answer from the shelf reads.",
   },
   price_and_label: {
     id: "price_and_label",
@@ -233,7 +246,7 @@ export function parseRoute(reply: string, question: string): AgentId {
 /** Questions a visitor can tap. */
 export const SAMPLE_QUESTIONS = [
   "What should the grocery team replenish first right now?",
-  "Which low-stock items should we fill before they run out?",
+  "Which shelves are likely to run out before the robot's next pass?",
   "Are any shelf tags showing the wrong price?",
   "Do we need another lane open at the front end?",
   "Which checkout exceptions need review?",
