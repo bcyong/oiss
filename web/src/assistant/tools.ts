@@ -855,7 +855,12 @@ function stockForecast(day: IndexedDay, t: number, args: ToolArgs, run: Forecast
     };
   });
   const hours = meta.passEvery !== undefined ? Math.round((meta.passEvery / 3600) * 10) / 10 : undefined;
-  const when = meta.nextPass !== undefined && hours !== undefined ? ` (it has passed every ${hours === 1 ? "hour" : `${hours} hours`} today, so about ${clock(meta.nextPass)})` : "";
+  const every = hours === 1 ? "hour" : `${hours} hours`;
+  const when = meta.nextPass === undefined || hours === undefined ? "" : meta.passUnderway ? ` (it has passed every ${every} today, and the pass that started about ${clock(meta.nextPass)} is likely under way now)` : ` (it has passed every ${every} today, so about ${clock(meta.nextPass)})`;
+  // The likely facings past the ones listed, so a count or range of them comes from here.
+  const unlisted = inDept.slice(facings.length).filter((r) => r.p >= 0.5);
+  const lo = unlisted.at(-1)?.p;
+  const hi = unlisted[0]?.p;
   const top = facings[0];
   const answer = [
     `NVIDIA Kumo Relational scored ${plural(inDept.length, "facing", "facings")} that aren't out of stock${dept ? ` in ${dept.replaceAll("_", " ")}` : ""} for the chance the robot's next pass${when} finds them out of stock.`,
@@ -866,12 +871,13 @@ function stockForecast(day: IndexedDay, t: number, args: ToolArgs, run: Forecast
   return {
     answer,
     forecastBy: "NVIDIA Kumo Relational",
-    nextRobotPass: meta.nextPass !== undefined ? `about ${clock(meta.nextPass)}, if the robot keeps today's schedule` : undefined,
+    nextRobotPass: meta.nextPass === undefined ? undefined : meta.passUnderway ? `likely under way now: by today's schedule it started about ${clock(meta.nextPass)}` : `about ${clock(meta.nextPass)}, if the robot keeps today's schedule`,
     learnedFrom: `${plural(meta.passes, "earlier robot pass", "earlier robot passes")} today: ${meta.labeled} facing reads with a known outcome, of which ${meta.ranOut} found the facing out of stock at the next pass.`,
     scored: inDept.length,
     likely,
     possible,
     facings,
+    likelyNotListed: unlisted.length && lo !== undefined && hi !== undefined ? `${plural(unlisted.length, "more facing", "more facings")} likely to run out, not listed: ${lo === hi ? pct(lo) : `${pct(lo)} to ${pct(hi)}`} chance` : undefined,
     note: "chanceOutOfStockAtNextPass is the forecast model's chance, learned from today's earlier robot passes; it is a forecast, not a shelf read, so say a facing is likely to run out, never that it is out of stock. Cite each facing's record, its latest shelf read, for where it stands now. Only a low-stock facing with no open task can be proposed for replenishment; for an in-stock facing, say it is one to watch. openReplenishmentTask is a replenishment task already open on the facing; routedTo is the team the store routes replenishment to when none is open.",
   };
 }

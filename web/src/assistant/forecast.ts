@@ -31,6 +31,8 @@ export interface ForecastMeta {
   /** When the robot would pass next if it keeps its schedule so far, in seconds since midnight, and how often it has passed. */
   nextPass?: number;
   passEvery?: number;
+  /** True when, by that schedule, the robot's next pass is already under way. */
+  passUnderway?: boolean;
   /** For each predict row, the facing's latest shelf read record. */
   records: string[];
 }
@@ -102,15 +104,21 @@ function featuresAt(day: IndexedDay, v: FacingView, robot: number[], t: number):
   };
 }
 
-/** When the robot will likely pass next, from the starts of its passes so far. */
-function nextPassAfter(day: IndexedDay, t: number): { at: number; every: number } | undefined {
-  const starts = day.robot.runs.filter((r) => r.end <= t).map((r) => r.start);
-  if (starts.length < 2) return undefined;
-  const gaps = starts.slice(1).map((s, i) => s - starts[i]!).sort((a, b) => a - b);
-  const gap = gaps[Math.floor(gaps.length / 2)]!;
-  let next = starts.at(-1)! + gap;
-  while (next <= t) next += gap;
-  return next < day.close ? { at: next, every: gap } : undefined;
+const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+
+/**
+ * When the robot will likely pass next, from its finished passes so far: their usual gap and length.
+ * A pass that by that schedule started before t and hasn't had time to finish counts as under way.
+ */
+function nextPassAfter(day: IndexedDay, t: number): { at: number; every: number; underway: boolean } | undefined {
+  const done = day.robot.runs.filter((r) => r.end <= t);
+  if (done.length < 2) return undefined;
+  const gap = median(done.slice(1).map((r, i) => r.start - done[i]!.start));
+  const length = median(done.map((r) => r.end - r.start));
+  let next = done.at(-1)!.start + gap;
+  while (next + length <= t) next += gap;
+  if (next <= t) return { at: next, every: gap, underway: true };
+  return next < day.close ? { at: next, every: gap, underway: false } : undefined;
 }
 
 /**
@@ -155,10 +163,11 @@ export function forecastInput(day: IndexedDay, t: number): { input: ForecastInpu
   negatives.sort((a, b) => a.key - b.key);
   const context = [...positives, ...negatives.slice(0, Math.max(0, LIMITS.maxContext - positives.length)).map((n) => n.row)].slice(0, LIMITS.maxContext);
   // Score the facings closest to empty first when there are more than a request holds.
+  const next = nextPassAfter(day, t);
   const order = predict.map((_, i) => i).sort((a, b) => (predict[a]![1] as number) - (predict[b]![1] as number)).slice(0, LIMITS.maxPredict);
   return {
     input: { anchor: isoAt(day, t), context, predict: order.map((i) => predict[i]!) },
-    meta: { labeled, ranOut: positives.length, passes: passesUsed.size, nextPass: nextPassAfter(day, t)?.at, passEvery: nextPassAfter(day, t)?.every, records: order.map((i) => records[i]!) },
+    meta: { labeled, ranOut: positives.length, passes: passesUsed.size, nextPass: next?.at, passEvery: next?.every, passUnderway: next?.underway, records: order.map((i) => records[i]!) },
   };
 }
 

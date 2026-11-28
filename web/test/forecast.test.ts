@@ -42,7 +42,7 @@ test("the forecast's rows come only from records up to the time asked about", ()
   assert.ok(!("reason" in early));
   const full = built(T);
   assert.deepEqual(early.input, full.input);
-  assert.deepEqual({ ...early.meta, nextPass: 0, passEvery: 0 }, { ...full.meta, nextPass: 0, passEvery: 0 }, "only the next-pass estimate, which needs the closing time, may differ");
+  assert.deepEqual({ ...early.meta, nextPass: 0, passEvery: 0, passUnderway: false }, { ...full.meta, nextPass: 0, passEvery: 0, passUnderway: false }, "only the next-pass estimate, which needs the closing time, may differ");
 });
 
 test("labeled rows say what the robot's next read found, and every facing to score isn't out of stock now", () => {
@@ -158,4 +158,19 @@ test("the forecast function's code imports nothing from the page's day index", (
   assert.deepEqual(imports("forecastProxy.ts"), ["./forecastRows.ts", "./proxy.ts"]);
   assert.deepEqual(imports("proxy.ts"), ["./agents.ts"]);
   assert.deepEqual(imports("agents.ts"), []);
+});
+
+test("the next pass is the one under way when the robot has just started one", () => {
+  const at = (h: number) => (built(h * 3600) as { meta: { nextPass?: number; passUnderway?: boolean } }).meta;
+  assert.deepEqual([at(15).nextPass, at(15).passUnderway], [16 * 3600, false]);
+  assert.deepEqual([at(18).nextPass, at(18).passUnderway], [18 * 3600, true]);
+  assert.deepEqual([at(18.5).nextPass, at(18.5).passUnderway], [18 * 3600, true]);
+  assert.deepEqual([at(19).nextPass, at(19).passUnderway], [20 * 3600, false]);
+});
+
+test("likely facings past the ones listed are counted with their range, so the answer needn't guess", async () => {
+  const run = await runForecast(day, T, fakeForecaster);
+  const r = runTool(day, T, "availability", "stock_forecast", { limit: 3 }, { forecast: run }) as { likely: number; facings: unknown[]; likelyNotListed?: string };
+  assert.ok(r.likely > 3);
+  assert.match(r.likelyNotListed!, new RegExp(`^${r.likely - 3} more facings likely to run out, not listed: \\d+% to \\d+% chance$`));
 });
