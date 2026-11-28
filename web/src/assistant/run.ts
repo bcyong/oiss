@@ -1,6 +1,7 @@
 import { clock, type IndexedDay } from "../day.ts";
 import { AGENTS, LIMITS, parseRoute, startTools, TOOLS, type AgentId } from "./agents.ts";
 import type { ChatMessage, SafetyCheck, StepReply, StepRequest, ToolCall } from "./proxy.ts";
+import { runForecast, type Forecaster } from "./forecast.ts";
 import { idsIn, runTool, type PeerStore, type Proposal, type ToolArgs, type ToolContext } from "./tools.ts";
 
 /**
@@ -28,8 +29,8 @@ export interface Answer {
   /** Record ids the answer cites that the tools returned, and any it cites that they didn't. */
   cited: string[];
   unverified: string[];
-  /** The models that routed the question and wrote the answer. */
-  models: { router?: string; agent?: string };
+  /** The models that routed the question and wrote the answer, and the one that forecast stock if a tool used it. */
+  models: { router?: string; agent?: string; forecast?: string };
   /** What the content safety model found in the question and the answer. */
   safety: { question?: SafetyCheck; answer?: SafetyCheck };
   /** Tasks the agent proposed, each waiting for the store manager's approval on the page. */
@@ -48,6 +49,7 @@ export function modelName(id?: string): string | undefined {
     "nvidia/nemotron-3.5-lightning-30b-a3b": "Nemotron 3.5 Lightning",
     "nvidia/nemotron-3.5-content-safety": "Nemotron 3.5 Content Safety",
     "nvidia/llama-3.1-nemotron-safety-guard-8b-v3": "Nemotron Safety Guard 8B",
+    "nvidia/kumo-relational": "Kumo Relational",
   };
   return known[id] ?? id.replace(/^[^/]+\//, "");
 }
@@ -169,7 +171,7 @@ export function citations(text: string): string[] {
 /** Gets the other stores of the district, simulating them first if they aren't ready. */
 export type LoadPeers = () => Promise<PeerStore[]>;
 
-export async function ask(day: IndexedDay, t: number, question: string, step: Step, onProgress?: (note: string) => void, loadPeers?: LoadPeers): Promise<Answer> {
+export async function ask(day: IndexedDay, t: number, question: string, step: Step, onProgress?: (note: string) => void, loadPeers?: LoadPeers, forecaster?: Forecaster): Promise<Answer> {
   const q = question.trim().slice(0, LIMITS.maxQuestionChars);
   let calls = 0;
   let agent: AgentId;
@@ -200,6 +202,11 @@ export async function ask(day: IndexedDay, t: number, question: string, step: St
     if (name === "compare_stores" && !ctx.peers && loadPeers) {
       onProgress?.("Gathering the other stores' records");
       ctx.peers = await loadPeers().catch(() => undefined);
+    }
+    if (name === "stock_forecast" && !ctx.forecast) {
+      onProgress?.("Forecasting which shelves run out next");
+      ctx.forecast = forecaster ? await runForecast(day, t, forecaster) : { state: "error", reason: "The forecast isn't connected on this page." };
+      if (ctx.forecast.state === "ready") models.forecast = ctx.forecast.reply.model;
     }
     const result = runTool(day, t, agent, name, args, ctx);
     idsIn(result, seen);

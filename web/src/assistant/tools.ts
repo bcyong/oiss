@@ -3,6 +3,7 @@ import { assigneeName, checkoutName, INCIDENT_LABEL, INCIDENT_STATUS, money, obs
 import { OPEN_LANE_WAIT_SECONDS, routeTask } from "@oiss/sim";
 import type { AnyRecord, IncidentData, OissRecord, ShelfObservationData, TaskData } from "../oiss.ts";
 import { AGENTS, type AgentId, type ToolName } from "./agents.ts";
+import type { ForecastRun } from "./forecast.ts";
 
 /**
  * The assistant's tools. Each one reads the day's OISS records as they stood at time t, the demo's
@@ -804,6 +805,75 @@ function compareStores(day: IndexedDay, t: number, peers: PeerStore[] | undefine
 /** What some tools need beyond the day: the other stores of the district, for compare_stores. */
 export interface ToolContext {
   peers?: PeerStore[];
+  /** The stock forecast at the question's time, run once by the page before the tool reads it. */
+  forecast?: ForecastRun;
+}
+
+const pct = (p: number) => `${Math.round(p * 100)}%`;
+
+/**
+ * Facings likely to be out of stock at the robot's next pass, from NVIDIA Kumo Relational's forecast,
+ * most likely first. Each row names the facing's latest shelf read, which is the record to cite for
+ * where it stands now; the chance itself is a forecast, not a record.
+ */
+function stockForecast(day: IndexedDay, t: number, args: ToolArgs, run: ForecastRun | undefined): ToolResult {
+  if (!run) return { error: "The stock forecast isn't available right now." };
+  if (run.state !== "ready") return { error: run.state === "not_enough" ? run.reason : `The stock forecast couldn't run: ${run.reason}` };
+  const n = int(args.limit, 10);
+  const dept = str(args.department).toLowerCase().replaceAll(" ", "_").replace("&", "and");
+  const { input, reply, meta } = run;
+  const traffic = trafficByZone(day, t);
+  const scored = input.predict
+    .map((row, i) => ({ v: day.facings[row[0]]!, p: reply.probabilities[i], record: meta.records[i]! }))
+    .filter((r): r is { v: FacingView; p: number; record: string } => typeof r.p === "number");
+  const inDept = scored.filter(({ v }) => {
+    if (!dept) return true;
+    const d = day.items.get(v.facing.gtin)?.department ?? "";
+    return d === dept || d.includes(dept) || zoneName(day, v.zone).toLowerCase().includes(dept.replaceAll("_", " "));
+  });
+  inDept.sort((a, b) => b.p - a.p);
+  const likely = inDept.filter((r) => r.p >= 0.5).length;
+  const possible = inDept.filter((r) => r.p >= 0.25 && r.p < 0.5).length;
+  const facings = inDept.slice(0, n).map(({ v, p, record }) => {
+    const i = lastAtOrBefore(v.statusTimes, t);
+    const obs = v.statusObs[i]!;
+    const status = STATUS_LABEL[obs.data.status!];
+    const view = (day.tasksByFacing.get(v.facing.id) ?? []).filter((tv) => tv.versions[0]!.data.kind === "replenish" && tv.times[0]! <= t).at(-1);
+    const task = view && taskLine(day, view, t);
+    const open = task && view && OPEN_STATES.has(taskAt(view, t)!.data.state) ? taskRef(task) : undefined;
+    return {
+      ...itemOf(day, v),
+      ...where(day, v),
+      chanceOutOfStockAtNextPass: pct(p),
+      statusNow: status,
+      fillNow: obs.data.fillLevel !== undefined ? pct(obs.data.fillLevel) : undefined,
+      lastShelfRead: clock(v.statusTimes[i]!),
+      record,
+      zoneTrafficLast15Min: traffic.get(v.zone),
+      openReplenishmentTask: open,
+      routedTo: open ? undefined : routedTo("replenish", day.items.get(v.facing.gtin)?.department),
+    };
+  });
+  const hours = meta.passEvery !== undefined ? Math.round((meta.passEvery / 3600) * 10) / 10 : undefined;
+  const when = meta.nextPass !== undefined && hours !== undefined ? ` (it has passed every ${hours === 1 ? "hour" : `${hours} hours`} today, so about ${clock(meta.nextPass)})` : "";
+  const top = facings[0];
+  const answer = [
+    `NVIDIA Kumo Relational scored ${plural(inDept.length, "facing", "facings")} that aren't out of stock${dept ? ` in ${dept.replaceAll("_", " ")}` : ""} for the chance the robot's next pass${when} finds them out of stock.`,
+    likely ? `${plural(likely, "facing looks", "facings look")} likely to run out (50% or more).` : "None looks more likely than not to run out.",
+    possible ? `${plural(possible, "more facing has", "more facings have")} a 25% to 50% chance.` : undefined,
+    top ? `Most at risk: ${top.item}, ${top.chanceOutOfStockAtNextPass}.` : undefined,
+  ].filter(Boolean).join(" ");
+  return {
+    answer,
+    forecastBy: "NVIDIA Kumo Relational",
+    nextRobotPass: meta.nextPass !== undefined ? `about ${clock(meta.nextPass)}, if the robot keeps today's schedule` : undefined,
+    learnedFrom: `${plural(meta.passes, "earlier robot pass", "earlier robot passes")} today: ${meta.labeled} facing reads with a known outcome, of which ${meta.ranOut} found the facing out of stock at the next pass.`,
+    scored: inDept.length,
+    likely,
+    possible,
+    facings,
+    note: "chanceOutOfStockAtNextPass is the forecast model's chance, learned from today's earlier robot passes; it is a forecast, not a shelf read, so say a facing is likely to run out, never that it is out of stock. Cite each facing's record, its latest shelf read, for where it stands now. Only a low-stock facing with no open task can be proposed for replenishment; for an in-stock facing, say it is one to watch. openReplenishmentTask is a replenishment task already open on the facing; routedTo is the team the store routes replenishment to when none is open.",
+  };
 }
 
 const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs, ctx: ToolContext) => ToolResult> = {
@@ -818,6 +888,7 @@ const RUN: Record<ToolName, (day: IndexedDay, t: number, args: ToolArgs, ctx: To
   get_record: getRecord,
   vendor_disagreements: vendorDisagreements,
   compare_stores: (day, t, _args, ctx) => compareStores(day, t, ctx.peers),
+  stock_forecast: (day, t, args, ctx) => stockForecast(day, t, args, ctx.forecast),
   propose_task: () => ({}),
 };
 
